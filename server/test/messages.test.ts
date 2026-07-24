@@ -89,4 +89,24 @@ describe("messages", () => {
       headers: { cookie: memberCookie }, payload: { content: "hi" } });
     expect(res.statusCode).toBe(403);
   });
+
+  it("forbids a member from reading messages in a moderator-only channel", async () => {
+    const staff = await app.inject({ method: "POST", url: "/api/channels",
+      headers: { cookie: adminCookie }, payload: { name: "staff", type: "text", minRole: "moderator" } });
+    const staffId = staff.json().id;
+    const inv = await app.inject({ method: "POST", url: "/api/invites", headers: { cookie: adminCookie } });
+    const reg = await app.inject({ method: "POST", url: "/api/auth/register",
+      payload: { inviteToken: inv.json().token, username: "alice", password: "alicepass123" } });
+    const memberCookie = `sid=${reg.cookies.find((c) => c.name === "sid")!.value}`;
+    const res = await app.inject({ method: "GET", url: `/api/channels/${staffId}/messages`,
+      headers: { cookie: memberCookie } });
+    expect(res.statusCode).toBe(403);
+  });
+
+  it("404 on reading messages of a nonexistent channel", async () => {
+    const res = await app.inject({ method: "GET",
+      url: "/api/channels/00000000-0000-0000-0000-000000000000/messages",
+      headers: { cookie: adminCookie } });
+    expect(res.statusCode).toBe(404);
+  });
 });

@@ -113,4 +113,74 @@ describe("websocket", () => {
     wsA.close();
     await closed(wsA);
   });
+
+  it("broadcasts message.created to a connected client", async () => {
+    const cookie = await loginCookie("theo", "correct horse battery");
+
+    // Create the channel before opening the WS so we don't have to skip a
+    // channel.created event before the message.created we care about.
+    const ch = await app.inject({ method: "POST", url: "/api/channels",
+      headers: { cookie }, payload: { name: "général", type: "text" } });
+    const channelId = ch.json().id;
+
+    const ws = openWs(cookie);
+    await new Promise((r) => ws.once("open", r));
+    await nextMessage(ws); // presence.sync
+
+    const eventP = nextMessage(ws);
+    const res = await app.inject({ method: "POST", url: `/api/channels/${channelId}/messages`,
+      headers: { cookie }, payload: { content: "salut 👋" } });
+    expect(res.statusCode).toBe(201);
+
+    const event = await eventP;
+    expect(event.type).toBe("message.created");
+    expect(event.message).toMatchObject({
+      content: "salut 👋", channelId, username: "theo",
+    });
+
+    ws.close();
+    await closed(ws);
+  });
+
+  it("broadcasts channel.created to a connected client", async () => {
+    const cookie = await loginCookie("theo", "correct horse battery");
+    const ws = openWs(cookie);
+    await new Promise((r) => ws.once("open", r));
+    await nextMessage(ws); // presence.sync
+
+    const eventP = nextMessage(ws);
+    const res = await app.inject({ method: "POST", url: "/api/channels",
+      headers: { cookie }, payload: { name: "annonces", type: "text" } });
+    expect(res.statusCode).toBe(201);
+
+    const event = await eventP;
+    expect(event.type).toBe("channel.created");
+    expect(event.channel).toMatchObject({ name: "annonces", type: "text" });
+    expect(typeof event.channel.createdAt).toBe("string");
+
+    ws.close();
+    await closed(ws);
+  });
+
+  it("broadcasts channel.deleted to a connected client", async () => {
+    const cookie = await loginCookie("theo", "correct horse battery");
+    const ch = await app.inject({ method: "POST", url: "/api/channels",
+      headers: { cookie }, payload: { name: "temporaire", type: "text" } });
+    const channelId = ch.json().id;
+
+    const ws = openWs(cookie);
+    await new Promise((r) => ws.once("open", r));
+    await nextMessage(ws); // presence.sync
+
+    const eventP = nextMessage(ws);
+    const res = await app.inject({ method: "DELETE", url: `/api/channels/${channelId}`,
+      headers: { cookie } });
+    expect(res.statusCode).toBe(204);
+
+    const event = await eventP;
+    expect(event).toEqual({ type: "channel.deleted", channelId });
+
+    ws.close();
+    await closed(ws);
+  });
 });
