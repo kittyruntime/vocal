@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import type pg from "pg";
+import type { FastifyInstance } from "fastify";
 import { makeTestDb } from "./helpers/db.js";
 import { buildApp } from "../src/app.js";
 
@@ -9,7 +10,8 @@ afterAll(async () => { await pool.end(); });
 
 describe("health", () => {
   it("GET /api/health returns ok", async () => {
-    const app = await buildApp({ pool });
+    let app: FastifyInstance;
+    ({ app } = await buildApp({ pool }));
     const res = await app.inject({ method: "GET", url: "/api/health" });
     expect(res.statusCode).toBe(200);
     expect(res.json()).toEqual({ status: "ok" });
@@ -17,7 +19,8 @@ describe("health", () => {
   });
 
   it("unknown routes return the { error } shape with 404", async () => {
-    const app = await buildApp({ pool });
+    let app: FastifyInstance;
+    ({ app } = await buildApp({ pool }));
     const res = await app.inject({ method: "GET", url: "/api/nope" });
     expect(res.statusCode).toBe(404);
     expect(res.json()).toEqual({ error: "not found" });

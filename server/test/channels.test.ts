@@ -23,7 +23,7 @@ async function makeMember(username: string): Promise<string> {
   return `sid=${reg.cookies.find((c) => c.name === "sid")!.value}`;
 }
 
-beforeAll(async () => { pool = await makeTestDb(); app = await buildApp({ pool }); });
+beforeAll(async () => { pool = await makeTestDb(); ({ app } = await buildApp({ pool })); });
 afterAll(async () => { await app.close(); await pool.end(); });
 
 beforeEach(async () => {
