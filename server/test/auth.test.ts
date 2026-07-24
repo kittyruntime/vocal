@@ -10,7 +10,7 @@ let app: FastifyInstance;
 
 beforeAll(async () => {
   pool = await makeTestDb();
-  app = await buildApp({ pool });
+  ({ app } = await buildApp({ pool }));
 });
 afterAll(async () => { await app.close(); await pool.end(); });
 beforeEach(async () => {
