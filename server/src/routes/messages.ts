@@ -36,7 +36,7 @@ export function registerMessageRoutes(
     const message = await createMessage(pool, key, {
       channelId: params.data.id, userId: req.user!.id, content: body.data.content,
     });
-    hub.broadcast({ type: "message.created", message });
+    hub.broadcastToRole(minRole, { type: "message.created", message });
     return reply.code(201).send(message);
   });
 

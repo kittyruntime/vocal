@@ -162,6 +162,125 @@ describe("websocket", () => {
     await closed(ws);
   });
 
+  it("scopes message.created to the channel's min_role: member is excluded, moderator/admin are included", async () => {
+    const adminCookie = await loginCookie("theo", "correct horse battery");
+
+    const staff = await app.inject({ method: "POST", url: "/api/channels",
+      headers: { cookie: adminCookie }, payload: { name: "staff", type: "text", minRole: "moderator" } });
+    const staffId = staff.json().id;
+    const general = await app.inject({ method: "POST", url: "/api/channels",
+      headers: { cookie: adminCookie }, payload: { name: "général", type: "text" } });
+    const generalId = general.json().id;
+
+    // Use the session cookie register() already sets, rather than a second
+    // /api/auth/login call — /api/auth/login is rate-limited and the test
+    // suite's total call count is close to that limit. Role is looked up
+    // live per-request (not cached in the session), so promoting bob after
+    // registering still takes effect on his existing cookie.
+    const invA = await app.inject({ method: "POST", url: "/api/invites", headers: { cookie: adminCookie } });
+    const regA = await app.inject({ method: "POST", url: "/api/auth/register",
+      payload: { inviteToken: invA.json().token, username: "alice", password: "alicepass123" } });
+    const memberCookie = `sid=${regA.cookies.find((c) => c.name === "sid")!.value}`;
+
+    const invB = await app.inject({ method: "POST", url: "/api/invites", headers: { cookie: adminCookie } });
+    const regB = await app.inject({ method: "POST", url: "/api/auth/register",
+      payload: { inviteToken: invB.json().token, username: "bob", password: "bobpass1234" } });
+    await pool.query("UPDATE users SET role = 'moderator' WHERE username = $1", ["bob"]);
+    const modCookie = `sid=${regB.cookies.find((c) => c.name === "sid")!.value}`;
+
+    // Connect and drain presence.sync one socket at a time so any
+    // presence.online noise from a later connect has no listener to land on.
+    const wsAdmin = openWs(adminCookie);
+    await new Promise((r) => wsAdmin.once("open", r));
+    await nextMessage(wsAdmin); // presence.sync
+
+    const wsMod = openWs(modCookie);
+    await new Promise((r) => wsMod.once("open", r));
+    await nextMessage(wsMod); // presence.sync
+
+    const wsMember = openWs(memberCookie);
+    await new Promise((r) => wsMember.once("open", r));
+    await nextMessage(wsMember); // presence.sync
+
+    const adminEventP = nextMessage(wsAdmin);
+    const modEventP = nextMessage(wsMod);
+    const memberEventP = nextMessage(wsMember);
+
+    const staffRes = await app.inject({ method: "POST", url: `/api/channels/${staffId}/messages`,
+      headers: { cookie: adminCookie }, payload: { content: "top secret" } });
+    expect(staffRes.statusCode).toBe(201);
+
+    const generalRes = await app.inject({ method: "POST", url: `/api/channels/${generalId}/messages`,
+      headers: { cookie: adminCookie }, payload: { content: "public hello" } });
+    expect(generalRes.statusCode).toBe(201);
+
+    // admin and moderator both receive the restricted (staff) message first.
+    const adminEvent = await adminEventP;
+    expect(adminEvent.type).toBe("message.created");
+    expect(adminEvent.message).toMatchObject({ content: "top secret", channelId: staffId });
+
+    const modEvent = await modEventP;
+    expect(modEvent.type).toBe("message.created");
+    expect(modEvent.message).toMatchObject({ content: "top secret", channelId: staffId });
+
+    // the member never gets the staff message — their next event is the
+    // member-channel message, proving the restricted content never arrived.
+    const memberEvent = await memberEventP;
+    expect(memberEvent.type).toBe("message.created");
+    expect(memberEvent.message).toMatchObject({ content: "public hello", channelId: generalId });
+
+    wsAdmin.close();
+    wsMod.close();
+    wsMember.close();
+    await Promise.all([closed(wsAdmin), closed(wsMod), closed(wsMember)]);
+  });
+
+  it("scopes channel.created to the channel's min_role: member is excluded, admin is included", async () => {
+    const adminCookie = await loginCookie("theo", "correct horse battery");
+
+    const invA = await app.inject({ method: "POST", url: "/api/invites", headers: { cookie: adminCookie } });
+    const regA = await app.inject({ method: "POST", url: "/api/auth/register",
+      payload: { inviteToken: invA.json().token, username: "alice", password: "alicepass123" } });
+    // Use the session cookie register() already sets, rather than a second
+    // /api/auth/login call — /api/auth/login is rate-limited and the test
+    // suite's total call count is close to that limit.
+    const memberCookie = `sid=${regA.cookies.find((c) => c.name === "sid")!.value}`;
+
+    const wsAdmin = openWs(adminCookie);
+    await new Promise((r) => wsAdmin.once("open", r));
+    await nextMessage(wsAdmin); // presence.sync
+
+    const wsMember = openWs(memberCookie);
+    await new Promise((r) => wsMember.once("open", r));
+    await nextMessage(wsMember); // presence.sync
+
+    const adminEventP = nextMessage(wsAdmin);
+    const memberEventP = nextMessage(wsMember);
+
+    const staffRes = await app.inject({ method: "POST", url: "/api/channels",
+      headers: { cookie: adminCookie }, payload: { name: "staff", type: "text", minRole: "moderator" } });
+    expect(staffRes.statusCode).toBe(201);
+
+    const generalRes = await app.inject({ method: "POST", url: "/api/channels",
+      headers: { cookie: adminCookie }, payload: { name: "général", type: "text" } });
+    expect(generalRes.statusCode).toBe(201);
+
+    // admin receives the restricted (staff) channel.created first.
+    const adminEvent = await adminEventP;
+    expect(adminEvent.type).toBe("channel.created");
+    expect(adminEvent.channel).toMatchObject({ name: "staff", minRole: "moderator" });
+
+    // the member never gets the staff channel.created — their next event is
+    // the member-visible channel, proving the restricted event never arrived.
+    const memberEvent = await memberEventP;
+    expect(memberEvent.type).toBe("channel.created");
+    expect(memberEvent.channel).toMatchObject({ name: "général", minRole: "member" });
+
+    wsAdmin.close();
+    wsMember.close();
+    await Promise.all([closed(wsAdmin), closed(wsMember)]);
+  });
+
   it("broadcasts channel.deleted to a connected client", async () => {
     const cookie = await loginCookie("theo", "correct horse battery");
     const ch = await app.inject({ method: "POST", url: "/api/channels",

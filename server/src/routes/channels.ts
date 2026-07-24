@@ -41,7 +41,7 @@ export function registerChannelRoutes(app: FastifyInstance, pool: pg.Pool, hub: 
       [name, type, minRole],
     );
     const channel = toChannel(res.rows[0]);
-    hub.broadcast({
+    hub.broadcastToRole(channel.minRole as Role, {
       type: "channel.created",
       channel: { ...channel, createdAt: channel.createdAt.toISOString() },
     });
@@ -62,8 +62,14 @@ export function registerChannelRoutes(app: FastifyInstance, pool: pg.Pool, hub: 
   app.delete("/api/channels/:id", { preHandler: [app.requireAuth, requireAdmin] }, async (req, reply) => {
     const params = idSchema.safeParse(req.params);
     if (!params.success) return reply.code(400).send({ error: "invalid channel id" });
-    await pool.query("DELETE FROM channels WHERE id = $1", [params.data.id]);
-    hub.broadcast({ type: "channel.deleted", channelId: params.data.id });
+    const res = await pool.query<{ min_role: string }>(
+      "DELETE FROM channels WHERE id = $1 RETURNING min_role", [params.data.id],
+    );
+    if ((res.rowCount ?? 0) > 0) {
+      hub.broadcastToRole(res.rows[0].min_role as Role, {
+        type: "channel.deleted", channelId: params.data.id,
+      });
+    }
     return reply.code(204).send();
   });
 }

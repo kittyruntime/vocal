@@ -20,7 +20,7 @@ export function registerWsRoute(app: FastifyInstance, pool: pg.Pool, hub: WsHub)
       socket.close(1008, "unauthorized");
       return;
     }
-    hub.add(user.id, socket);
+    hub.add(user.id, user.role, socket);
     socket.send(JSON.stringify({ type: "presence.sync", userIds: hub.onlineUserIds() }));
 
     socket.on("message", (raw: Buffer) => {
