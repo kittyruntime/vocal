@@ -1,5 +1,6 @@
 import { createHash, randomBytes } from "node:crypto";
 import type pg from "pg";
+import type { SessionUser } from "./guard.js";
 
 const SESSION_DAYS = 30;
 
@@ -21,14 +22,16 @@ export async function createSession(
 
 export async function getSessionUser(
   pool: pg.Pool, token: string,
-): Promise<{ id: string; username: string; role: string } | null> {
+): Promise<SessionUser | null> {
   const res = await pool.query(
     `SELECT u.id, u.username, u.role FROM sessions s
      JOIN users u ON u.id = s.user_id
      WHERE s.token_hash = $1 AND s.expires_at > now()`,
     [hashToken(token)],
   );
-  return res.rows[0] ?? null;
+  // role is DB-constrained to the admin/moderator/member CHECK, so this
+  // narrowing cast at the read boundary is safe.
+  return (res.rows[0] as SessionUser | undefined) ?? null;
 }
 
 export async function deleteSession(pool: pg.Pool, token: string): Promise<void> {

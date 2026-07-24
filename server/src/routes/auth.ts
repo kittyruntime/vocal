@@ -4,6 +4,12 @@ import { z } from "zod";
 import { hashPassword, verifyPassword } from "../auth/passwords.js";
 import { createSession, deleteSession, hashToken } from "../auth/sessions.js";
 
+// Precomputed once at module load so that an unknown-username login still
+// pays the cost of an argon2 verify, keeping the response time close to a
+// wrong-password login and avoiding a timing side-channel for username
+// enumeration.
+const DUMMY_HASH_PROMISE: Promise<string> = hashPassword("dummy-password-for-timing-normalization");
+
 const credentialsSchema = z.object({
   username: z.string().min(2).max(32).regex(/^[a-zA-Z0-9_.-]+$/),
   password: z.string().min(8).max(256),
@@ -55,7 +61,14 @@ export function registerAuthRoutes(app: FastifyInstance, pool: pg.Pool): void {
       [body.data.username],
     );
     const row = res.rows[0];
-    if (!row?.password_hash || !(await verifyPassword(row.password_hash, body.data.password))) {
+    if (!row?.password_hash) {
+      // No such user (or no password set yet): still run an argon2 verify
+      // against a dummy hash so the response time doesn't reveal whether
+      // the username exists.
+      await verifyPassword(await DUMMY_HASH_PROMISE, body.data.password);
+      return reply.code(401).send({ error: "invalid credentials" });
+    }
+    if (!(await verifyPassword(row.password_hash, body.data.password))) {
       return reply.code(401).send({ error: "invalid credentials" });
     }
     const session = await createSession(pool, row.id);

@@ -3,6 +3,7 @@ import type pg from "pg";
 import type { FastifyInstance } from "fastify";
 import { makeTestDb } from "./helpers/db.js";
 import { buildApp } from "../src/app.js";
+import { hashToken } from "../src/auth/sessions.js";
 
 let pool: pg.Pool;
 let app: FastifyInstance;
@@ -77,5 +78,40 @@ describe("login / logout", () => {
   it("GET /api/me without cookie is 401", async () => {
     const me = await app.inject({ method: "GET", url: "/api/me" });
     expect(me.statusCode).toBe(401);
+  });
+
+  it("rejects an unknown username with the same body as a wrong password", async () => {
+    const res = await app.inject({ method: "POST", url: "/api/auth/login",
+      payload: { username: "ghost", password: "whatever1" } });
+    expect(res.statusCode).toBe(401);
+    expect(res.json()).toEqual({ error: "invalid credentials" });
+  });
+});
+
+describe("register", () => {
+  it("returns 409 with 'username taken' when the username already exists", async () => {
+    const setup = await app.inject({ method: "POST", url: "/api/setup",
+      payload: { username: "theo", password: "correct horse battery" } });
+    const adminId = (await app.inject({
+      method: "GET", url: "/api/me", headers: { cookie: sidCookie(setup) },
+    })).json().id;
+
+    const token = "a-known-invite-token";
+    await pool.query(
+      `INSERT INTO invites (token_hash, created_by, expires_at)
+       VALUES ($1, $2, now() + interval '1 day')`,
+      [hashToken(token), adminId],
+    );
+
+    const res = await app.inject({
+      method: "POST", url: "/api/auth/register",
+      payload: {
+        username: "theo",
+        password: "another password",
+        inviteToken: token,
+      },
+    });
+    expect(res.statusCode).toBe(409);
+    expect(res.json()).toEqual({ error: "username taken" });
   });
 });

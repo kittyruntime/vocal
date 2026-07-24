@@ -2,7 +2,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import type pg from "pg";
 import { getSessionUser } from "./sessions.js";
 
-export type SessionUser = { id: string; username: string; role: string };
+export type SessionUser = { id: string; username: string; role: "admin" | "moderator" | "member" };
 
 declare module "fastify" {
   interface FastifyRequest { user?: SessionUser }
