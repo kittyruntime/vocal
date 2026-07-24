@@ -18,6 +18,9 @@ export async function buildApp(opts: { pool: pg.Pool }): Promise<FastifyInstance
     app.log.error(err);
     reply.code(500).send({ error: "internal server error" });
   });
+  app.setNotFoundHandler((_req, reply) => {
+    reply.code(404).send({ error: "not found" });
+  });
   registerAuthGuard(app, opts.pool);
   app.get("/api/health", async () => ({ status: "ok" }));
   registerAuthRoutes(app, opts.pool);

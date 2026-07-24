@@ -4,7 +4,7 @@ import type pg from "pg";
 import { z } from "zod";
 import { hashToken } from "../auth/sessions.js";
 
-const inviteIdSchema = z.object({ id: z.string().uuid() });
+const inviteIdSchema = z.object({ id: z.uuid() });
 
 const INVITE_DAYS = 7;
 

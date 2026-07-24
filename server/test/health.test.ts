@@ -15,4 +15,12 @@ describe("health", () => {
     expect(res.json()).toEqual({ status: "ok" });
     await app.close();
   });
+
+  it("unknown routes return the { error } shape with 404", async () => {
+    const app = await buildApp({ pool });
+    const res = await app.inject({ method: "GET", url: "/api/nope" });
+    expect(res.statusCode).toBe(404);
+    expect(res.json()).toEqual({ error: "not found" });
+    await app.close();
+  });
 });
