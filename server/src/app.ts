@@ -9,6 +9,8 @@ import { registerInviteRoutes } from "./routes/invites.js";
 import { registerChannelRoutes } from "./routes/channels.js";
 import { createHub, type WsHub } from "./ws/hub.js";
 import { registerWsRoute } from "./ws/route.js";
+import { loadMasterKey } from "./crypto/messages.js";
+import { registerMessageRoutes } from "./routes/messages.js";
 
 export async function buildApp(
   opts: { pool: pg.Pool },
@@ -18,6 +20,7 @@ export async function buildApp(
   await app.register(rateLimit, { global: false });
   await app.register(websocket);
   const hub = createHub();
+  const key = loadMasterKey();
   app.setErrorHandler((err: FastifyError, _req, reply) => {
     if (typeof err.statusCode === "number") {
       reply.code(err.statusCode).send({ error: err.message });
@@ -33,7 +36,8 @@ export async function buildApp(
   app.get("/api/health", async () => ({ status: "ok" }));
   registerAuthRoutes(app, opts.pool);
   registerInviteRoutes(app, opts.pool);
-  registerChannelRoutes(app, opts.pool);
+  registerChannelRoutes(app, opts.pool, hub);
+  registerMessageRoutes(app, opts.pool, key, hub);
   registerWsRoute(app, opts.pool, hub);
   return { app, hub };
 }

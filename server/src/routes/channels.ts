@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import type pg from "pg";
 import { z } from "zod";
 import { hasAtLeastRole, type Role } from "../roles.js";
+import type { WsHub } from "../ws/hub.js";
 
 const createSchema = z.object({
   name: z.string().min(1).max(64),
@@ -29,7 +30,7 @@ function toChannel(row: ChannelRow) {
   };
 }
 
-export function registerChannelRoutes(app: FastifyInstance, pool: pg.Pool): void {
+export function registerChannelRoutes(app: FastifyInstance, pool: pg.Pool, hub: WsHub): void {
   app.post("/api/channels", { preHandler: [app.requireAuth, requireAdmin] }, async (req, reply) => {
     const body = createSchema.safeParse(req.body);
     if (!body.success) return reply.code(400).send({ error: "invalid payload" });
@@ -39,7 +40,12 @@ export function registerChannelRoutes(app: FastifyInstance, pool: pg.Pool): void
        RETURNING id, name, type, min_role, position, created_at`,
       [name, type, minRole],
     );
-    return reply.code(201).send(toChannel(res.rows[0]));
+    const channel = toChannel(res.rows[0]);
+    hub.broadcast({
+      type: "channel.created",
+      channel: { ...channel, createdAt: channel.createdAt.toISOString() },
+    });
+    return reply.code(201).send(channel);
   });
 
   app.get("/api/channels", { preHandler: app.requireAuth }, async (req) => {
@@ -57,6 +63,7 @@ export function registerChannelRoutes(app: FastifyInstance, pool: pg.Pool): void
     const params = idSchema.safeParse(req.params);
     if (!params.success) return reply.code(400).send({ error: "invalid channel id" });
     await pool.query("DELETE FROM channels WHERE id = $1", [params.data.id]);
+    hub.broadcast({ type: "channel.deleted", channelId: params.data.id });
     return reply.code(204).send();
   });
 }

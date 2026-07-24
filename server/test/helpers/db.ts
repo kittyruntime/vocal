@@ -1,6 +1,8 @@
 import pg from "pg";
 import { migrate } from "../../src/db/migrate.js";
 
+process.env.MESSAGE_MASTER_KEY ??= Buffer.alloc(32, 7).toString("base64");
+
 const ADMIN_URL = "postgres://vocal:vocal@localhost:5432/vocal";
 export const TEST_URL = "postgres://vocal:vocal@localhost:5432/vocal_test";
 
