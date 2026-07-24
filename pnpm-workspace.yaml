@@ -1,3 +1,7 @@
 packages:
   - server
   - web
+
+onlyBuiltDependencies:
+  - argon2
+  - esbuild
