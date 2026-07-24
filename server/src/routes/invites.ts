@@ -1,7 +1,10 @@
 import { randomBytes } from "node:crypto";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import type pg from "pg";
+import { z } from "zod";
 import { hashToken } from "../auth/sessions.js";
+
+const inviteIdSchema = z.object({ id: z.string().uuid() });
 
 const INVITE_DAYS = 7;
 
@@ -34,8 +37,9 @@ export function registerInviteRoutes(app: FastifyInstance, pool: pg.Pool): void 
   });
 
   app.delete("/api/invites/:id", guards, async (req, reply) => {
-    const { id } = req.params as { id: string };
-    await pool.query("DELETE FROM invites WHERE id = $1", [id]);
+    const params = inviteIdSchema.safeParse(req.params);
+    if (!params.success) return reply.code(400).send({ error: "invalid invite id" });
+    await pool.query("DELETE FROM invites WHERE id = $1", [params.data.id]);
     return reply.code(204).send();
   });
 }

@@ -75,4 +75,11 @@ describe("invites", () => {
       headers: { cookie: adminCookie } });
     expect(list2.json()).toHaveLength(0);
   });
+
+  it("rejects a malformed invite id with 400", async () => {
+    const res = await app.inject({ method: "DELETE", url: "/api/invites/not-a-uuid",
+      headers: { cookie: adminCookie } });
+    expect(res.statusCode).toBe(400);
+    expect(res.json()).toEqual({ error: "invalid invite id" });
+  });
 });
