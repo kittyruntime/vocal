@@ -5,6 +5,7 @@ import type pg from "pg";
 import { registerAuthGuard } from "./auth/guard.js";
 import { registerAuthRoutes } from "./routes/auth.js";
 import { registerInviteRoutes } from "./routes/invites.js";
+import { registerChannelRoutes } from "./routes/channels.js";
 
 export async function buildApp(opts: { pool: pg.Pool }): Promise<FastifyInstance> {
   const app = Fastify({ logger: false });
@@ -25,5 +26,6 @@ export async function buildApp(opts: { pool: pg.Pool }): Promise<FastifyInstance
   app.get("/api/health", async () => ({ status: "ok" }));
   registerAuthRoutes(app, opts.pool);
   registerInviteRoutes(app, opts.pool);
+  registerChannelRoutes(app, opts.pool);
   return app;
 }
