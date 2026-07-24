@@ -2,7 +2,6 @@ import type { FastifyInstance } from "fastify";
 import type pg from "pg";
 import { getSessionUser } from "../auth/sessions.js";
 import type { WsHub } from "./hub.js";
-import type { ClientEvent } from "./protocol.js";
 
 function parseCookie(header: string | undefined, name: string): string | undefined {
   if (!header) return undefined;
@@ -25,13 +24,17 @@ export function registerWsRoute(app: FastifyInstance, pool: pg.Pool, hub: WsHub)
     socket.send(JSON.stringify({ type: "presence.sync", userIds: hub.onlineUserIds() }));
 
     socket.on("message", (raw: Buffer) => {
-      let event: ClientEvent;
+      let event: unknown;
       try {
         event = JSON.parse(raw.toString());
       } catch {
         return;
       }
-      if (event.type === "ping") {
+      if (
+        typeof event === "object" &&
+        event !== null &&
+        (event as { type?: unknown }).type === "ping"
+      ) {
         socket.send(JSON.stringify({ type: "pong" }));
       }
     });

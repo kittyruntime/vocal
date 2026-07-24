@@ -67,6 +67,25 @@ describe("websocket", () => {
     await closed(ws);
   });
 
+  it("ignores non-object JSON payloads instead of crashing", async () => {
+    const cookie = await loginCookie("theo", "correct horse battery");
+    const ws = openWs(cookie);
+    await new Promise((r) => ws.once("open", r));
+    const sync = await nextMessage(ws);
+    expect(sync.type).toBe("presence.sync");
+
+    ws.send("null");
+    expect(ws.readyState).toBe(WebSocket.OPEN);
+
+    ws.send(JSON.stringify({ type: "ping" }));
+    const pong = await nextMessage(ws);
+    expect(pong).toEqual({ type: "pong" });
+    expect(ws.readyState).toBe(WebSocket.OPEN);
+
+    ws.close();
+    await closed(ws);
+  });
+
   it("broadcasts presence.online / presence.offline across clients", async () => {
     const cookieA = await loginCookie("theo", "correct horse battery");
     const wsA = openWs(cookieA);
