@@ -8,6 +8,7 @@ import { buildApp } from "../src/app.js";
 let pool: pg.Pool;
 let app: FastifyInstance;
 let baseUrl: string;
+let adminCookie: string;
 
 async function loginCookie(username: string, password: string): Promise<string> {
   const res = await app.inject({ method: "POST", url: "/api/auth/login",
@@ -17,6 +18,10 @@ async function loginCookie(username: string, password: string): Promise<string> 
 
 function openWs(cookie?: string): WebSocket {
   return new WebSocket(`${baseUrl}/ws`, cookie ? { headers: { cookie } } : {});
+}
+
+function openWsWithHeaders(headers: Record<string, string>): WebSocket {
+  return new WebSocket(`${baseUrl}/ws`, { headers });
 }
 
 function nextMessage(ws: WebSocket): Promise<any> {
@@ -42,8 +47,9 @@ afterAll(async () => { await app.close(); await pool.end(); });
 
 beforeEach(async () => {
   await pool.query("TRUNCATE users, sessions, invites, channels CASCADE");
-  await app.inject({ method: "POST", url: "/api/setup",
+  const setup = await app.inject({ method: "POST", url: "/api/setup",
     payload: { username: "theo", password: "correct horse battery" } });
+  adminCookie = `sid=${setup.cookies.find((c) => c.name === "sid")!.value}`;
 });
 
 describe("websocket", () => {
@@ -51,6 +57,22 @@ describe("websocket", () => {
     const ws = openWs();
     const code = await closed(ws);
     expect(code).toBe(1008);
+  });
+
+  it("rejects a cross-origin handshake even with a valid cookie (CSWSH)", async () => {
+    const ws = openWsWithHeaders({ cookie: adminCookie, origin: "https://evil.example" });
+    const code = await closed(ws);
+    expect(code).toBe(1008);
+  });
+
+  it("accepts a same-origin handshake", async () => {
+    const origin = baseUrl.replace(/^ws:/, "http:");
+    const ws = openWsWithHeaders({ cookie: adminCookie, origin });
+    await new Promise((r) => ws.once("open", r));
+    const sync = await nextMessage(ws);
+    expect(sync.type).toBe("presence.sync");
+    ws.close();
+    await closed(ws);
   });
 
   it("sends presence.sync on connect and answers ping with pong", async () => {
