@@ -1,4 +1,4 @@
-import type { FastifyInstance } from "fastify";
+import type { FastifyInstance, FastifyRequest } from "fastify";
 import type pg from "pg";
 import { getSessionUser } from "../auth/sessions.js";
 import type { WsHub } from "./hub.js";
@@ -12,8 +12,32 @@ function parseCookie(header: string | undefined, name: string): string | undefin
   return undefined;
 }
 
+// Guards against Cross-Site WebSocket Hijacking: browsers attach the sid cookie
+// to cross-origin WS handshakes (CORS does not apply to WebSocket), so a session
+// cookie alone is not proof the handshake came from our own page. A missing Origin
+// means a non-browser client (no ambient cookie, no CSWSH risk) and is allowed.
+function isAllowedOrigin(req: FastifyRequest): boolean {
+  const origin = req.headers.origin;
+  if (!origin) return true;
+  const configured = process.env.APP_ORIGIN;
+  if (configured) {
+    const allowlist = configured.split(",").map((o) => o.trim());
+    return allowlist.includes(origin);
+  }
+  // Default: same-origin — the Origin's host must match the request Host.
+  try {
+    return new URL(origin).host === req.headers.host;
+  } catch {
+    return false;
+  }
+}
+
 export function registerWsRoute(app: FastifyInstance, pool: pg.Pool, hub: WsHub): void {
   app.get("/ws", { websocket: true }, async (socket, req) => {
+    if (!isAllowedOrigin(req)) {
+      socket.close(1008, "bad origin");
+      return;
+    }
     const token = parseCookie(req.headers.cookie, "sid");
     const user = token ? await getSessionUser(pool, token) : null;
     if (!user) {
