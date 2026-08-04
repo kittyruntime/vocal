@@ -45,6 +45,21 @@ describe("setup", () => {
   });
 });
 
+describe("GET /api/setup", () => {
+  it("reports done:false before any user exists", async () => {
+    const res = await app.inject({ method: "GET", url: "/api/setup" });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ done: false });
+  });
+
+  it("reports done:true after the first user is created", async () => {
+    await app.inject({ method: "POST", url: "/api/setup",
+      payload: { username: "theo", password: "correct horse battery" } });
+    const res = await app.inject({ method: "GET", url: "/api/setup" });
+    expect(res.json()).toEqual({ done: true });
+  });
+});
+
 describe("login / logout", () => {
   beforeEach(async () => {
     await app.inject({ method: "POST", url: "/api/setup",

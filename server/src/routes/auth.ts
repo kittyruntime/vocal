@@ -34,6 +34,11 @@ function setSidCookie(reply: any, token: string, expiresAt: Date): void {
 }
 
 export function registerAuthRoutes(app: FastifyInstance, pool: pg.Pool): void {
+  app.get("/api/setup", async () => {
+    const count = await pool.query("SELECT count(*)::int AS n FROM users");
+    return { done: count.rows[0].n > 0 };
+  });
+
   app.post("/api/setup", async (req, reply) => {
     const body = credentialsSchema.safeParse(req.body);
     if (!body.success) return reply.code(400).send({ error: "invalid payload" });
