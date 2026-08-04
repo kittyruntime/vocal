@@ -1,0 +1,13 @@
+:root { color-scheme: dark; }
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: "gg sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  background: #313338;
+  color: #dbdee1;
+}
+
+button { font: inherit; }
+input, select { font: inherit; }
