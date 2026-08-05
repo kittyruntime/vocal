@@ -11,3 +11,43 @@ body {
 
 button { font: inherit; }
 input, select { font: inherit; }
+
+.auth-screen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.auth-card {
+  background: #2b2d31;
+  padding: 32px;
+  border-radius: 8px;
+  width: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.auth-card input {
+  background: #1e1f22;
+  border: 1px solid #1e1f22;
+  color: #dbdee1;
+  padding: 8px;
+  border-radius: 4px;
+}
+
+.auth-card button {
+  background: #5865f2;
+  color: white;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  margin-top: 8px;
+}
+
+.auth-error {
+  color: #fa777c;
+  font-size: 0.85rem;
+}
