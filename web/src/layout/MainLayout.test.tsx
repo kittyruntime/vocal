@@ -70,9 +70,9 @@ describe("MainLayout", () => {
   it("loads channels and hides the reconnecting banner once the socket opens", async () => {
     renderLayout();
     expect(await screen.findByRole("button", { name: /général/ })).toBeInTheDocument();
-    expect(screen.getByText("Reconnexion…")).toBeInTheDocument();
+    expect(screen.getByText("Connexion…")).toBeInTheDocument();
     FakeWebSocket.instances[0].emit("open");
-    await waitFor(() => expect(screen.queryByText("Reconnexion…")).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByText("Connexion…")).not.toBeInTheDocument());
   });
 
   it("updates presence from WebSocket events", async () => {
