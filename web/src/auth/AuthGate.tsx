@@ -6,9 +6,22 @@ import { LoginScreen } from "./LoginScreen";
 import { RegisterScreen } from "./RegisterScreen";
 
 export function AuthGate({ children }: { children(user: CurrentUser): ReactNode }) {
-  const { state } = useAuth();
+  const { state, refresh } = useAuth();
 
   if (state.phase === "loading") return <div className="auth-loading">Chargement…</div>;
+  if (state.phase === "error") {
+    return (
+      <div className="auth-screen">
+        <div className="auth-card auth-error-screen">
+          <h1>Connexion impossible</h1>
+          <p role="alert">{state.message}</p>
+          <button type="button" onClick={() => void refresh()}>
+            Réessayer
+          </button>
+        </div>
+      </div>
+    );
+  }
   if (state.phase === "needs-setup") return <SetupScreen />;
   if (state.phase === "signed-out") {
     const params = new URLSearchParams(window.location.search);

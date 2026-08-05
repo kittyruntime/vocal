@@ -52,6 +52,35 @@ input, select { font: inherit; }
   font-size: 0.85rem;
 }
 
+.auth-loading {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #949ba4;
+}
+
+.auth-error-screen {
+  align-items: center;
+  text-align: center;
+}
+
+.auth-error-screen p {
+  color: #fa777c;
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+.error-boundary-screen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fa777c;
+  text-align: center;
+  padding: 16px;
+}
+
 .app-shell {
   display: flex;
   flex-direction: column;

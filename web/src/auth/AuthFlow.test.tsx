@@ -92,4 +92,41 @@ describe("AuthGate", () => {
     renderGate();
     expect(await screen.findByText("Contenu protégé pour theo")).toBeInTheDocument();
   });
+
+  it("shows a retry screen when the initial bootstrap call fails, and can recover", async () => {
+    vi.mocked(api.getSetupStatus).mockRejectedValueOnce(new ApiError(503, "service unavailable"));
+    renderGate();
+    expect(await screen.findByRole("button", { name: "Réessayer" })).toBeInTheDocument();
+    expect(screen.getByText("service unavailable")).toBeInTheDocument();
+
+    vi.mocked(api.getSetupStatus).mockResolvedValue({ done: false });
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Réessayer" }));
+    expect(await screen.findByText("Bienvenue sur Vocal")).toBeInTheDocument();
+  });
+
+  it("shows a generic message on retry screen for a non-ApiError failure", async () => {
+    vi.mocked(api.getSetupStatus).mockRejectedValueOnce(new TypeError("Failed to fetch"));
+    renderGate();
+    expect(await screen.findByRole("button", { name: "Réessayer" })).toBeInTheDocument();
+    expect(screen.getByText(/serveur/i)).toBeInTheDocument();
+  });
+
+  it("clears the invite token from the URL after a successful registration", async () => {
+    window.history.replaceState({}, "", "/?invite=abc123");
+    vi.mocked(api.getSetupStatus).mockResolvedValue({ done: true });
+    vi.mocked(api.getMe).mockRejectedValue(new ApiError(401, "authentication required"));
+    vi.mocked(api.register).mockResolvedValue({ ok: true });
+    renderGate();
+    await screen.findByText("Rejoindre Vocal");
+
+    vi.mocked(api.getMe).mockResolvedValue({ id: "1", username: "theo", role: "member" });
+    const user = userEvent.setup();
+    await user.type(screen.getByLabelText("Nom d'utilisateur"), "theo");
+    await user.type(screen.getByLabelText("Mot de passe"), "correct horse battery");
+    await user.click(screen.getByRole("button", { name: "Créer mon compte" }));
+
+    expect(await screen.findByText("Contenu protégé pour theo")).toBeInTheDocument();
+    expect(window.location.search).toBe("");
+  });
 });
