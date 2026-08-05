@@ -1,10 +1,15 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { App } from "./App";
 
+vi.mock("./api/client", async () => {
+  const actual = await vi.importActual<typeof import("./api/client")>("./api/client");
+  return { ...actual, getSetupStatus: vi.fn(() => new Promise(() => {})) };
+});
+
 describe("App", () => {
-  it("renders the app shell", () => {
+  it("shows a loading state while auth is bootstrapping", () => {
     render(<App />);
-    expect(screen.getByText("Vocal")).toBeInTheDocument();
+    expect(screen.getByText("Chargement…")).toBeInTheDocument();
   });
 });

@@ -1,3 +1,14 @@
+import { AuthProvider } from "./auth/AuthContext";
+import { AuthGate } from "./auth/AuthGate";
+import { MainLayout } from "./layout/MainLayout";
+import { ToastProvider } from "./toast/ToastContext";
+
 export function App() {
-  return <div className="app-shell">Vocal</div>;
+  return (
+    <ToastProvider>
+      <AuthProvider>
+        <AuthGate>{(user) => <MainLayout currentUser={user} />}</AuthGate>
+      </AuthProvider>
+    </ToastProvider>
+  );
 }
