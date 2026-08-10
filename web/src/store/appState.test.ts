@@ -78,6 +78,13 @@ describe("appReducer", () => {
     });
   });
 
+  it("does not let a stale websocket snapshot erase the active LiveKit room", () => {
+    const liveParticipants = [{ userId: "u1", username: "theo" }, { userId: "u2", username: "alice" }];
+    const current: AppState = { ...initialAppState, voiceOccupancy: { c2: liveParticipants } };
+    const state = appReducer(current, { type: "voice/sync", channels: {}, preserveChannelId: "c2" });
+    expect(state.voiceOccupancy.c2).toEqual(liveParticipants);
+  });
+
   it("replaces one channel with a LiveKit participant snapshot", () => {
     const initial: AppState = {
       ...initialAppState,
