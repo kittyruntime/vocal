@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useReducer, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useReducer, useRef, useState } from "react";
 import type { Channel, CurrentUser } from "../api/client";
 import * as api from "../api/client";
 import { appReducer, initialAppState } from "../store/appState";
@@ -9,6 +9,7 @@ import { Sidebar } from "./Sidebar";
 import { ChatView } from "./ChatView";
 import { UserBar } from "./UserBar";
 import { ConnectionBanner } from "./ConnectionBanner";
+import { playAppSound } from "../audio/sounds";
 
 const VoiceView = lazy(() => import("../voice/VoiceView").then((module) => ({ default: module.VoiceView })));
 
@@ -17,6 +18,7 @@ export function MainLayout({ currentUser }: { currentUser: CurrentUser }) {
   const { showToast } = useToast();
   const [state, dispatch] = useReducer(appReducer, { ...initialAppState, currentUser });
   const [retainedVoiceChannel, setRetainedVoiceChannel] = useState<Channel | null>(null);
+  const joinedVoiceChannelIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     api
@@ -41,6 +43,7 @@ export function MainLayout({ currentUser }: { currentUser: CurrentUser }) {
             break;
           case "message.created":
             dispatch({ type: "message/received", message: event.message });
+            if (event.message.userId !== currentUser.id) playAppSound("message");
             break;
           case "channel.created":
             dispatch({ type: "channel/added", channel: event.channel });
@@ -50,12 +53,22 @@ export function MainLayout({ currentUser }: { currentUser: CurrentUser }) {
             break;
           case "voice.sync":
             dispatch({ type: "voice/sync", channels: event.channels });
+            joinedVoiceChannelIdRef.current = Object.entries(event.channels)
+              .find(([, participants]) => participants.some((participant) => participant.userId === currentUser.id))?.[0] ?? null;
             break;
           case "voice.joined":
             dispatch({ type: "voice/joined", channelId: event.channelId, participant: event.participant });
+            if (event.participant.userId === currentUser.id) {
+              joinedVoiceChannelIdRef.current = event.channelId;
+              playAppSound("userJoin");
+            } else if (joinedVoiceChannelIdRef.current === event.channelId) {
+              playAppSound("userJoin");
+            }
             break;
           case "voice.left":
             dispatch({ type: "voice/left", channelId: event.channelId, userId: event.userId });
+            if (joinedVoiceChannelIdRef.current === event.channelId) playAppSound("userLeave");
+            if (event.userId === currentUser.id) joinedVoiceChannelIdRef.current = null;
             break;
         }
       },
