@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import type { Channel, CurrentUser } from "../api/client";
 import * as api from "../api/client";
 import { useToast } from "../toast/ToastContext";
+import type { VoiceParticipant } from "../ws/protocol";
 
 export function Sidebar({
   channels,
@@ -15,7 +16,7 @@ export function Sidebar({
   channels: Channel[];
   selectedChannelId: string | null;
   onlineUserIds: string[];
-  voiceOccupancy: Record<string, string[]>;
+  voiceOccupancy: Record<string, VoiceParticipant[]>;
   currentUser: CurrentUser;
   onSelectChannel(channelId: string): void;
   onChannelCreated(channel: Channel): void;
@@ -63,7 +64,7 @@ function ChannelGroup({
 }: {
   title: string;
   channels: Channel[];
-  voiceOccupancy: Record<string, string[]>;
+  voiceOccupancy: Record<string, VoiceParticipant[]>;
   currentUserId: string;
   selectedChannelId: string | null;
   onSelectChannel(channelId: string): void;
@@ -85,8 +86,10 @@ function ChannelGroup({
             </button>
             {channel.type === "voice" && occupants.length > 0 && (
               <ul className="voice-occupants" aria-label={`Participants dans ${channel.name}`}>
-                {occupants.map((userId) => (
-                  <li key={userId}>{userId === currentUserId ? "Vous" : userId}</li>
+                {occupants.map((participant) => (
+                  <li key={participant.userId}>
+                    {participant.userId === currentUserId ? `${participant.username} (vous)` : participant.username}
+                  </li>
                 ))}
               </ul>
             )}

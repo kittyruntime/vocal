@@ -101,7 +101,7 @@ describe("POST /api/voice/webhook", () => {
     const body = JSON.stringify({
       event: "participant_joined",
       room: { name: channelId },
-      participant: { identity: "some-user-id" },
+      participant: { identity: "some-user-id", name: "Alice" },
     });
     const res = await app.inject({ method: "POST", url: "/api/voice/webhook",
       headers: { "content-type": "application/json", authorization: await signWebhook(body) },
@@ -109,7 +109,11 @@ describe("POST /api/voice/webhook", () => {
     expect(res.statusCode).toBe(200);
 
     const event = await eventP;
-    expect(event).toEqual({ type: "voice.joined", channelId, userId: "some-user-id" });
+    expect(event).toEqual({
+      type: "voice.joined",
+      channelId,
+      participant: { userId: "some-user-id", username: "Alice" },
+    });
 
     ws.close();
   });
@@ -122,7 +126,7 @@ describe("POST /api/voice/webhook", () => {
     const joinedBody = JSON.stringify({
       event: "participant_joined",
       room: { name: channelId },
-      participant: { identity: "some-user-id" },
+      participant: { identity: "some-user-id", name: "Alice" },
     });
     await app.inject({ method: "POST", url: "/api/voice/webhook",
       headers: { "content-type": "application/json", authorization: await signWebhook(joinedBody) },
@@ -132,13 +136,13 @@ describe("POST /api/voice/webhook", () => {
     await new Promise((r) => ws.once("open", r));
     await nextMessage(ws); // presence.sync
     const voiceSync = await nextMessage(ws);
-    expect(voiceSync.channels[channelId]).toEqual(["some-user-id"]);
+    expect(voiceSync.channels[channelId]).toEqual([{ userId: "some-user-id", username: "Alice" }]);
 
     const eventP = nextMessage(ws);
     const leftBody = JSON.stringify({
       event: "participant_left",
       room: { name: channelId },
-      participant: { identity: "some-user-id" },
+      participant: { identity: "some-user-id", name: "Alice" },
     });
     const res = await app.inject({ method: "POST", url: "/api/voice/webhook",
       headers: { "content-type": "application/json", authorization: await signWebhook(leftBody) },
@@ -181,7 +185,11 @@ describe("POST /api/voice/webhook", () => {
     expect(res.statusCode).toBe(200);
 
     const event = await eventP;
-    expect(event).toEqual({ type: "voice.joined", channelId, userId: "some-user-id" });
+    expect(event).toEqual({
+      type: "voice.joined",
+      channelId,
+      participant: { userId: "some-user-id", username: "some-user-id" },
+    });
 
     ws.close();
   });

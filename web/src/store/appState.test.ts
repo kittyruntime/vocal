@@ -71,15 +71,18 @@ describe("appReducer", () => {
   it("voice/sync replaces voice occupancy", () => {
     const state = appReducer(initialAppState, {
       type: "voice/sync",
-      channels: { c2: ["u1", "u2"] },
+      channels: { c2: [{ userId: "u1", username: "theo" }, { userId: "u2", username: "alice" }] },
     });
-    expect(state.voiceOccupancy).toEqual({ c2: ["u1", "u2"] });
+    expect(state.voiceOccupancy).toEqual({
+      c2: [{ userId: "u1", username: "theo" }, { userId: "u2", username: "alice" }],
+    });
   });
 
   it("voice join and leave events are idempotent and remove empty rooms", () => {
-    const joined = appReducer(initialAppState, { type: "voice/joined", channelId: "c2", userId: "u1" });
-    const duplicate = appReducer(joined, { type: "voice/joined", channelId: "c2", userId: "u1" });
-    expect(duplicate.voiceOccupancy).toEqual({ c2: ["u1"] });
+    const participant = { userId: "u1", username: "theo" };
+    const joined = appReducer(initialAppState, { type: "voice/joined", channelId: "c2", participant });
+    const duplicate = appReducer(joined, { type: "voice/joined", channelId: "c2", participant });
+    expect(duplicate.voiceOccupancy).toEqual({ c2: [participant] });
     const left = appReducer(duplicate, { type: "voice/left", channelId: "c2", userId: "u1" });
     expect(left.voiceOccupancy).toEqual({});
   });

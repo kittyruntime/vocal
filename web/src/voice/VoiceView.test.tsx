@@ -8,16 +8,28 @@ import * as api from "../api/client";
 const connect = vi.fn();
 const disconnect = vi.fn();
 const setMicrophoneEnabled = vi.fn();
+const setCameraEnabled = vi.fn();
+const setScreenShareEnabled = vi.fn();
+const getTrackPublication = vi.fn();
 
 vi.mock("livekit-client", () => ({
   Room: class {
     connect = connect;
     disconnect = disconnect;
-    localParticipant = { setMicrophoneEnabled };
+    localParticipant = { setMicrophoneEnabled, setCameraEnabled, setScreenShareEnabled, getTrackPublication };
     on() { return this; }
   },
-  RoomEvent: { TrackSubscribed: "trackSubscribed", TrackUnsubscribed: "trackUnsubscribed", Disconnected: "disconnected" },
-  Track: { Kind: { Audio: "audio" } },
+  RoomEvent: {
+    TrackSubscribed: "trackSubscribed",
+    TrackUnsubscribed: "trackUnsubscribed",
+    LocalTrackUnpublished: "localTrackUnpublished",
+    ActiveSpeakersChanged: "activeSpeakersChanged",
+    Disconnected: "disconnected",
+  },
+  Track: {
+    Kind: { Audio: "audio", Video: "video" },
+    Source: { Camera: "camera", ScreenShare: "screen_share" },
+  },
 }));
 
 vi.mock("../api/client", async () => {
@@ -34,6 +46,13 @@ beforeEach(() => {
   connect.mockResolvedValue(undefined);
   disconnect.mockResolvedValue(undefined);
   setMicrophoneEnabled.mockResolvedValue(undefined);
+  getTrackPublication.mockReturnValue(undefined);
+  const videoTrack = {
+    attach: vi.fn(() => document.createElement("video")),
+    detach: vi.fn(() => []),
+  };
+  setCameraEnabled.mockResolvedValue({ track: videoTrack });
+  setScreenShareEnabled.mockResolvedValue({ track: videoTrack });
 });
 
 function renderView() {
@@ -59,5 +78,22 @@ describe("VoiceView", () => {
     await user.click(screen.getByRole("button", { name: "Quitter" }));
     await waitFor(() => expect(disconnect).toHaveBeenCalled());
     expect(screen.getByRole("button", { name: "Rejoindre" })).toBeInTheDocument();
+  });
+
+  it("controls deafen, camera, and screen sharing", async () => {
+    renderView();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Rejoindre" }));
+
+    await user.click(await screen.findByRole("button", { name: "Assourdir" }));
+    expect(screen.getByRole("button", { name: "Rétablir le son" })).toHaveAttribute("aria-pressed", "true");
+
+    await user.click(screen.getByRole("button", { name: "Activer la caméra" }));
+    expect(setCameraEnabled).toHaveBeenCalledWith(true);
+    expect(screen.getByRole("button", { name: "Arrêter la caméra" })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Partager l’écran" }));
+    expect(setScreenShareEnabled).toHaveBeenCalledWith(true);
+    expect(screen.getByRole("button", { name: "Arrêter le partage" })).toBeInTheDocument();
   });
 });

@@ -16,6 +16,8 @@ export type ChannelPayload = {
   createdAt: string;
 };
 
+export type VoiceParticipantPayload = { userId: string; username: string };
+
 export type ServerEvent =
   | { type: "presence.sync"; userIds: string[] }
   | { type: "presence.online"; userId: string }
@@ -23,8 +25,8 @@ export type ServerEvent =
   | { type: "message.created"; message: MessagePayload }
   | { type: "channel.created"; channel: ChannelPayload }
   | { type: "channel.deleted"; channelId: string }
-  | { type: "voice.sync"; channels: Record<string, string[]> }
-  | { type: "voice.joined"; channelId: string; userId: string }
+  | { type: "voice.sync"; channels: Record<string, VoiceParticipantPayload[]> }
+  | { type: "voice.joined"; channelId: string; participant: VoiceParticipantPayload }
   | { type: "voice.left"; channelId: string; userId: string };
 
 export type ClientEvent = { type: "ping" };
