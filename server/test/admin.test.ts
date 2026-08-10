@@ -1,13 +1,21 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type pg from "pg";
 import type { FastifyInstance } from "fastify";
 import { makeTestDb } from "./helpers/db.js";
 import { buildApp } from "../src/app.js";
+import type { VoicePresence } from "../src/voice/presence.js";
 
 let pool: pg.Pool; let app: FastifyInstance; let adminCookie: string;
-beforeAll(async () => { pool = await makeTestDb(); ({ app } = await buildApp({ pool })); });
+let voicePresence: VoicePresence;
+const setParticipantPublishing = vi.fn(async () => {});
+const removeParticipant = vi.fn(async () => {});
+beforeAll(async () => {
+  pool = await makeTestDb();
+  ({ app, voicePresence } = await buildApp({ pool, voiceAdmin: { setParticipantPublishing, removeParticipant } }));
+});
 afterAll(async () => { await app.close(); await pool.end(); });
 beforeEach(async () => {
+  vi.clearAllMocks();
   await pool.query("TRUNCATE users, sessions, invites, channels CASCADE");
   await pool.query("UPDATE server_settings SET registration_open = true");
   const setup = await app.inject({ method: "POST", url: "/api/setup", payload: { username: "theo", password: "correct horse battery" } });
@@ -64,6 +72,33 @@ describe("server administration", () => {
       const res = await app.inject({ method: "POST", url: "/api/admin/users/00000000-0000-0000-0000-000000000000/kick", headers: { cookie: adminCookie } });
       expect(res.statusCode).toBe(404);
     });
+
+    it("removes a connected target from LiveKit", async () => {
+      const alice = await registerAlice();
+      voicePresence.join("00000000-0000-0000-0000-000000000123", { userId: alice.id, username: "alice" });
+      const kick = await app.inject({ method: "POST", url: `/api/admin/users/${alice.id}/kick`, headers: { cookie: adminCookie } });
+      expect(kick.statusCode).toBe(200);
+      expect(removeParticipant).toHaveBeenCalledWith("00000000-0000-0000-0000-000000000123", alice.id);
+      voicePresence.leave("00000000-0000-0000-0000-000000000123", alice.id);
+    });
+  });
+
+  describe("forced voice mute", () => {
+    it("persists mute and revokes publishing in the active LiveKit room", async () => {
+      const alice = await registerAlice();
+      voicePresence.join("00000000-0000-0000-0000-000000000123", { userId: alice.id, username: "alice" });
+      const muted = await app.inject({ method: "PATCH", url: `/api/admin/users/${alice.id}/voice-mute`, headers: { cookie: adminCookie }, payload: { muted: true } });
+      expect(muted.statusCode).toBe(200);
+      expect(muted.json()).toMatchObject({ id: alice.id, voiceMuted: true });
+      expect(setParticipantPublishing).toHaveBeenCalledWith("00000000-0000-0000-0000-000000000123", alice.id, false);
+      voicePresence.leave("00000000-0000-0000-0000-000000000123", alice.id);
+    });
+
+    it("refuses to mute yourself", async () => {
+      const me = await app.inject({ method: "GET", url: "/api/me", headers: { cookie: adminCookie } });
+      const result = await app.inject({ method: "PATCH", url: `/api/admin/users/${me.json().id}/voice-mute`, headers: { cookie: adminCookie }, payload: { muted: true } });
+      expect(result.statusCode).toBe(409);
+    });
   });
 
   describe("ban / unban", () => {
@@ -111,15 +146,13 @@ describe("server administration", () => {
 
     it("a moderate-only user can kick and ban without manage_server", async () => {
       const alice = await registerAlice();
-      const bob = await app.inject({ method: "POST", url: "/api/auth/register", payload: { username: "bob", password: "bobpass1234" } });
-      const bobCookie = `sid=${bob.cookies.find((c) => c.name === "sid")!.value}`;
-      const bobId = (await app.inject({ method: "GET", url: "/api/me", headers: { cookie: bobCookie } })).json().id;
-      await app.inject({ method: "PATCH", url: `/api/admin/users/${bobId}`, headers: { cookie: adminCookie }, payload: { capabilities: ["moderate"] } });
+      await app.inject({ method: "PATCH", url: `/api/admin/users/${alice.id}`, headers: { cookie: adminCookie }, payload: { capabilities: ["moderate"] } });
+      const admin = await app.inject({ method: "GET", url: "/api/me", headers: { cookie: adminCookie } });
 
-      const kick = await app.inject({ method: "POST", url: `/api/admin/users/${alice.id}/kick`, headers: { cookie: bobCookie } });
+      const kick = await app.inject({ method: "POST", url: `/api/admin/users/${admin.json().id}/kick`, headers: { cookie: alice.cookie } });
       expect(kick.statusCode).toBe(200);
 
-      const settings = await app.inject({ method: "GET", url: "/api/admin/settings", headers: { cookie: bobCookie } });
+      const settings = await app.inject({ method: "GET", url: "/api/admin/settings", headers: { cookie: alice.cookie } });
       expect(settings.statusCode).toBe(403);
     });
 

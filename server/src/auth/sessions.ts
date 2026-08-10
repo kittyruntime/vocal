@@ -24,7 +24,7 @@ export async function getSessionUser(
   pool: pg.Pool, token: string,
 ): Promise<SessionUser | null> {
   const res = await pool.query(
-    `SELECT u.id, u.username,
+    `SELECT u.id, u.username, u.voice_muted AS "voiceMuted",
        COALESCE(array_agg(uc.capability) FILTER (WHERE uc.capability IS NOT NULL), '{}') AS capabilities
      FROM sessions s
      JOIN users u ON u.id = s.user_id

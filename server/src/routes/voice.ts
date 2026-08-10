@@ -27,7 +27,7 @@ export function registerVoiceTokenRoute(
     }
     const { token, url } = await mintVoiceToken(liveKitConfig, {
       channelId: params.data.id, userId: req.user!.id, username: req.user!.username,
-      canPublish: req.user!.capabilities.includes("publish_voice"),
+      canPublish: req.user!.capabilities.includes("publish_voice") && !req.user!.voiceMuted,
     });
     return reply.code(201).send({ token, url });
   });

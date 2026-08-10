@@ -38,6 +38,7 @@ export function Sidebar({
   const editingChannel = channels.find((c) => c.id === editingChannelId) ?? null;
   const canManageChannels = currentUser.capabilities.includes("manage_channels");
   const canManageServer = currentUser.capabilities.includes("manage_server");
+  const canModerate = currentUser.capabilities.includes("moderate");
 
   return (
     <nav className="sidebar" aria-label="Channels">
@@ -65,8 +66,8 @@ export function Sidebar({
         onEditChannel={canManageChannels ? setEditingChannelId : undefined}
       />
       <p className="sidebar-presence"><span className="online-dot" /> {onlineUserIds.length} online</p>
-      {canManageServer && (
-        <button type="button" className="server-settings-button" onClick={() => setAdminOpen(true)}><Icon name="settings" size={15} /> Server settings</button>
+      {(canManageServer || canModerate) && (
+        <button type="button" className="server-settings-button" onClick={() => setAdminOpen(true)}><Icon name="settings" size={15} /> {canManageServer ? "Server settings" : "Moderation"}</button>
       )}
       {canManageChannels && (
         <CreateChannelForm

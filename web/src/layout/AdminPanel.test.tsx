@@ -7,11 +7,11 @@ import type { AdminUser, CurrentUser } from "../api/client";
 
 vi.mock("../api/client", async () => {
   const actual = await vi.importActual<typeof import("../api/client")>("../api/client");
-  return { ...actual, listAdminUsers: vi.fn(), getAdminSettings: vi.fn(), kickUser: vi.fn(), banUser: vi.fn(), unbanUser: vi.fn() };
+  return { ...actual, listAdminUsers: vi.fn(), getAdminSettings: vi.fn(), kickUser: vi.fn(), banUser: vi.fn(), unbanUser: vi.fn(), setUserVoiceMuted: vi.fn() };
 });
 
 const admin: CurrentUser = { id: "u1", username: "theo", capabilities: ["manage_channels", "manage_server", "moderate", "publish_voice"] };
-const alice: AdminUser = { id: "u2", username: "alice", capabilities: [], createdAt: "now", bannedAt: null };
+const alice: AdminUser = { id: "u2", username: "alice", capabilities: [], createdAt: "now", bannedAt: null, voiceMuted: false };
 
 function renderPanel(users: AdminUser[] = [alice]) {
   vi.mocked(api.listAdminUsers).mockResolvedValue(users);
@@ -25,6 +25,7 @@ beforeEach(() => {
   vi.mocked(api.kickUser).mockReset();
   vi.mocked(api.banUser).mockReset();
   vi.mocked(api.unbanUser).mockReset();
+  vi.mocked(api.setUserVoiceMuted).mockReset();
   vi.spyOn(window, "confirm").mockReturnValue(true);
 });
 
@@ -65,6 +66,15 @@ describe("AdminPanel moderation", () => {
     expect(window.confirm).not.toHaveBeenCalled();
   });
 
+  it("force-mutes a user and exposes the persistent status", async () => {
+    vi.mocked(api.setUserVoiceMuted).mockResolvedValue({ ...alice, voiceMuted: true });
+    renderPanel();
+    await userEvent.setup().click(await screen.findByRole("button", { name: "Force mute" }));
+    await waitFor(() => expect(api.setUserVoiceMuted).toHaveBeenCalledWith("u2", true));
+    expect(await screen.findByText("Voice muted")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Allow voice" })).toBeInTheDocument();
+  });
+
   it("shows an error toast-equivalent message when self-ban is rejected", async () => {
     vi.mocked(api.banUser).mockRejectedValue(new api.ApiError(409, "cannot ban yourself"));
     renderPanel();
@@ -74,7 +84,7 @@ describe("AdminPanel moderation", () => {
   });
 
   it("hides moderation actions for the current admin's own row", async () => {
-    renderPanel([{ id: admin.id, username: admin.username, capabilities: ["manage_channels", "manage_server", "moderate", "publish_voice"], createdAt: "now", bannedAt: null }, alice]);
+    renderPanel([{ id: admin.id, username: admin.username, capabilities: ["manage_channels", "manage_server", "moderate", "publish_voice"], createdAt: "now", bannedAt: null, voiceMuted: false }, alice]);
     await screen.findByText("alice");
     const rows = screen.getAllByText(/theo|alice/).map((el) => el.closest(".admin-user"));
     const theoRow = rows.find((row) => row?.textContent?.includes("theo"));

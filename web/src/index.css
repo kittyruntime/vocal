@@ -455,6 +455,8 @@ summary:focus-visible {
 .admin-channel select, .admin-channel input { min-width: 0; padding: 8px; border: 1px solid #1e1f22; border-radius: 4px; background: #1e1f22; color: #dbdee1; }
 .channel-settings-modal select { min-width: 0; padding: 8px; border: 1px solid #1e1f22; border-radius: 4px; background: #1e1f22; color: #dbdee1; }
 .ban-badge { margin-left: 6px; padding: 1px 6px; border-radius: 4px; background: rgb(218 55 60 / 20%); color: #fa777c; font-size: 10px; font-weight: 700; text-transform: uppercase; }
+.mute-badge { margin-left: 6px; padding: 1px 6px; border-radius: 4px; background: rgb(240 178 50 / 16%); color: #f0b232; font-size: 10px; font-weight: 700; text-transform: uppercase; }
+.admin-capability-summary { color: #949ba4; font-size: 12px; }
 .admin-user-actions { grid-area: actions; display: flex; gap: 6px; }
 .admin-user-actions button { padding: 6px 9px; border: 0; border-radius: 4px; background: #4e5058; color: #f2f3f5; font-size: 12px; cursor: pointer; }
 .admin-user-actions .danger-link { background: transparent; color: #fa777c; }
