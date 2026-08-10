@@ -3,6 +3,7 @@ import type pg from "pg";
 import { z } from "zod";
 import { hashPassword, verifyPassword } from "../auth/passwords.js";
 import { createSession, deleteSession, hashToken } from "../auth/sessions.js";
+import { CAPABILITIES } from "../capabilities.js";
 
 // Precomputed once at module load so that an unknown-username login still
 // pays the cost of an argon2 verify, keeping the response time close to a
@@ -47,11 +48,29 @@ export function registerAuthRoutes(app: FastifyInstance, pool: pg.Pool): void {
       return reply.code(403).send({ error: "setup already done" });
     }
     const hash = await hashPassword(body.data.password);
-    const res = await pool.query(
-      "INSERT INTO users (username, password_hash, role) VALUES ($1, $2, 'admin') RETURNING id",
-      [body.data.username, hash],
-    );
-    const session = await createSession(pool, res.rows[0].id);
+    const client = await pool.connect();
+    let userId: string;
+    try {
+      await client.query("BEGIN");
+      const res = await client.query(
+        "INSERT INTO users (username, password_hash) VALUES ($1, $2) RETURNING id",
+        [body.data.username, hash],
+      );
+      userId = res.rows[0].id;
+      for (const capability of CAPABILITIES) {
+        await client.query(
+          "INSERT INTO user_capabilities (user_id, capability) VALUES ($1, $2)",
+          [userId, capability],
+        );
+      }
+      await client.query("COMMIT");
+    } catch (err) {
+      await client.query("ROLLBACK");
+      throw err;
+    } finally {
+      client.release();
+    }
+    const session = await createSession(pool, userId);
     setSidCookie(reply, session.token, session.expiresAt);
     return reply.code(201).send({ ok: true });
   });
@@ -115,6 +134,10 @@ export function registerAuthRoutes(app: FastifyInstance, pool: pg.Pool): void {
       const user = await client.query(
         "INSERT INTO users (username, password_hash) VALUES ($1, $2) RETURNING id",
         [body.data.username, hash],
+      );
+      await client.query(
+        "INSERT INTO user_capabilities (user_id, capability) VALUES ($1, 'publish_voice')",
+        [user.rows[0].id],
       );
       if (inviteId) {
         await client.query(

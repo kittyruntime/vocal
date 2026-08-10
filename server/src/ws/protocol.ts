@@ -11,7 +11,7 @@ export type ChannelPayload = {
   id: string;
   name: string;
   type: string;
-  minRole: string;
+  requiredCapability: string | null;
   position: number;
   createdAt: string;
 };

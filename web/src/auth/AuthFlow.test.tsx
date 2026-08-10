@@ -49,7 +49,7 @@ describe("AuthGate", () => {
     renderGate();
     await screen.findByText("Welcome to Vocal");
     vi.mocked(api.getSetupStatus).mockResolvedValue({ done: true });
-    vi.mocked(api.getMe).mockResolvedValue({ id: "1", username: "theo", role: "admin" });
+    vi.mocked(api.getMe).mockResolvedValue({ id: "1", username: "theo", capabilities: ["manage_channels", "manage_server", "moderate", "publish_voice"] });
     const user = userEvent.setup();
     await user.type(screen.getByLabelText("Username"), "theo");
     await user.type(screen.getByLabelText("Password"), "correct horse battery");
@@ -97,7 +97,7 @@ describe("AuthGate", () => {
 
   it("renders protected content once signed in", async () => {
     vi.mocked(api.getSetupStatus).mockResolvedValue({ done: true });
-    vi.mocked(api.getMe).mockResolvedValue({ id: "1", username: "theo", role: "admin" });
+    vi.mocked(api.getMe).mockResolvedValue({ id: "1", username: "theo", capabilities: ["manage_channels", "manage_server", "moderate", "publish_voice"] });
     renderGate();
     expect(await screen.findByText("Protected content for theo")).toBeInTheDocument();
   });
@@ -129,7 +129,7 @@ describe("AuthGate", () => {
     renderGate();
     await screen.findByText("Join Vocal");
 
-    vi.mocked(api.getMe).mockResolvedValue({ id: "1", username: "theo", role: "member" });
+    vi.mocked(api.getMe).mockResolvedValue({ id: "1", username: "theo", capabilities: [] });
     const user = userEvent.setup();
     await user.type(screen.getByLabelText("Username"), "theo");
     await user.type(screen.getByLabelText("Password"), "correct horse battery");

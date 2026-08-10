@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { ToastProvider } from "../toast/ToastContext";
 import { VoiceView } from "./VoiceView";
 import * as api from "../api/client";
+import type { CurrentUser } from "../api/client";
 import { ConnectionError } from "livekit-client";
 
 const connect = vi.fn();
@@ -79,8 +80,8 @@ vi.mock("../api/client", async () => {
   return { ...actual, getVoiceToken: vi.fn() };
 });
 
-const channel = { id: "c2", name: "salle", type: "voice", minRole: "member", position: 0, createdAt: "now" } as const;
-const currentUser = { id: "u1", username: "theo", role: "member" } as const;
+const channel = { id: "c2", name: "salle", type: "voice", requiredCapability: null, position: 0, createdAt: "now" } as const;
+const currentUser: CurrentUser = { id: "u1", username: "theo", capabilities: [] };
 
 beforeEach(() => {
   vi.clearAllMocks();

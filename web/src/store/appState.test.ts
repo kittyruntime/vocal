@@ -2,8 +2,8 @@ import { describe, it, expect } from "vitest";
 import { appReducer, initialAppState, type AppState } from "./appState";
 import type { Channel, Message } from "../api/client";
 
-const channelA: Channel = { id: "c1", name: "général", type: "text", minRole: "member", position: 0, createdAt: "now" };
-const channelB: Channel = { id: "c2", name: "staff", type: "text", minRole: "moderator", position: 1, createdAt: "now" };
+const channelA: Channel = { id: "c1", name: "général", type: "text", requiredCapability: null, position: 0, createdAt: "now" };
+const channelB: Channel = { id: "c2", name: "staff", type: "text", requiredCapability: "moderate", position: 1, createdAt: "now" };
 
 function msg(id: string, channelId: string, content: string): Message {
   return { id, channelId, userId: "u1", username: "theo", content, createdAt: "now" };

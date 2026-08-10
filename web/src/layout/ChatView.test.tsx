@@ -11,7 +11,7 @@ vi.mock("../api/client", async () => {
   return { ...actual, listMessages: vi.fn(), postMessage: vi.fn() };
 });
 
-const channel: Channel = { id: "c1", name: "général", type: "text", minRole: "member", position: 0, createdAt: "now" };
+const channel: Channel = { id: "c1", name: "général", type: "text", requiredCapability: null, position: 0, createdAt: "now" };
 
 function msg(id: string, content: string, createdAt: string): Message {
   return { id, channelId: "c1", userId: "u1", username: "theo", content, createdAt };

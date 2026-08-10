@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import type pg from "pg";
 import { getSessionUser } from "../auth/sessions.js";
-import { hasAtLeastRole, type Role } from "../roles.js";
+import type { Capability } from "../capabilities.js";
 import type { WsHub } from "./hub.js";
 import type { VoicePresence } from "../voice/presence.js";
 import type { VoiceParticipantPayload } from "./protocol.js";
@@ -36,17 +36,18 @@ function isAllowedOrigin(req: FastifyRequest): boolean {
 }
 
 // Returns the subset of `occupancy` (channelId -> userIds) for voice channels
-// whose min_role is satisfied by `role`, skipping empty entries.
+// whose required capability is satisfied by `capabilities`, skipping empty entries.
 async function visibleVoiceOccupancy(
-  pool: pg.Pool, role: Role, occupancy: Record<string, VoiceParticipantPayload[]>,
+  pool: pg.Pool, capabilities: Capability[], occupancy: Record<string, VoiceParticipantPayload[]>,
 ): Promise<Record<string, VoiceParticipantPayload[]>> {
-  const res = await pool.query<{ id: string; min_role: string }>(
-    "SELECT id, min_role FROM channels WHERE type = 'voice'",
+  const res = await pool.query<{ id: string; required_capability: Capability | null }>(
+    "SELECT id, required_capability FROM channels WHERE type = 'voice'",
   );
   const visible: Record<string, VoiceParticipantPayload[]> = {};
   for (const row of res.rows) {
     const occupants = occupancy[row.id];
-    if (occupants && occupants.length > 0 && hasAtLeastRole(role, row.min_role as Role)) {
+    const allowed = row.required_capability === null || capabilities.includes(row.required_capability);
+    if (occupants && occupants.length > 0 && allowed) {
       visible[row.id] = occupants;
     }
   }
@@ -74,9 +75,9 @@ export function registerWsRoute(
     // socket would then send a stale voice.sync that appears to "undo" an event
     // the client already received. No await may occur between hub.add() and the
     // final socket.send() below — both sends are queued back-to-back.
-    const channels = await visibleVoiceOccupancy(pool, user.role, voicePresence.allOccupancy());
+    const channels = await visibleVoiceOccupancy(pool, user.capabilities, voicePresence.allOccupancy());
 
-    hub.add(user.id, user.role, socket);
+    hub.add(user.id, user.capabilities, socket);
     socket.send(JSON.stringify({ type: "presence.sync", userIds: hub.onlineUserIds() }));
     socket.send(JSON.stringify({ type: "voice.sync", channels }));
 

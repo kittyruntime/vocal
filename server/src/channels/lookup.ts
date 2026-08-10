@@ -1,10 +1,14 @@
 import type pg from "pg";
-import type { Role } from "../roles.js";
+import type { Capability } from "../capabilities.js";
 
-// Returns the channel's min_role, or null if the channel doesn't exist.
-export async function channelMinRole(pool: pg.Pool, channelId: string): Promise<Role | null> {
-  const res = await pool.query<{ min_role: string }>(
-    "SELECT min_role FROM channels WHERE id = $1", [channelId],
+// Returns the channel's required capability (null = open to any authenticated
+// user), or undefined if the channel doesn't exist.
+export async function channelRequiredCapability(
+  pool: pg.Pool, channelId: string,
+): Promise<Capability | null | undefined> {
+  const res = await pool.query<{ required_capability: Capability | null }>(
+    "SELECT required_capability FROM channels WHERE id = $1", [channelId],
   );
-  return (res.rows[0]?.min_role as Role | undefined) ?? null;
+  if (res.rowCount === 0) return undefined;
+  return res.rows[0].required_capability;
 }

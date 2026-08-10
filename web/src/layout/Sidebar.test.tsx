@@ -11,12 +11,12 @@ vi.mock("../api/client", async () => {
   return { ...actual, createChannel: vi.fn() };
 });
 
-const admin: CurrentUser = { id: "u1", username: "theo", role: "admin" };
-const member: CurrentUser = { id: "u2", username: "alice", role: "member" };
+const admin: CurrentUser = { id: "u1", username: "theo", capabilities: ["manage_channels", "manage_server", "moderate", "publish_voice"] };
+const member: CurrentUser = { id: "u2", username: "alice", capabilities: [] };
 
 const channels: Channel[] = [
-  { id: "c1", name: "général", type: "text", minRole: "member", position: 0, createdAt: "now" },
-  { id: "c2", name: "salle", type: "voice", minRole: "member", position: 1, createdAt: "now" },
+  { id: "c1", name: "général", type: "text", requiredCapability: null, position: 0, createdAt: "now" },
+  { id: "c2", name: "salle", type: "voice", requiredCapability: null, position: 1, createdAt: "now" },
 ];
 
 function renderSidebar(user: CurrentUser, onSelect = vi.fn(), onCreated = vi.fn()) {
@@ -78,7 +78,7 @@ describe("Sidebar", () => {
   });
 
   it("creates a channel and reports it back to the parent", async () => {
-    const created: Channel = { id: "c3", name: "annonces", type: "text", minRole: "member", position: 2, createdAt: "now" };
+    const created: Channel = { id: "c3", name: "annonces", type: "text", requiredCapability: null, position: 2, createdAt: "now" };
     vi.mocked(api.createChannel).mockResolvedValue(created);
     const onCreated = vi.fn();
     renderSidebar(admin, vi.fn(), onCreated);

@@ -34,7 +34,8 @@ export function Sidebar({
   const [adminOpen, setAdminOpen] = useState(false);
   const [editingChannelId, setEditingChannelId] = useState<string | null>(null);
   const editingChannel = channels.find((c) => c.id === editingChannelId) ?? null;
-  const isAdmin = currentUser.role === "admin";
+  const canManageChannels = currentUser.capabilities.includes("manage_channels");
+  const canManageServer = currentUser.capabilities.includes("manage_server");
 
   return (
     <nav className="sidebar" aria-label="Channels">
@@ -49,7 +50,7 @@ export function Sidebar({
         currentUserId={currentUser.id}
         selectedChannelId={selectedChannelId}
         onSelectChannel={onSelectChannel}
-        onEditChannel={isAdmin ? setEditingChannelId : undefined}
+        onEditChannel={canManageChannels ? setEditingChannelId : undefined}
       />
       <ChannelGroup
         title="Voice channels"
@@ -58,23 +59,27 @@ export function Sidebar({
         currentUserId={currentUser.id}
         selectedChannelId={selectedChannelId}
         onSelectChannel={onSelectChannel}
-        onEditChannel={isAdmin ? setEditingChannelId : undefined}
+        onEditChannel={canManageChannels ? setEditingChannelId : undefined}
       />
       <p className="sidebar-presence"><span className="online-dot" /> {onlineUserIds.length} online</p>
-      {isAdmin && (
-        <><button type="button" className="server-settings-button" onClick={() => setAdminOpen(true)}><Icon name="settings" size={15} /> Server settings</button><CreateChannelForm
+      {canManageServer && (
+        <button type="button" className="server-settings-button" onClick={() => setAdminOpen(true)}><Icon name="settings" size={15} /> Server settings</button>
+      )}
+      {canManageChannels && (
+        <CreateChannelForm
           onCreated={onChannelCreated}
           onError={() => showToast("Could not create the channel")}
-        />{adminOpen ? <AdminPanel currentUser={currentUser} onClose={() => setAdminOpen(false)} /> : null}
-        {editingChannel ? (
-          <ChannelSettingsModal
-            channel={editingChannel}
-            onUpdated={(channel) => { onChannelUpdated?.(channel); setEditingChannelId(null); }}
-            onDeleted={(channelId) => { onChannelDeleted?.(channelId); setEditingChannelId(null); }}
-            onClose={() => setEditingChannelId(null)}
-          />
-        ) : null}</>
+        />
       )}
+      {adminOpen ? <AdminPanel currentUser={currentUser} onClose={() => setAdminOpen(false)} /> : null}
+      {editingChannel ? (
+        <ChannelSettingsModal
+          channel={editingChannel}
+          onUpdated={(channel) => { onChannelUpdated?.(channel); setEditingChannelId(null); }}
+          onDeleted={(channelId) => { onChannelDeleted?.(channelId); setEditingChannelId(null); }}
+          onClose={() => setEditingChannelId(null)}
+        />
+      ) : null}
     </nav>
   );
 }

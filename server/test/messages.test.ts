@@ -79,7 +79,7 @@ describe("messages", () => {
 
   it("forbids a member from posting in a moderator-only channel", async () => {
     const staff = await app.inject({ method: "POST", url: "/api/channels",
-      headers: { cookie: adminCookie }, payload: { name: "staff", type: "text", minRole: "moderator" } });
+      headers: { cookie: adminCookie }, payload: { name: "staff", type: "text", requiredCapability: "moderate" } });
     const staffId = staff.json().id;
     const inv = await app.inject({ method: "POST", url: "/api/invites", headers: { cookie: adminCookie } });
     const reg = await app.inject({ method: "POST", url: "/api/auth/register",
@@ -92,7 +92,7 @@ describe("messages", () => {
 
   it("forbids a member from reading messages in a moderator-only channel", async () => {
     const staff = await app.inject({ method: "POST", url: "/api/channels",
-      headers: { cookie: adminCookie }, payload: { name: "staff", type: "text", minRole: "moderator" } });
+      headers: { cookie: adminCookie }, payload: { name: "staff", type: "text", requiredCapability: "moderate" } });
     const staffId = staff.json().id;
     const inv = await app.inject({ method: "POST", url: "/api/invites", headers: { cookie: adminCookie } });
     const reg = await app.inject({ method: "POST", url: "/api/auth/register",

@@ -10,8 +10,8 @@ vi.mock("../api/client", async () => {
   return { ...actual, updateChannel: vi.fn(), deleteChannel: vi.fn() };
 });
 
-const textChannel: Channel = { id: "c1", name: "general", type: "text", minRole: "member", position: 0, createdAt: "now" };
-const voiceChannel: Channel = { id: "c2", name: "lounge", type: "voice", minRole: "member", position: 1, createdAt: "now" };
+const textChannel: Channel = { id: "c1", name: "general", type: "text", requiredCapability: null, position: 0, createdAt: "now" };
+const voiceChannel: Channel = { id: "c2", name: "lounge", type: "voice", requiredCapability: null, position: 1, createdAt: "now" };
 
 beforeEach(() => {
   vi.mocked(api.updateChannel).mockReset();

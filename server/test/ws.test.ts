@@ -115,7 +115,7 @@ describe("websocket", () => {
     await closed(ws);
   });
 
-  it("sends voice.sync on connect, filtered to channels the user's role can see", async () => {
+  it("sends voice.sync on connect, filtered to channels the user's capabilities can see", async () => {
     const adminCookie = await loginCookie("theo", "correct horse battery");
 
     const publicVoice = await app.inject({ method: "POST", url: "/api/channels",
@@ -124,7 +124,7 @@ describe("websocket", () => {
 
     const staffVoice = await app.inject({ method: "POST", url: "/api/channels",
       headers: { cookie: adminCookie },
-      payload: { name: "staff-voice", type: "voice", minRole: "moderator" } });
+      payload: { name: "staff-voice", type: "voice", requiredCapability: "moderate" } });
     const staffId = staffVoice.json().id;
 
     // Populate real occupancy directly via the presence tracker — this is
@@ -149,11 +149,14 @@ describe("websocket", () => {
     expect(memberVoiceSync.channels[staffId]).toBeUndefined();
 
     // A moderator: sees both channels' occupants, proving the filter
-    // allows access (not just excludes it) when the role is sufficient.
+    // allows access (not just excludes it) when the capability is held.
     const invB = await app.inject({ method: "POST", url: "/api/invites", headers: { cookie: adminCookie } });
     const regB = await app.inject({ method: "POST", url: "/api/auth/register",
       payload: { inviteToken: invB.json().token, username: "bob", password: "bobpass1234" } });
-    await pool.query("UPDATE users SET role = 'moderator' WHERE username = $1", ["bob"]);
+    const bobId = (await app.inject({ method: "GET", url: "/api/me",
+      headers: { cookie: `sid=${regB.cookies.find((c) => c.name === "sid")!.value}` } })).json().id;
+    await app.inject({ method: "PATCH", url: `/api/admin/users/${bobId}`,
+      headers: { cookie: adminCookie }, payload: { capabilities: ["moderate"] } });
     const modCookie = `sid=${regB.cookies.find((c) => c.name === "sid")!.value}`;
 
     const wsMod = openWs(modCookie);
@@ -268,11 +271,11 @@ describe("websocket", () => {
     await closed(ws);
   });
 
-  it("scopes message.created to the channel's min_role: member is excluded, moderator/admin are included", async () => {
+  it("scopes message.created to the channel's required capability: a non-holder is excluded, holders are included", async () => {
     const adminCookie = await loginCookie("theo", "correct horse battery");
 
     const staff = await app.inject({ method: "POST", url: "/api/channels",
-      headers: { cookie: adminCookie }, payload: { name: "staff", type: "text", minRole: "moderator" } });
+      headers: { cookie: adminCookie }, payload: { name: "staff", type: "text", requiredCapability: "moderate" } });
     const staffId = staff.json().id;
     const general = await app.inject({ method: "POST", url: "/api/channels",
       headers: { cookie: adminCookie }, payload: { name: "général", type: "text" } });
@@ -280,9 +283,10 @@ describe("websocket", () => {
 
     // Use the session cookie register() already sets, rather than a second
     // /api/auth/login call — /api/auth/login is rate-limited and the test
-    // suite's total call count is close to that limit. Role is looked up
-    // live per-request (not cached in the session), so promoting bob after
-    // registering still takes effect on his existing cookie.
+    // suite's total call count is close to that limit. Capabilities are
+    // looked up live per-request (not cached in the session), so granting
+    // bob 'moderate' after registering still takes effect on his existing
+    // cookie.
     const invA = await app.inject({ method: "POST", url: "/api/invites", headers: { cookie: adminCookie } });
     const regA = await app.inject({ method: "POST", url: "/api/auth/register",
       payload: { inviteToken: invA.json().token, username: "alice", password: "alicepass123" } });
@@ -291,7 +295,10 @@ describe("websocket", () => {
     const invB = await app.inject({ method: "POST", url: "/api/invites", headers: { cookie: adminCookie } });
     const regB = await app.inject({ method: "POST", url: "/api/auth/register",
       payload: { inviteToken: invB.json().token, username: "bob", password: "bobpass1234" } });
-    await pool.query("UPDATE users SET role = 'moderator' WHERE username = $1", ["bob"]);
+    const bobId = (await app.inject({ method: "GET", url: "/api/me",
+      headers: { cookie: `sid=${regB.cookies.find((c) => c.name === "sid")!.value}` } })).json().id;
+    await app.inject({ method: "PATCH", url: `/api/admin/users/${bobId}`,
+      headers: { cookie: adminCookie }, payload: { capabilities: ["moderate"] } });
     const modCookie = `sid=${regB.cookies.find((c) => c.name === "sid")!.value}`;
 
     // Connect one socket at a time, draining both its own presence.sync /
@@ -350,7 +357,7 @@ describe("websocket", () => {
     await Promise.all([closed(wsAdmin), closed(wsMod), closed(wsMember)]);
   });
 
-  it("scopes channel.created to the channel's min_role: member is excluded, admin is included", async () => {
+  it("scopes channel.created to the channel's required capability: a non-holder is excluded, a holder is included", async () => {
     const adminCookie = await loginCookie("theo", "correct horse battery");
 
     const invA = await app.inject({ method: "POST", url: "/api/invites", headers: { cookie: adminCookie } });
@@ -376,7 +383,7 @@ describe("websocket", () => {
     const memberEventP = nextMessage(wsMember);
 
     const staffRes = await app.inject({ method: "POST", url: "/api/channels",
-      headers: { cookie: adminCookie }, payload: { name: "staff", type: "text", minRole: "moderator" } });
+      headers: { cookie: adminCookie }, payload: { name: "staff", type: "text", requiredCapability: "moderate" } });
     expect(staffRes.statusCode).toBe(201);
 
     const generalRes = await app.inject({ method: "POST", url: "/api/channels",
@@ -386,13 +393,13 @@ describe("websocket", () => {
     // admin receives the restricted (staff) channel.created first.
     const adminEvent = await adminEventP;
     expect(adminEvent.type).toBe("channel.created");
-    expect(adminEvent.channel).toMatchObject({ name: "staff", minRole: "moderator" });
+    expect(adminEvent.channel).toMatchObject({ name: "staff", requiredCapability: "moderate" });
 
     // the member never gets the staff channel.created — their next event is
     // the member-visible channel, proving the restricted event never arrived.
     const memberEvent = await memberEventP;
     expect(memberEvent.type).toBe("channel.created");
-    expect(memberEvent.channel).toMatchObject({ name: "général", minRole: "member" });
+    expect(memberEvent.channel).toMatchObject({ name: "général", requiredCapability: null });
 
     wsAdmin.close();
     wsMember.close();

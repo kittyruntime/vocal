@@ -25,12 +25,20 @@ describe("server administration", () => {
     expect(invited.statusCode).toBe(201);
   });
 
-  it("lists users and changes their role", async () => {
+  it("lists users and changes their capabilities", async () => {
     await app.inject({ method: "POST", url: "/api/auth/register", payload: { username: "alice", password: "password123" } });
     const list = await app.inject({ method: "GET", url: "/api/admin/users", headers: { cookie: adminCookie } });
     const alice = list.json().find((user: { username: string }) => user.username === "alice");
-    const update = await app.inject({ method: "PATCH", url: `/api/admin/users/${alice.id}`, headers: { cookie: adminCookie }, payload: { role: "moderator" } });
-    expect(update.json()).toMatchObject({ username: "alice", role: "moderator" });
+    expect(alice.capabilities).toEqual(["publish_voice"]);
+    const update = await app.inject({ method: "PATCH", url: `/api/admin/users/${alice.id}`, headers: { cookie: adminCookie }, payload: { capabilities: ["moderate"] } });
+    expect(update.json()).toMatchObject({ username: "alice", capabilities: ["moderate"] });
+  });
+
+  it("refuses to remove manage_server from the last holder", async () => {
+    const me = await app.inject({ method: "GET", url: "/api/me", headers: { cookie: adminCookie } });
+    const res = await app.inject({ method: "PATCH", url: `/api/admin/users/${me.json().id}`, headers: { cookie: adminCookie }, payload: { capabilities: ["moderate"] } });
+    expect(res.statusCode).toBe(409);
+    expect(res.json()).toEqual({ error: "cannot remove manage_server from the last holder" });
   });
 
   async function registerAlice(): Promise<{ id: string; cookie: string }> {
@@ -93,12 +101,26 @@ describe("server administration", () => {
       expect(res.json()).toEqual({ error: "cannot ban yourself" });
     });
 
-    it("allows banning another admin when at least one admin remains", async () => {
+    it("allows banning another manage_server holder", async () => {
       const alice = await registerAlice();
-      await app.inject({ method: "PATCH", url: `/api/admin/users/${alice.id}`, headers: { cookie: adminCookie }, payload: { role: "admin" } });
+      await app.inject({ method: "PATCH", url: `/api/admin/users/${alice.id}`, headers: { cookie: adminCookie }, payload: { capabilities: ["manage_server"] } });
       const res = await app.inject({ method: "POST", url: `/api/admin/users/${alice.id}/ban`, headers: { cookie: adminCookie } });
       expect(res.statusCode).toBe(200);
       expect(res.json().bannedAt).not.toBeNull();
+    });
+
+    it("a moderate-only user can kick and ban without manage_server", async () => {
+      const alice = await registerAlice();
+      const bob = await app.inject({ method: "POST", url: "/api/auth/register", payload: { username: "bob", password: "bobpass1234" } });
+      const bobCookie = `sid=${bob.cookies.find((c) => c.name === "sid")!.value}`;
+      const bobId = (await app.inject({ method: "GET", url: "/api/me", headers: { cookie: bobCookie } })).json().id;
+      await app.inject({ method: "PATCH", url: `/api/admin/users/${bobId}`, headers: { cookie: adminCookie }, payload: { capabilities: ["moderate"] } });
+
+      const kick = await app.inject({ method: "POST", url: `/api/admin/users/${alice.id}/kick`, headers: { cookie: bobCookie } });
+      expect(kick.statusCode).toBe(200);
+
+      const settings = await app.inject({ method: "GET", url: "/api/admin/settings", headers: { cookie: bobCookie } });
+      expect(settings.statusCode).toBe(403);
     });
 
     it("404s for an unknown user", async () => {
