@@ -40,6 +40,17 @@ Dernière mise à jour : 2026-08-10
 - [x] Paramètres voix/vidéo déplacés dans une modale inspirée de Discord.
 - [x] Tuiles nominatives par participant avec anneau ou cadre vert sur le locuteur actif.
 - [x] Barre d’appel compacte à contrôles circulaires inspirée de Discord.
+- [x] Connexion automatique au clic sur un salon vocal.
+- [x] Choix détection vocale/push-to-talk déplacé dans les paramètres.
+
+## Administration serveur
+
+- [x] Qualités média par défaut persistées par salon vocal.
+- [x] Édition du nom, du rôle minimum et suppression d’un salon.
+- [x] Ouverture/fermeture des inscriptions dans les paramètres serveur.
+- [x] Liste des utilisateurs et attribution des rôles par un administrateur.
+- [x] Protection contre la rétrogradation du dernier administrateur.
+- [x] Mise à jour immédiate des droits WebSocket lors d’un changement de rôle.
 
 ## À faire ensuite
 

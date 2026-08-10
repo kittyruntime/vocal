@@ -13,6 +13,7 @@ import { loadMasterKey } from "./crypto/messages.js";
 import { registerMessageRoutes } from "./routes/messages.js";
 import { loadLiveKitConfig } from "./voice/tokens.js";
 import { registerVoiceTokenRoute, registerVoiceWebhookRoute } from "./routes/voice.js";
+import { registerAdminRoutes } from "./routes/admin.js";
 import { createVoicePresence, type VoicePresence } from "./voice/presence.js";
 
 export async function buildApp(
@@ -40,6 +41,7 @@ export async function buildApp(
   registerAuthGuard(app, opts.pool);
   app.get("/api/health", async () => ({ status: "ok" }));
   registerAuthRoutes(app, opts.pool);
+  registerAdminRoutes(app, opts.pool, hub);
   registerInviteRoutes(app, opts.pool);
   registerChannelRoutes(app, opts.pool, hub);
   registerMessageRoutes(app, opts.pool, key, hub);
