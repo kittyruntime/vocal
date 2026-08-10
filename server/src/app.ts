@@ -13,11 +13,11 @@ import { loadMasterKey } from "./crypto/messages.js";
 import { registerMessageRoutes } from "./routes/messages.js";
 import { loadLiveKitConfig } from "./voice/tokens.js";
 import { registerVoiceTokenRoute } from "./routes/voice.js";
-import { createVoicePresence } from "./voice/presence.js";
+import { createVoicePresence, type VoicePresence } from "./voice/presence.js";
 
 export async function buildApp(
   opts: { pool: pg.Pool },
-): Promise<{ app: FastifyInstance; hub: WsHub }> {
+): Promise<{ app: FastifyInstance; hub: WsHub; voicePresence: VoicePresence }> {
   const app = Fastify({ logger: false });
   await app.register(cookie);
   await app.register(rateLimit, { global: false });
@@ -45,5 +45,5 @@ export async function buildApp(
   registerMessageRoutes(app, opts.pool, key, hub);
   registerVoiceTokenRoute(app, opts.pool, liveKitConfig);
   registerWsRoute(app, opts.pool, hub, voicePresence);
-  return { app, hub };
+  return { app, hub, voicePresence };
 }

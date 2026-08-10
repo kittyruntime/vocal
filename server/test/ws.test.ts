@@ -4,9 +4,11 @@ import type { FastifyInstance } from "fastify";
 import { WebSocket } from "ws";
 import { makeTestDb } from "./helpers/db.js";
 import { buildApp } from "../src/app.js";
+import type { VoicePresence } from "../src/voice/presence.js";
 
 let pool: pg.Pool;
 let app: FastifyInstance;
+let voicePresence: VoicePresence;
 let baseUrl: string;
 let adminCookie: string;
 
@@ -37,7 +39,7 @@ function closed(ws: WebSocket): Promise<number> {
 
 beforeAll(async () => {
   pool = await makeTestDb();
-  ({ app } = await buildApp({ pool }));
+  ({ app, voicePresence } = await buildApp({ pool }));
   await app.listen({ host: "127.0.0.1", port: 0 });
   const addr = app.server.address();
   const port = typeof addr === "object" && addr ? addr.port : 0;
@@ -102,30 +104,46 @@ describe("websocket", () => {
       payload: { name: "staff-voice", type: "voice", minRole: "moderator" } });
     const staffId = staffVoice.json().id;
 
-    // Someone already "in" both voice channels before the member connects —
-    // simulated directly since joining for real needs Task 4's webhook.
-    const wsAdmin = openWs(adminCookie);
-    await new Promise((r) => wsAdmin.once("open", r));
-    const adminSync = await nextMessage(wsAdmin); // presence.sync
-    expect(adminSync.type).toBe("presence.sync");
+    // Populate real occupancy directly via the presence tracker — this is
+    // the same interface Task 4's webhook will call, just invoked here
+    // without a real LiveKit round-trip.
+    voicePresence.join(publicId, "occupant-1");
+    voicePresence.join(staffId, "occupant-2");
 
-    const inv = await app.inject({ method: "POST", url: "/api/invites", headers: { cookie: adminCookie } });
-    const reg = await app.inject({ method: "POST", url: "/api/auth/register",
-      payload: { inviteToken: inv.json().token, username: "alice", password: "alicepass123" } });
-    const memberCookie = `sid=${reg.cookies.find((c) => c.name === "sid")!.value}`;
+    // A plain member: sees the public channel's occupant, but the
+    // moderator-only channel's occupant must not leak through.
+    const invA = await app.inject({ method: "POST", url: "/api/invites", headers: { cookie: adminCookie } });
+    const regA = await app.inject({ method: "POST", url: "/api/auth/register",
+      payload: { inviteToken: invA.json().token, username: "alice", password: "alicepass123" } });
+    const memberCookie = `sid=${regA.cookies.find((c) => c.name === "sid")!.value}`;
 
     const wsMember = openWs(memberCookie);
     await new Promise((r) => wsMember.once("open", r));
     await nextMessage(wsMember); // presence.sync
-    const voiceSync = await nextMessage(wsMember);
-    expect(voiceSync.type).toBe("voice.sync");
-    expect(voiceSync.channels).toEqual({});
-    expect(voiceSync.channels[staffId]).toBeUndefined();
-    expect(publicId).toBeTruthy(); // publicId exists, no occupants yet either
+    const memberVoiceSync = await nextMessage(wsMember);
+    expect(memberVoiceSync.type).toBe("voice.sync");
+    expect(memberVoiceSync.channels[publicId]).toEqual(["occupant-1"]);
+    expect(memberVoiceSync.channels[staffId]).toBeUndefined();
 
-    wsAdmin.close();
+    // A moderator: sees both channels' occupants, proving the filter
+    // allows access (not just excludes it) when the role is sufficient.
+    const invB = await app.inject({ method: "POST", url: "/api/invites", headers: { cookie: adminCookie } });
+    const regB = await app.inject({ method: "POST", url: "/api/auth/register",
+      payload: { inviteToken: invB.json().token, username: "bob", password: "bobpass1234" } });
+    await pool.query("UPDATE users SET role = 'moderator' WHERE username = $1", ["bob"]);
+    const modCookie = `sid=${regB.cookies.find((c) => c.name === "sid")!.value}`;
+
+    const wsMod = openWs(modCookie);
+    await new Promise((r) => wsMod.once("open", r));
+    await nextMessage(wsMod); // presence.sync
+    const modVoiceSync = await nextMessage(wsMod);
+    expect(modVoiceSync.type).toBe("voice.sync");
+    expect(modVoiceSync.channels[publicId]).toEqual(["occupant-1"]);
+    expect(modVoiceSync.channels[staffId]).toEqual(["occupant-2"]);
+
     wsMember.close();
-    await Promise.all([closed(wsAdmin), closed(wsMember)]);
+    wsMod.close();
+    await Promise.all([closed(wsMember), closed(wsMod)]);
   });
 
   it("ignores non-object JSON payloads instead of crashing", async () => {
