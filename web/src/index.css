@@ -110,7 +110,7 @@ summary:focus-visible {
 
 /* Application shell */
 .app-shell { height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
-.connection-banner { flex: 0 0 auto; padding: 5px 12px; background: #f0b232; color: #111214; text-align: center; font-size: 13px; font-weight: 600; }
+.connection-banner { flex: 0 0 auto; padding: 5px 12px; background: #f0b232; color: #111214; text-align: center; font-size: 13px; font-weight: 600; animation: banner-enter 180ms ease-out both; }
 .main-layout { flex: 1; min-height: 0; display: flex; }
 
 .sidebar-column {
@@ -167,6 +167,7 @@ summary:focus-visible {
   color: #949ba4;
   cursor: pointer;
   text-align: left;
+  transition: background-color 120ms ease-out, color 120ms ease-out;
 }
 .channel-link:hover { background: #35373c; color: #dbdee1; }
 .channel-link.active { background: #404249; color: #fff; }
@@ -258,7 +259,7 @@ summary:focus-visible {
 .chat-empty-icon { width: 68px; height: 68px; display: grid; place-items: center; border-radius: 50%; background: #41434a; color: #fff; font-size: 40px; font-weight: 700; }
 .chat-empty h1 { margin: 14px 0 4px; color: #f2f3f5; font-size: 28px; line-height: 1.2; letter-spacing: -.025em; }
 .chat-empty p { margin: 0; color: #b5bac1; }
-.chat-message { display: flex; gap: 14px; padding: 3px 16px; margin-top: 14px; }
+.chat-message { display: flex; gap: 14px; padding: 3px 16px; margin-top: 14px; animation: call-enter 160ms ease-out both; }
 .chat-message:hover { background: #2e3035; }
 .message-avatar { width: 40px; height: 40px; margin-top: 2px; }
 .message-body { min-width: 0; }
@@ -431,15 +432,27 @@ summary:focus-visible {
 @keyframes speaking-ring { 50% { box-shadow: 0 0 0 8px rgb(35 165 90 / 7%); } }
 @keyframes modal-fade { from { opacity: 0; } }
 @keyframes modal-enter { from { opacity: 0; transform: translateY(10px) scale(.98); } }
+@keyframes banner-enter { from { opacity: 0; transform: translateY(-100%); } }
+@keyframes toast-enter { from { opacity: 0; transform: translateX(12px); } }
 
 @media (prefers-reduced-motion: reduce) {
-  .voice-hero, .video-tile, .local-video:not(:empty), .voice-participant-grid, .voice-participant.is-speaking .participant-avatar-wrap, .connecting-dots i, .voice-modal-backdrop, .voice-settings-modal { animation: none; }
-  .voice-controls button, .voice-meter span { transition: none; }
+  .voice-hero, .video-tile, .local-video:not(:empty), .voice-participant-grid, .voice-participant.is-speaking .participant-avatar-wrap, .connecting-dots i, .voice-modal-backdrop, .voice-settings-modal, .connection-banner, .chat-message, .toast { animation: none; }
+  .voice-controls button, .voice-meter span, .channel-link, .toast { transition: none; }
 }
 
 /* Feedback */
 .toast-viewport { position: fixed; right: 16px; bottom: 16px; z-index: 20; display: flex; flex-direction: column; gap: 8px; }
-.toast { max-width: min(380px, calc(100vw - 32px)); padding: 11px 14px; border-radius: 6px; background: #111214; color: #f2f3f5; box-shadow: 0 5px 18px rgb(0 0 0 / 40%); }
+.toast {
+  max-width: min(380px, calc(100vw - 32px));
+  padding: 11px 14px;
+  border-radius: 6px;
+  background: #111214;
+  color: #f2f3f5;
+  box-shadow: 0 5px 18px rgb(0 0 0 / 40%);
+  animation: toast-enter 180ms ease-out both;
+  transition: opacity 180ms ease-in, transform 180ms ease-in;
+}
+.toast.is-leaving { opacity: 0; transform: translateX(12px); }
 
 @media (max-width: 760px) {
   .sidebar-column { width: 210px; min-width: 210px; }
