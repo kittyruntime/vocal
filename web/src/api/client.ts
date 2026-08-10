@@ -6,10 +6,12 @@ export type CurrentUser = {
   username: string;
   email?: string | null;
   avatarUrl?: string | null;
+  bannerUrl?: string | null;
   description?: string;
   capabilities: Capability[];
 };
-export type ProfileUpdate = Pick<Required<CurrentUser>, "username" | "email" | "avatarUrl" | "description">;
+export type ProfileUpdate = Pick<Required<CurrentUser>, "username" | "email" | "avatarUrl" | "bannerUrl" | "description">;
+export type PublicProfile = { id: string; username: string; description: string; avatarUrl: string | null; bannerUrl: string | null };
 
 export type Channel = {
   id: string;
@@ -100,6 +102,7 @@ export function getMe(): Promise<CurrentUser> {
 export function updateProfile(profile: ProfileUpdate): Promise<CurrentUser> {
   return request("/api/me", { method: "PATCH", body: JSON.stringify(profile) });
 }
+export function getPublicProfile(userId: string): Promise<PublicProfile> { return request(`/api/users/${userId}/profile`); }
 
 export function listChannels(): Promise<Channel[]> {
   return request("/api/channels");

@@ -14,9 +14,11 @@ export function ProfileModal({ currentUser, onClose, onSaved }: {
   const [email, setEmail] = useState(currentUser.email ?? "");
   const [description, setDescription] = useState(currentUser.description ?? "");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(currentUser.avatarUrl ?? null);
+  const [bannerUrl, setBannerUrl] = useState<string | null>(currentUser.bannerUrl ?? null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const bannerInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
@@ -47,13 +49,25 @@ export function ProfileModal({ currentUser, onClose, onSaved }: {
     reader.readAsDataURL(file);
   }
 
+  async function selectBanner(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    if (!/^image\/(png|jpeg|webp|gif)$/.test(file.type)) return setError("Choose a PNG, JPEG, WebP or GIF banner.");
+    if (file.size > MAX_AVATAR_BYTES) return setError("The profile banner must be smaller than 512 KB.");
+    const reader = new FileReader();
+    reader.onload = () => { setBannerUrl(typeof reader.result === "string" ? reader.result : null); setError(""); };
+    reader.onerror = () => setError("The banner could not be read.");
+    reader.readAsDataURL(file);
+  }
+
   async function submit(event: FormEvent) {
     event.preventDefault();
     if (saving) return;
     setSaving(true);
     setError("");
     try {
-      await api.updateProfile({ username: username.trim(), email: email.trim() || null, description: description.trim(), avatarUrl });
+      await api.updateProfile({ username: username.trim(), email: email.trim() || null, description: description.trim(), avatarUrl, bannerUrl });
       await onSaved();
       onClose();
     } catch (err) {
@@ -74,7 +88,7 @@ export function ProfileModal({ currentUser, onClose, onSaved }: {
         </header>
         <form className="profile-form" onSubmit={submit}>
           <div className="profile-preview">
-            <div className="profile-banner" />
+            <button type="button" className="profile-banner" style={bannerUrl ? { backgroundImage: `url(${bannerUrl})` } : undefined} onClick={() => bannerInputRef.current?.click()} aria-label="Change profile banner"><span><Icon name="camera" size={15} /> Change banner</span></button>
             <div className="profile-preview-body">
               <button type="button" className="profile-avatar-button" onClick={() => fileInputRef.current?.click()} aria-label="Change profile picture">
                 {avatarUrl ? <img src={avatarUrl} alt="Profile preview" /> : <span>{username.slice(0, 1).toUpperCase() || "?"}</span>}
@@ -85,6 +99,7 @@ export function ProfileModal({ currentUser, onClose, onSaved }: {
             </div>
           </div>
           <input ref={fileInputRef} className="sr-only" type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={(event) => void selectAvatar(event)} />
+          <input ref={bannerInputRef} className="sr-only" type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={(event) => void selectBanner(event)} />
           <div className="profile-fields">
             <label>Username<input value={username} onChange={(event) => setUsername(event.target.value)} minLength={2} maxLength={32} required /></label>
             <label>Email<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} maxLength={254} placeholder="you@example.com" /></label>
@@ -93,6 +108,11 @@ export function ProfileModal({ currentUser, onClose, onSaved }: {
               <button type="button" onClick={() => fileInputRef.current?.click()}>Upload picture</button>
               {avatarUrl ? <button type="button" className="danger-link" onClick={() => setAvatarUrl(null)}>Remove</button> : null}
               <small>PNG, JPEG, WebP or GIF · 512 KB max</small>
+            </div>
+            <div className="profile-avatar-actions">
+              <button type="button" onClick={() => bannerInputRef.current?.click()}>Upload banner</button>
+              {bannerUrl ? <button type="button" className="danger-link" onClick={() => setBannerUrl(null)}>Remove banner</button> : null}
+              <small>Recommended ratio 3:1 · 512 KB max</small>
             </div>
           </div>
           {error ? <p className="admin-error" role="alert">{error}</p> : null}

@@ -17,6 +17,7 @@ export function ChatView({
   onMessagesLoaded,
   onMessagesPrepended,
   onOpenSidebar,
+  onViewProfile,
 }: {
   channel: Channel;
   maxMessageLength?: number;
@@ -24,6 +25,7 @@ export function ChatView({
   onMessagesLoaded(messages: Message[]): void;
   onMessagesPrepended(messages: Message[]): void;
   onOpenSidebar?(): void;
+  onViewProfile?(userId: string): void;
 }) {
   const { showToast } = useToast();
   const [draft, setDraft] = useState("");
@@ -197,10 +199,10 @@ export function ChatView({
         )}
         {messages.map((message) => (
           <article key={message.id} className="chat-message">
-            <span className="message-avatar" aria-hidden="true">{message.avatarUrl ? <img src={message.avatarUrl} alt="" /> : message.username.slice(0, 1).toUpperCase()}</span>
+            <button type="button" className="message-profile-trigger" aria-label={`View profile of ${message.username}`} onClick={() => onViewProfile?.(message.userId)}><span className="message-avatar" aria-hidden="true">{message.avatarUrl ? <img src={message.avatarUrl} alt="" /> : message.username.slice(0, 1).toUpperCase()}</span></button>
             <div className="message-body">
               <div className="message-meta">
-                <span className="chat-author">{message.username}</span>
+                <button type="button" className="chat-author" onClick={() => onViewProfile?.(message.userId)}>{message.username}</button>
                 <time dateTime={message.createdAt}>{formatMessageTime(message.createdAt)}</time>
               </div>
               <div className="chat-content">{message.content}</div>

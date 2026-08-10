@@ -21,7 +21,7 @@ import { createVoiceAdminService, type VoiceAdminService } from "./voice/admin.j
 export async function buildApp(
   opts: { pool: pg.Pool; voiceAdmin?: VoiceAdminService },
 ): Promise<{ app: FastifyInstance; hub: WsHub; voicePresence: VoicePresence }> {
-  const app = Fastify({ logger: false });
+  const app = Fastify({ logger: false, bodyLimit: 2 * 1024 * 1024 });
   await app.register(cookie);
   await app.register(rateLimit, { global: false });
   await app.register(websocket);

@@ -48,11 +48,11 @@ describe("api client", () => {
 
   it("updates the current profile", async () => {
     mockFetchOnce(200, { id: "u1", username: "theophile" });
-    await updateProfile({ username: "theophile", email: "theo@example.com", description: "Hello", avatarUrl: null });
+    await updateProfile({ username: "theophile", email: "theo@example.com", description: "Hello", avatarUrl: null, bannerUrl: null });
     const [url, init] = (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls[0];
     expect(url).toBe("/api/me");
     expect(init.method).toBe("PATCH");
-    expect(JSON.parse(init.body)).toEqual({ username: "theophile", email: "theo@example.com", description: "Hello", avatarUrl: null });
+    expect(JSON.parse(init.body)).toEqual({ username: "theophile", email: "theo@example.com", description: "Hello", avatarUrl: null, bannerUrl: null });
   });
 
   it("listChannels returns the parsed array", async () => {

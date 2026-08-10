@@ -33,6 +33,10 @@ const profileSchema = z.object({
     z.string().max(700_000).regex(/^data:image\/(?:png|jpeg|webp|gif);base64,[A-Za-z0-9+/]+=*$/),
     z.null(),
   ]),
+  bannerUrl: z.union([
+    z.string().max(700_000).regex(/^data:image\/(?:png|jpeg|webp|gif);base64,[A-Za-z0-9+/]+=*$/),
+    z.null(),
+  ]).optional(),
 });
 const userIdSchema = z.object({ id: z.uuid() });
 
@@ -191,6 +195,34 @@ export function registerAuthRoutes(app: FastifyInstance, pool: pg.Pool): void {
       .send(Buffer.from(match[2], "base64"));
   });
 
+  app.get("/api/users/:id/banner", { preHandler: app.requireAuth }, async (req, reply) => {
+    const params = userIdSchema.safeParse(req.params);
+    if (!params.success) return reply.code(404).send({ error: "banner not found" });
+    const result = await pool.query<{ banner_url: string | null }>("SELECT banner_url FROM users WHERE id = $1", [params.data.id]);
+    const encoded = result.rows[0]?.banner_url;
+    const match = encoded?.match(/^data:(image\/(?:png|jpeg|webp|gif));base64,(.+)$/);
+    if (!match) return reply.code(404).send({ error: "banner not found" });
+    return reply.type(match[1]).header("Cache-Control", "private, no-cache").send(Buffer.from(match[2], "base64"));
+  });
+
+  app.get("/api/users/:id/profile", { preHandler: app.requireAuth }, async (req, reply) => {
+    const params = userIdSchema.safeParse(req.params);
+    if (!params.success) return reply.code(404).send({ error: "user not found" });
+    const result = await pool.query<{ id: string; username: string; description: string; avatar_url: string | null; banner_url: string | null }>(
+      "SELECT id, username, description, avatar_url, banner_url FROM users WHERE id = $1 AND banned_at IS NULL",
+      [params.data.id],
+    );
+    const user = result.rows[0];
+    if (!user) return reply.code(404).send({ error: "user not found" });
+    return {
+      id: user.id,
+      username: user.username,
+      description: user.description,
+      avatarUrl: user.avatar_url ? `/api/users/${user.id}/avatar` : null,
+      bannerUrl: user.banner_url ? `/api/users/${user.id}/banner` : null,
+    };
+  });
+
   app.patch("/api/me", { preHandler: app.requireAuth }, async (req, reply) => {
     const body = profileSchema.safeParse(req.body);
     if (!body.success) {
@@ -200,16 +232,17 @@ export function registerAuthRoutes(app: FastifyInstance, pool: pg.Pool): void {
         email: "email address",
         description: "description",
         avatarUrl: "profile picture",
+        bannerUrl: "profile banner",
       };
       return reply.code(400).send({ error: `invalid ${labels[String(field)] ?? "profile"}` });
     }
     try {
       const updated = await pool.query(
         `UPDATE users
-         SET username = $1, email = $2, avatar_url = $3, description = $4
-         WHERE id = $5
-         RETURNING username, email, avatar_url AS "avatarUrl", description`,
-        [body.data.username, body.data.email, body.data.avatarUrl, body.data.description, req.user!.id],
+         SET username = $1, email = $2, avatar_url = $3, description = $4, banner_url = $5
+         WHERE id = $6
+         RETURNING username, email, avatar_url AS "avatarUrl", banner_url AS "bannerUrl", description`,
+        [body.data.username, body.data.email, body.data.avatarUrl, body.data.description, body.data.bannerUrl ?? req.user!.bannerUrl, req.user!.id],
       );
       return { ...req.user!, ...updated.rows[0] };
     } catch (err: any) {

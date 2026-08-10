@@ -8,6 +8,7 @@ export type SessionUser = {
   username: string;
   email: string | null;
   avatarUrl: string | null;
+  bannerUrl: string | null;
   description: string;
   capabilities: Capability[];
   voiceMuted: boolean;

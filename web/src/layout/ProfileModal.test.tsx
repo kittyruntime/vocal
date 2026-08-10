@@ -28,7 +28,7 @@ describe("ProfileModal", () => {
     await user.click(screen.getByRole("button", { name: "Save changes" }));
 
     await waitFor(() => expect(api.updateProfile).toHaveBeenCalledWith({
-      username: "theophile", email: "theo@example.com", description: "Hello there", avatarUrl: null,
+      username: "theophile", email: "theo@example.com", description: "Hello there", avatarUrl: null, bannerUrl: null,
     }));
     expect(onSaved).toHaveBeenCalled();
     expect(onClose).toHaveBeenCalled();
