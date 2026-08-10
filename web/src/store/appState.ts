@@ -1,5 +1,6 @@
 import type { Channel, CurrentUser, Message } from "../api/client";
 import type { ConnectionStatus } from "../ws/socketClient";
+import type { VoiceParticipant } from "../ws/protocol";
 
 export type AppState = {
   currentUser: CurrentUser | null;
@@ -7,7 +8,7 @@ export type AppState = {
   selectedChannelId: string | null;
   messagesByChannel: Record<string, Message[]>;
   onlineUserIds: string[];
-  voiceOccupancy: Record<string, string[]>;
+  voiceOccupancy: Record<string, VoiceParticipant[]>;
   connectionStatus: ConnectionStatus;
 };
 
@@ -32,8 +33,8 @@ export type AppAction =
   | { type: "presence/sync"; userIds: string[] }
   | { type: "presence/online"; userId: string }
   | { type: "presence/offline"; userId: string }
-  | { type: "voice/sync"; channels: Record<string, string[]> }
-  | { type: "voice/joined"; channelId: string; userId: string }
+  | { type: "voice/sync"; channels: Record<string, VoiceParticipant[]> }
+  | { type: "voice/joined"; channelId: string; participant: VoiceParticipant }
   | { type: "voice/left"; channelId: string; userId: string }
   | { type: "connection/status"; status: ConnectionStatus };
 
@@ -90,18 +91,18 @@ export function appReducer(state: AppState, action: AppAction): AppState {
       return { ...state, voiceOccupancy: action.channels };
     case "voice/joined": {
       const occupants = state.voiceOccupancy[action.channelId] ?? [];
-      if (occupants.includes(action.userId)) return state;
+      if (occupants.some((participant) => participant.userId === action.participant.userId)) return state;
       return {
         ...state,
         voiceOccupancy: {
           ...state.voiceOccupancy,
-          [action.channelId]: [...occupants, action.userId],
+          [action.channelId]: [...occupants, action.participant],
         },
       };
     }
     case "voice/left": {
       const occupants = (state.voiceOccupancy[action.channelId] ?? []).filter(
-        (id) => id !== action.userId,
+        (participant) => participant.userId !== action.userId,
       );
       const voiceOccupancy = { ...state.voiceOccupancy };
       if (occupants.length === 0) delete voiceOccupancy[action.channelId];

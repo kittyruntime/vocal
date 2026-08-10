@@ -51,7 +51,7 @@ export function MainLayout({ currentUser }: { currentUser: CurrentUser }) {
             dispatch({ type: "voice/sync", channels: event.channels });
             break;
           case "voice.joined":
-            dispatch({ type: "voice/joined", channelId: event.channelId, userId: event.userId });
+            dispatch({ type: "voice/joined", channelId: event.channelId, participant: event.participant });
             break;
           case "voice.left":
             dispatch({ type: "voice/left", channelId: event.channelId, userId: event.userId });

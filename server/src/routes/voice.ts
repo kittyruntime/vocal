@@ -67,8 +67,9 @@ export function registerVoiceWebhookRoute(
         const minRole = await channelMinRole(pool, channelId);
         if (minRole) {
           if (event.event === "participant_joined") {
-            voicePresence.join(channelId, userId);
-            hub.broadcastToRole(minRole, { type: "voice.joined", channelId, userId });
+            const participant = { userId, username: event.participant?.name || userId };
+            voicePresence.join(channelId, participant);
+            hub.broadcastToRole(minRole, { type: "voice.joined", channelId, participant });
           } else {
             voicePresence.leave(channelId, userId);
             hub.broadcastToRole(minRole, { type: "voice.left", channelId, userId });

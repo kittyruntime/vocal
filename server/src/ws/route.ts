@@ -4,6 +4,7 @@ import { getSessionUser } from "../auth/sessions.js";
 import { hasAtLeastRole, type Role } from "../roles.js";
 import type { WsHub } from "./hub.js";
 import type { VoicePresence } from "../voice/presence.js";
+import type { VoiceParticipantPayload } from "./protocol.js";
 
 function parseCookie(header: string | undefined, name: string): string | undefined {
   if (!header) return undefined;
@@ -37,12 +38,12 @@ function isAllowedOrigin(req: FastifyRequest): boolean {
 // Returns the subset of `occupancy` (channelId -> userIds) for voice channels
 // whose min_role is satisfied by `role`, skipping empty entries.
 async function visibleVoiceOccupancy(
-  pool: pg.Pool, role: Role, occupancy: Record<string, string[]>,
-): Promise<Record<string, string[]>> {
+  pool: pg.Pool, role: Role, occupancy: Record<string, VoiceParticipantPayload[]>,
+): Promise<Record<string, VoiceParticipantPayload[]>> {
   const res = await pool.query<{ id: string; min_role: string }>(
     "SELECT id, min_role FROM channels WHERE type = 'voice'",
   );
-  const visible: Record<string, string[]> = {};
+  const visible: Record<string, VoiceParticipantPayload[]> = {};
   for (const row of res.rows) {
     const occupants = occupancy[row.id];
     if (occupants && occupants.length > 0 && hasAtLeastRole(role, row.min_role as Role)) {

@@ -130,8 +130,8 @@ describe("websocket", () => {
     // Populate real occupancy directly via the presence tracker — this is
     // the same interface Task 4's webhook will call, just invoked here
     // without a real LiveKit round-trip.
-    voicePresence.join(publicId, "occupant-1");
-    voicePresence.join(staffId, "occupant-2");
+    voicePresence.join(publicId, { userId: "occupant-1", username: "Alice" });
+    voicePresence.join(staffId, { userId: "occupant-2", username: "Bob" });
 
     // A plain member: sees the public channel's occupant, but the
     // moderator-only channel's occupant must not leak through.
@@ -145,7 +145,7 @@ describe("websocket", () => {
     await nextMessage(wsMember); // presence.sync
     const memberVoiceSync = await nextMessage(wsMember);
     expect(memberVoiceSync.type).toBe("voice.sync");
-    expect(memberVoiceSync.channels[publicId]).toEqual(["occupant-1"]);
+    expect(memberVoiceSync.channels[publicId]).toEqual([{ userId: "occupant-1", username: "Alice" }]);
     expect(memberVoiceSync.channels[staffId]).toBeUndefined();
 
     // A moderator: sees both channels' occupants, proving the filter
@@ -161,8 +161,8 @@ describe("websocket", () => {
     await nextMessage(wsMod); // presence.sync
     const modVoiceSync = await nextMessage(wsMod);
     expect(modVoiceSync.type).toBe("voice.sync");
-    expect(modVoiceSync.channels[publicId]).toEqual(["occupant-1"]);
-    expect(modVoiceSync.channels[staffId]).toEqual(["occupant-2"]);
+    expect(modVoiceSync.channels[publicId]).toEqual([{ userId: "occupant-1", username: "Alice" }]);
+    expect(modVoiceSync.channels[staffId]).toEqual([{ userId: "occupant-2", username: "Bob" }]);
 
     wsMember.close();
     wsMod.close();
