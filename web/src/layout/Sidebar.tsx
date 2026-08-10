@@ -56,7 +56,10 @@ export function Sidebar({
     <nav className="sidebar" aria-label="Channels">
       <div className="sidebar-server-name">
         <span>Vocal</span>
-        <span className="online-dot" aria-label={`${onlineUserIds.length} members online`} />
+        <div className="sidebar-server-actions">
+          <span className="online-dot" aria-label={`${onlineUserIds.length} members online`} />
+          {(canManageServer || canModerate) ? <button type="button" className="server-settings-button" aria-label={canManageServer ? "Server settings" : "Moderation"} title={canManageServer ? "Server settings" : "Moderation"} onClick={() => setAdminOpen(true)}><Icon name="settings" size={17} /></button> : null}
+        </div>
       </div>
       <ChannelGroup
         title="Text channels"
@@ -82,9 +85,6 @@ export function Sidebar({
         onViewProfile={onViewProfile}
       />
       <p className="sidebar-presence"><span className="online-dot" /> {onlineUserIds.length} online</p>
-      {(canManageServer || canModerate) && (
-        <button type="button" className="server-settings-button" onClick={() => setAdminOpen(true)}><Icon name="settings" size={15} /> {canManageServer ? "Server settings" : "Moderation"}</button>
-      )}
       {canManageChannels && (
         <button type="button" className="create-channel-button" onClick={() => setCreateChannelOpen(true)}><Icon name="plus" size={16} /> Create channel</button>
       )}

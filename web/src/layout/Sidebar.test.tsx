@@ -68,6 +68,14 @@ describe("Sidebar", () => {
     expect(screen.getByRole("button", { name: "Create channel" })).toBeInTheDocument();
   });
 
+  it("keeps server settings in the server header", async () => {
+    renderSidebar(admin);
+    const button = screen.getByRole("button", { name: "Server settings" });
+    expect(button.closest(".sidebar-server-name")).toBeInTheDocument();
+    await userEvent.setup().click(button);
+    expect(screen.getByRole("dialog", { name: "Server settings" })).toBeInTheDocument();
+  });
+
   it("hides the create-channel form from non-admins", () => {
     renderSidebar(member);
     expect(screen.queryByRole("button", { name: "Create channel" })).not.toBeInTheDocument();
