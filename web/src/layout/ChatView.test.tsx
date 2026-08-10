@@ -150,6 +150,7 @@ describe("ChatView", () => {
     await user.click(screen.getByRole("button", { name: "Send" }));
     await waitFor(() => expect(api.postMessage).toHaveBeenCalledWith("c1", "salut"));
     expect(input).toHaveValue("");
+    expect(input).toHaveFocus();
   });
 
   it("loads older messages when scrolled to the top", async () => {

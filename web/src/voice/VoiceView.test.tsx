@@ -112,7 +112,7 @@ function renderView(extraProps: Partial<ComponentProps<typeof VoiceView>> = {}) 
 describe("VoiceView", () => {
   it("joins LiveKit and enables the microphone", async () => {
     renderView();
-    await screen.findByText(/Connected as theo/);
+    await screen.findByRole("button", { name: "Mute microphone" });
     expect(api.getVoiceToken).toHaveBeenCalledWith("c2");
     expect(connect).toHaveBeenCalledWith("ws://livekit", "jwt");
     expect(setMicrophoneEnabled).toHaveBeenCalledWith(true, expect.any(Object), expect.any(Object));
@@ -169,7 +169,7 @@ describe("VoiceView", () => {
 
   it("shows a fullscreen button on remote video tiles too", async () => {
     renderView();
-    await screen.findByText(/Connected as theo/);
+    await screen.findByRole("button", { name: "Mute microphone" });
     const remoteTrack = {
       kind: "video",
       sid: "remote-track-1",
@@ -221,7 +221,7 @@ describe("VoiceView", () => {
 
   it("keeps the voice session connected while the view is hidden", async () => {
     const view = renderView();
-    await screen.findByText(/Connected as theo/);
+    await screen.findByRole("button", { name: "Mute microphone" });
 
     view.rerender(
       <ToastProvider><VoiceView channel={channel} currentUser={currentUser} visible={false} /></ToastProvider>,
@@ -233,7 +233,7 @@ describe("VoiceView", () => {
 
   it("shows a reconnect banner while LiveKit reconnects and clears it once reconnected", async () => {
     renderView();
-    await screen.findByText(/Connected as theo/);
+    await screen.findByRole("button", { name: "Mute microphone" });
 
     act(() => roomHandlers.get("reconnecting")?.());
     expect(screen.getByText(/Reconnecting/)).toBeInTheDocument();
@@ -244,7 +244,7 @@ describe("VoiceView", () => {
 
   it("shows a toast and returns to idle when the connection is lost after failed reconnection attempts", async () => {
     renderView();
-    await screen.findByText(/Connected as theo/);
+    await screen.findByRole("button", { name: "Mute microphone" });
 
     act(() => roomHandlers.get("reconnecting")?.());
     act(() => roomHandlers.get("disconnected")?.());
@@ -256,7 +256,7 @@ describe("VoiceView", () => {
   it("does not show the reconnection-loss toast for a graceful disconnect", async () => {
     renderView();
     const user = userEvent.setup();
-    await screen.findByText(/Connected as theo/);
+    await screen.findByRole("button", { name: "Mute microphone" });
 
     await user.click(screen.getByRole("button", { name: "Leave" }));
     await waitFor(() => expect(disconnect).toHaveBeenCalled());
@@ -292,7 +292,7 @@ describe("VoiceView", () => {
   it("shows a differentiated toast when the camera permission is denied", async () => {
     renderView();
     const user = userEvent.setup();
-    await screen.findByText(/Connected as theo/);
+    await screen.findByRole("button", { name: "Mute microphone" });
     setCameraEnabled.mockRejectedValueOnce(Object.assign(new Error("denied"), { name: "NotAllowedError" }));
     await user.click(screen.getByRole("button", { name: "Turn on camera" }));
     await screen.findByText("Camera permission denied. Check your browser settings.");
@@ -301,7 +301,7 @@ describe("VoiceView", () => {
   it("shows a cancelled toast when the screen-share picker is dismissed", async () => {
     renderView();
     const user = userEvent.setup();
-    await screen.findByText(/Connected as theo/);
+    await screen.findByRole("button", { name: "Mute microphone" });
     setScreenShareEnabled.mockRejectedValueOnce(Object.assign(new Error("cancel"), { name: "NotAllowedError" }));
     await user.click(screen.getByRole("button", { name: "Share screen" }));
     await screen.findByText("Screen share cancelled.");
@@ -320,7 +320,7 @@ describe("VoiceView", () => {
   it("reports active speakers to the parent and clears them on leave", async () => {
     const onSpeakingChange = vi.fn();
     renderView({ onSpeakingChange });
-    await screen.findByText(/Connected as theo/);
+    await screen.findByRole("button", { name: "Mute microphone" });
 
     act(() => roomHandlers.get("activeSpeakersChanged")?.([{ identity: "u2", name: "alice" }]));
     expect(onSpeakingChange).toHaveBeenCalledWith(["u2"]);
@@ -333,7 +333,7 @@ describe("VoiceView", () => {
   it("reports self-presence to the parent on join and on leave", async () => {
     const onSelfPresenceChange = vi.fn();
     renderView({ onSelfPresenceChange });
-    await screen.findByText(/Connected as theo/);
+    await screen.findByRole("button", { name: "Mute microphone" });
     expect(onSelfPresenceChange).toHaveBeenLastCalledWith(true);
 
     const user = userEvent.setup();
@@ -344,7 +344,7 @@ describe("VoiceView", () => {
   it("clears self-presence when disconnected involuntarily", async () => {
     const onSelfPresenceChange = vi.fn();
     renderView({ onSelfPresenceChange });
-    await screen.findByText(/Connected as theo/);
+    await screen.findByRole("button", { name: "Mute microphone" });
     onSelfPresenceChange.mockClear();
 
     act(() => roomHandlers.get("disconnected")?.());
@@ -354,7 +354,7 @@ describe("VoiceView", () => {
   it("re-joins the new channel when switching directly between two voice channels while connected", async () => {
     const onSelfPresenceChange = vi.fn();
     const view = renderView({ onSelfPresenceChange });
-    await screen.findByText(/Connected as theo/);
+    await screen.findByRole("button", { name: "Mute microphone" });
     expect(connect).toHaveBeenCalledTimes(1);
 
     const otherChannel = { ...channel, id: "c3", name: "autre" };
@@ -367,7 +367,7 @@ describe("VoiceView", () => {
     expect(disconnect).toHaveBeenCalledTimes(1);
     expect(onSelfPresenceChange).toHaveBeenCalledWith(false);
     await waitFor(() => expect(api.getVoiceToken).toHaveBeenCalledWith("c3"));
-    await screen.findByText(/Connected as theo/);
+    await screen.findByRole("button", { name: "Mute microphone" });
     expect(connect).toHaveBeenCalledTimes(2);
   });
 });

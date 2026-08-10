@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import {
   ConnectionError,
   ConnectionErrorReason,
@@ -196,7 +196,6 @@ export function VoiceView({
     screenQuality: channel.defaultScreenQuality ?? "standard",
   }));
   const [audioLevel, setAudioLevel] = useState(0);
-  const [participantCount, setParticipantCount] = useState(1);
   const [remoteVideoCount, setRemoteVideoCount] = useState(0);
   const [remoteScreenCount, setRemoteScreenCount] = useState(0);
   const [activeSpeakerIds, setActiveSpeakerIds] = useState<Set<string>>(() => new Set());
@@ -302,7 +301,6 @@ export function VoiceView({
     deafenedRef.current = false;
     setCameraEnabled(false);
     setScreenShareEnabled(false);
-    setParticipantCount(1);
     setRemoteVideoCount(0);
     setRemoteScreenCount(0);
     setActiveSpeakerIds(new Set());
@@ -448,7 +446,6 @@ export function VoiceView({
         })),
       ];
       setCallParticipants(participants);
-      setParticipantCount(participants.length);
     };
     room.on(RoomEvent.ParticipantConnected, refreshParticipants);
     room.on(RoomEvent.ParticipantDisconnected, refreshParticipants);
@@ -657,6 +654,13 @@ export function VoiceView({
 
   const hasVideo = cameraEnabled || screenShareEnabled || remoteVideoCount > 0;
   const hasScreenShare = screenShareEnabled || remoteScreenCount > 0;
+  const videoTileCount = remoteVideoCount + Number(cameraEnabled) + Number(screenShareEnabled);
+  const videoColumns = videoTileCount <= 1 ? 1 : videoTileCount <= 4 ? 2 : videoTileCount <= 9 ? 3 : 4;
+  const videoRows = Math.max(1, Math.ceil(videoTileCount / videoColumns));
+  const videoGridStyle = {
+    "--video-columns": videoColumns,
+    "--video-rows": videoRows,
+  } as CSSProperties;
   const localSpeaking = microphoneEnabled && audioLevel >= settings.vadThreshold;
 
   // Deliberately keyed on `status` too: switching directly from one voice
@@ -688,11 +692,11 @@ export function VoiceView({
         <span className="header-channel-icon"><Icon name="volume" size={21} /></span> {channel.name}
       </header>
       <div className="voice-stage">
-        <div className={`voice-hero ${status === "connected" || status === "reconnecting" ? "is-connected" : ""}`}>
+        {status === "idle" || status === "connecting" ? <div className="voice-hero">
           <div className="voice-hero-icon"><Icon name="volume" size={28} /></div>
           <h1>{channel.name}</h1>
-          <p>{status === "connected" || status === "reconnecting" ? `${participantCount} participant${participantCount > 1 ? "s" : ""} · Connected as ${currentUser.username}` : "Join the channel to talk, share your camera, or share your screen."}</p>
-        </div>
+          <p>Join the channel to talk, share your camera, or share your screen.</p>
+        </div> : null}
         {status === "reconnecting" ? (
           <div className="voice-reconnect-banner" role="status">
             <span className="connecting-dots" aria-hidden="true"><i /><i /><i /></span> Reconnecting…
@@ -713,7 +717,7 @@ export function VoiceView({
             })}
           </div>
         ) : null}
-        <div className={`video-grid ${hasScreenShare ? "has-screen-share" : ""} ${!hasVideo ? "is-empty" : ""}`} aria-label="Channel videos">
+        <div className={`video-grid ${hasScreenShare ? "has-screen-share" : ""} ${!hasVideo ? "is-empty" : ""}`} style={videoGridStyle} aria-label="Channel videos">
           <div ref={localScreenRef} className={`local-video local-screen ${localSpeaking ? "is-speaking" : ""}`} data-participant-id={currentUser.id} />
           <div ref={localCameraRef} className={`local-video ${localSpeaking ? "is-speaking" : ""}`} data-participant-id={currentUser.id} />
           <div ref={remoteVideoRef} className="remote-videos" />

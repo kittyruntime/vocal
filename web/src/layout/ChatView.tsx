@@ -30,6 +30,7 @@ export function ChatView({
   const [hasMore, setHasMore] = useState(true);
 
   const messagesRef = useRef<HTMLDivElement>(null);
+  const composerInputRef = useRef<HTMLInputElement>(null);
   // Tells the scroll-restoration effect (below) why `messages` just changed, so it knows
   // whether to jump to the bottom, preserve the reading position, or leave things alone.
   const pendingScrollActionRef = useRef<"load" | "prepend" | null>(null);
@@ -109,7 +110,7 @@ export function ChatView({
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     const content = draft.trim();
-    if (!content) return;
+    if (!content || sending) return;
     setSending(true);
     try {
       await api.postMessage(channel.id, content);
@@ -118,6 +119,7 @@ export function ChatView({
       showToast("The message could not be sent");
     } finally {
       setSending(false);
+      composerInputRef.current?.focus();
     }
   }
 
@@ -160,11 +162,11 @@ export function ChatView({
         <div className="composer-field">
           <span aria-hidden="true"><Icon name="plus" size={20} /></span>
           <input
+            ref={composerInputRef}
             aria-label={`Message in ${channel.name}`}
             placeholder={`Send a message in #${channel.name}`}
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
-            disabled={sending}
           />
         </div>
         <button type="submit" aria-label="Send" disabled={sending || draft.trim().length === 0}>
