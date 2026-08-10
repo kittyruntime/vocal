@@ -1,8 +1,12 @@
 import type { FastifyInstance } from "fastify";
 import type pg from "pg";
 import { z } from "zod";
+import { WebhookReceiver } from "livekit-server-sdk";
 import { hasAtLeastRole, type Role } from "../roles.js";
 import { mintVoiceToken, type LiveKitConfig } from "../voice/tokens.js";
+import { channelMinRole } from "../channels/lookup.js";
+import type { WsHub } from "../ws/hub.js";
+import type { VoicePresence } from "../voice/presence.js";
 
 const idSchema = z.object({ id: z.uuid() });
 
@@ -25,5 +29,49 @@ export function registerVoiceTokenRoute(
       channelId: params.data.id, userId: req.user!.id, username: req.user!.username,
     });
     return reply.code(201).send({ token, url });
+  });
+}
+
+export function registerVoiceWebhookRoute(
+  app: FastifyInstance, pool: pg.Pool, hub: WsHub,
+  liveKitConfig: LiveKitConfig, voicePresence: VoicePresence,
+): void {
+  const receiver = new WebhookReceiver(liveKitConfig.apiKey, liveKitConfig.apiSecret);
+
+  // Scoped to this encapsulation context only: LiveKit's webhook signature is
+  // computed over the exact raw request body, so this route needs the raw
+  // string instead of Fastify's normal parsed-JSON body. Registering the
+  // parser inside `app.register(async (instance) => ...)` keeps every other
+  // route on the default JSON parser.
+  app.register(async (instance) => {
+    instance.addContentTypeParser("application/json", { parseAs: "string" }, (_req, body, done) => {
+      done(null, body);
+    });
+
+    instance.post("/api/voice/webhook", async (req, reply) => {
+      const rawBody = req.body as string;
+      let event;
+      try {
+        event = await receiver.receive(rawBody, req.headers.authorization);
+      } catch {
+        return reply.code(401).send({ error: "invalid webhook signature" });
+      }
+
+      const channelId = event.room?.name;
+      const userId = event.participant?.identity;
+      if (channelId && userId && (event.event === "participant_joined" || event.event === "participant_left")) {
+        const minRole = await channelMinRole(pool, channelId);
+        if (minRole) {
+          if (event.event === "participant_joined") {
+            voicePresence.join(channelId, userId);
+            hub.broadcastToRole(minRole, { type: "voice.joined", channelId, userId });
+          } else {
+            voicePresence.leave(channelId, userId);
+            hub.broadcastToRole(minRole, { type: "voice.left", channelId, userId });
+          }
+        }
+      }
+      return reply.code(200).send({ ok: true });
+    });
   });
 }

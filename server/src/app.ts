@@ -12,7 +12,7 @@ import { registerWsRoute } from "./ws/route.js";
 import { loadMasterKey } from "./crypto/messages.js";
 import { registerMessageRoutes } from "./routes/messages.js";
 import { loadLiveKitConfig } from "./voice/tokens.js";
-import { registerVoiceTokenRoute } from "./routes/voice.js";
+import { registerVoiceTokenRoute, registerVoiceWebhookRoute } from "./routes/voice.js";
 import { createVoicePresence, type VoicePresence } from "./voice/presence.js";
 
 export async function buildApp(
@@ -44,6 +44,7 @@ export async function buildApp(
   registerChannelRoutes(app, opts.pool, hub);
   registerMessageRoutes(app, opts.pool, key, hub);
   registerVoiceTokenRoute(app, opts.pool, liveKitConfig);
+  registerVoiceWebhookRoute(app, opts.pool, hub, liveKitConfig, voicePresence);
   registerWsRoute(app, opts.pool, hub, voicePresence);
   return { app, hub, voicePresence };
 }
