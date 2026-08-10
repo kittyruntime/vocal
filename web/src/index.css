@@ -260,6 +260,7 @@ summary:focus-visible {
 .voice-hero-icon { width: 64px; height: 64px; display: grid; place-items: center; border-radius: 50%; background: #404249; color: #f2f3f5; font-size: 23px; }
 .voice-hero h1 { margin: 12px 0 4px; color: #f2f3f5; font-size: 24px; line-height: 1.25; letter-spacing: -.02em; }
 .voice-hero p { max-width: 560px; margin: 0; color: #949ba4; }
+.voice-reconnect-banner { display: flex; align-items: center; justify-content: center; gap: 4px; align-self: stretch; max-width: 1180px; margin-inline: auto; padding: 5px 12px; border-radius: 6px; background: #f0b232; color: #111214; text-align: center; font-size: 13px; font-weight: 600; }
 .video-grid { width: min(1180px, 100%); display: grid; grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr)); gap: 12px; }
 .video-grid.is-empty { display: none; }
 .video-grid.has-screen-share { grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr)); }

@@ -1,6 +1,6 @@
 # Plan 5 — Client voix, caméra et partage d'écran
 
-Dernière mise à jour : 2026-08-10
+Dernière mise à jour : 2026-08-10 (soir)
 
 ## Terminé
 
@@ -55,7 +55,7 @@ Dernière mise à jour : 2026-08-10
 ## À faire ensuite
 
 - [x] Appliquer réellement le seuil VAD à la transmission avec porte audio et délai anti-coupure.
-- [ ] Reconnexion et messages d'erreur média détaillés.
+- [x] Reconnexion et messages d'erreur média détaillés.
 - [ ] Vérification réelle à deux navigateurs via le déploiement Coolify.
 - [ ] TURN/TLS et durcissement production.
 
@@ -63,14 +63,33 @@ Dernière mise à jour : 2026-08-10
 
 Le composant principal est `web/src/voice/VoiceView.tsx`. La refonte frontend,
 les périphériques, le vumètre, le push-to-talk, les vues d'appel animées, les
-profils de qualité, l'administration serveur et la porte audio VAD sont
-implémentés. La porte audio vit dans `web/src/voice/VoiceGateProcessor.ts` : elle
-ouvre le signal au-dessus du seuil et conserve 280 ms de marge avant fermeture.
+profils de qualité, l'administration serveur, la porte audio VAD et la
+reconnexion LiveKit sont implémentés. La porte audio vit dans
+`web/src/voice/VoiceGateProcessor.ts` : elle ouvre le signal au-dessus du seuil
+et conserve 280 ms de marge avant fermeture.
 
-**Prochaine étape exacte :** implémenter la reconnexion LiveKit avec un état
-visuel dédié et des messages différenciés pour refus de permissions micro,
-caméra, partage annulé, périphérique absent et perte réseau. Ensuite seulement,
-redéployer sur Coolify et effectuer le test réel à deux navigateurs, notamment
-le mode Jeu selon les limites du navigateur et de la connexion. Toute nouvelle
-tranche doit finir par les tests frontend et backend, les typechecks, le build,
-puis une mise à jour de ce fichier.
+**Reconnexion et erreurs différenciées (fait) :** `VoiceStatus` a un état
+`"reconnecting"` distinct, piloté par `RoomEvent.Reconnecting`/`Reconnected` du
+SDK LiveKit — la vue reste affichée (grille, contrôles) avec un bandeau
+« Reconnexion en cours… » plutôt que de tout réinitialiser comme le fait un
+vrai `RoomEvent.Disconnected`. Si la reconnexion échoue définitivement (un
+`Disconnected` survient alors qu'on était en train de reconnecter), un toast
+distinct prévient l'utilisateur ; un `Disconnected` consécutif à un départ
+volontaire (`leaveRoom`) ne déclenche rien, comme avant. Les messages d'erreur
+sont différenciés via `MediaDeviceFailure.getFailure()` du SDK (refus de
+permission micro/caméra, périphérique absent, périphérique déjà utilisé) et
+`ConnectionError`/`ConnectionErrorReason` pour distinguer une perte réseau au
+moment de rejoindre un salon d'un autre échec ; le partage d'écran annulé est
+traité comme un refus de permission (les deux cas sont indiscernables au
+niveau de l'API navigateur `getDisplayMedia`). Tout vit dans
+`web/src/voice/VoiceView.tsx` (`describeJoinError`, `describeMediaError`,
+`MEDIA_ERROR_MESSAGES`) — pas de nouveau fichier.
+
+**Prochaine étape exacte :** redéployer sur Coolify et effectuer le test réel
+à deux navigateurs, notamment le mode Jeu selon les limites du navigateur et
+de la connexion, et vérifier que le nouveau bandeau de reconnexion / les
+messages d'erreur se comportent correctement en conditions réelles (couper le
+réseau pendant un appel, refuser la permission micro, annuler le partage
+d'écran). Ensuite seulement, TURN/TLS et durcissement production. Toute
+nouvelle tranche doit finir par les tests frontend et backend, les
+typechecks, le build, puis une mise à jour de ce fichier.
