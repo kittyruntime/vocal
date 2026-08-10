@@ -4,6 +4,7 @@ Dernière mise à jour : 2026-08-10 (soir)
 
 ## Terminé
 
+- [x] Plein écran par tuile vidéo (partage d'écran, caméra locale et distante) via la Fullscreen API native, bouton visible au survol, icône synchronisée sur l'état réel (y compris sortie via Échap ou l'UI du navigateur).
 - [x] Réglages d'un salon (nom, accès, qualité média par défaut, suppression) déplacés du panneau admin global vers une icône réglages par salon dans la sidebar (`ChannelSettingsModal.tsx`), visible aux admins uniquement. Le panneau admin ne garde que les réglages serveur (inscriptions, membres/rôles).
 - [x] Interface entièrement traduite en anglais (composants + tests + `lang="en"`). Les noms de salons restent du contenu utilisateur, non traduits.
 - [x] SDK `livekit-client` chargé à la demande.

@@ -4,7 +4,9 @@ import {
   Hash,
   Headphones,
   LogOut,
+  Maximize2,
   Mic,
+  Minimize2,
   MonitorUp,
   PhoneOff,
   Plus,
@@ -21,7 +23,9 @@ type IconName =
   | "hash"
   | "headphones"
   | "logout"
+  | "maximize"
   | "microphone"
+  | "minimize"
   | "monitor"
   | "phone"
   | "plus"
@@ -36,7 +40,9 @@ const icons: Record<IconName, LucideIcon> = {
   hash: Hash,
   headphones: Headphones,
   logout: LogOut,
+  maximize: Maximize2,
   microphone: Mic,
+  minimize: Minimize2,
   monitor: MonitorUp,
   phone: PhoneOff,
   plus: Plus,
