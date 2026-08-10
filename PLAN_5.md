@@ -51,11 +51,17 @@ Dernière mise à jour : 2026-08-10 (soir)
 - [x] Liste des utilisateurs et attribution des rôles par un administrateur.
 - [x] Protection contre la rétrogradation du dernier administrateur.
 - [x] Mise à jour immédiate des droits WebSocket lors d’un changement de rôle.
+- [x] Expulsion (kick) : révoque les sessions actives et force la déconnexion WebSocket ; l’utilisateur peut se reconnecter.
+- [x] Bannissement (ban/unban) : comme kick, mais bloque aussi les futures connexions (login 403, sessions déjà valides rejetées) jusqu’à levée. Impossible de se bannir soi-même.
 
 ## À faire ensuite
 
 - [x] Appliquer réellement le seuil VAD à la transmission avec porte audio et délai anti-coupure.
 - [x] Reconnexion et messages d'erreur média détaillés.
+- [x] Expulsion et bannissement de comptes (modération de base).
+- [ ] Mute forcé par un modérateur, non contournable (API serveur LiveKit `RoomServiceClient`).
+- [ ] Retirer aussi un utilisateur expulsé/banni d’un salon vocal LiveKit auquel iel est déjà connecté·e (aujourd’hui, kick/ban coupe la session WebSocket mais pas une connexion WebRTC déjà établie — limite connue, à traiter avec le mute forcé puisque les deux ont besoin du `RoomServiceClient`).
+- [ ] Tests E2E Playwright.
 - [ ] Vérification réelle à deux navigateurs via le déploiement Coolify.
 - [ ] TURN/TLS et durcissement production.
 

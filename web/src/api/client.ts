@@ -13,7 +13,7 @@ export type Channel = {
   defaultCameraQuality?: "low" | "standard" | "high";
   defaultScreenQuality?: "low" | "standard" | "high" | "game";
 };
-export type AdminUser = CurrentUser & { createdAt: string };
+export type AdminUser = CurrentUser & { createdAt: string; bannedAt: string | null };
 export type ServerSettings = { registrationOpen: boolean };
 
 export type Message = {
@@ -106,6 +106,15 @@ export function updateAdminSettings(settings: ServerSettings): Promise<ServerSet
 export function listAdminUsers(): Promise<AdminUser[]> { return request("/api/admin/users"); }
 export function updateUserRole(userId: string, role: Role): Promise<AdminUser> {
   return request(`/api/admin/users/${userId}`, { method: "PATCH", body: JSON.stringify({ role }) });
+}
+export function kickUser(userId: string): Promise<{ ok: true }> {
+  return request(`/api/admin/users/${userId}/kick`, { method: "POST" });
+}
+export function banUser(userId: string): Promise<AdminUser> {
+  return request(`/api/admin/users/${userId}/ban`, { method: "POST" });
+}
+export function unbanUser(userId: string): Promise<AdminUser> {
+  return request(`/api/admin/users/${userId}/unban`, { method: "POST" });
 }
 
 export function listMessages(channelId: string, opts?: { before?: string; limit?: number }): Promise<Message[]> {

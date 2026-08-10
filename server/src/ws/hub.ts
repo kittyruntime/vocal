@@ -3,6 +3,7 @@ import type { ServerEvent } from "./protocol.js";
 
 export interface WsLike {
   send(data: string): void;
+  close(code?: number, reason?: string): void;
 }
 
 export interface WsHub {
@@ -12,6 +13,7 @@ export interface WsHub {
   broadcast(event: ServerEvent): void;
   broadcastToRole(minRole: Role, event: ServerEvent): void;
   onlineUserIds(): string[];
+  disconnect(userId: string, code: number, reason: string): void;
 }
 
 export function createHub(): WsHub {
@@ -74,6 +76,14 @@ export function createHub(): WsHub {
     },
     onlineUserIds() {
       return [...byUser.keys()];
+    },
+    disconnect(userId, code, reason) {
+      const entry = byUser.get(userId);
+      if (!entry) return;
+      // Each socket's own "close" handler calls hub.remove(), which tears
+      // down the byUser entry and broadcasts presence.offline once the last
+      // socket is gone — no need to mutate `byUser` here directly.
+      for (const socket of entry.sockets) socket.close(code, reason);
     },
   };
 }

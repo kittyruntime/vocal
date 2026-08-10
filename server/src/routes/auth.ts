@@ -62,7 +62,7 @@ export function registerAuthRoutes(app: FastifyInstance, pool: pg.Pool): void {
     const body = loginSchema.safeParse(req.body);
     if (!body.success) return reply.code(400).send({ error: "invalid payload" });
     const res = await pool.query(
-      "SELECT id, password_hash FROM users WHERE username = $1",
+      "SELECT id, password_hash, banned_at FROM users WHERE username = $1",
       [body.data.username],
     );
     const row = res.rows[0];
@@ -75,6 +75,9 @@ export function registerAuthRoutes(app: FastifyInstance, pool: pg.Pool): void {
     }
     if (!(await verifyPassword(row.password_hash, body.data.password))) {
       return reply.code(401).send({ error: "invalid credentials" });
+    }
+    if (row.banned_at) {
+      return reply.code(403).send({ error: "account banned" });
     }
     const session = await createSession(pool, row.id);
     setSidCookie(reply, session.token, session.expiresAt);
