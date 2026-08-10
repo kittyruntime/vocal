@@ -27,6 +27,10 @@ export function Sidebar({
 
   return (
     <nav className="sidebar" aria-label="Channels">
+      <div className="sidebar-server-name">
+        <span>Vocal</span>
+        <span className="online-dot" aria-label={`${onlineUserIds.length} membres en ligne`} />
+      </div>
       <ChannelGroup
         title="Salons textuels"
         channels={textChannels}
@@ -43,7 +47,7 @@ export function Sidebar({
         selectedChannelId={selectedChannelId}
         onSelectChannel={onSelectChannel}
       />
-      <p className="sidebar-presence">{onlineUserIds.length} en ligne</p>
+      <p className="sidebar-presence"><span className="online-dot" /> {onlineUserIds.length} en ligne</p>
       {currentUser.role === "admin" && (
         <CreateChannelForm
           onCreated={onChannelCreated}
@@ -71,8 +75,8 @@ function ChannelGroup({
 }) {
   if (channels.length === 0) return null;
   return (
-    <section>
-      <h2>{title}</h2>
+    <section className="channel-group">
+      <h2><span>⌄</span> {title}</h2>
       <ul>
         {channels.map((channel) => {
           const occupants = voiceOccupancy[channel.id] ?? [];
@@ -82,12 +86,14 @@ function ChannelGroup({
               className={channel.id === selectedChannelId ? "channel-link active" : "channel-link"}
               onClick={() => onSelectChannel(channel.id)}
             >
-              {channel.type === "voice" ? "🔊" : "#"} {channel.name}
+              <span className="channel-icon" aria-hidden="true">{channel.type === "voice" ? "◖))" : "#"}</span>
+              <span className="channel-name">{channel.name}</span>
             </button>
             {channel.type === "voice" && occupants.length > 0 && (
               <ul className="voice-occupants" aria-label={`Participants dans ${channel.name}`}>
                 {occupants.map((participant) => (
                   <li key={participant.userId}>
+                    <span className="member-avatar">{participant.username.slice(0, 1).toUpperCase()}</span>
                     {participant.userId === currentUserId ? `${participant.username} (vous)` : participant.username}
                   </li>
                 ))}
@@ -128,7 +134,9 @@ function CreateChannelForm({
   }
 
   return (
-    <form className="create-channel" onSubmit={handleSubmit}>
+    <details className="create-channel">
+      <summary>＋ Créer un salon</summary>
+      <form onSubmit={handleSubmit}>
       <input
         aria-label="Nom du nouveau channel"
         placeholder="nouveau-channel"
@@ -146,6 +154,7 @@ function CreateChannelForm({
       <button type="submit" disabled={submitting}>
         + Ajouter
       </button>
-    </form>
+      </form>
+    </details>
   );
 }
