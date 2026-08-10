@@ -98,6 +98,9 @@ beforeEach(() => {
   };
   setCameraEnabled.mockResolvedValue({ track: videoTrack });
   setScreenShareEnabled.mockResolvedValue({ track: videoTrack });
+  HTMLElement.prototype.requestFullscreen = vi.fn().mockResolvedValue(undefined);
+  document.exitFullscreen = vi.fn().mockResolvedValue(undefined);
+  Object.defineProperty(document, "fullscreenElement", { value: null, writable: true, configurable: true });
 });
 
 function renderView() {
@@ -136,6 +139,46 @@ describe("VoiceView", () => {
     await user.click(screen.getByRole("button", { name: "Share screen" }));
     expect(setScreenShareEnabled).toHaveBeenCalledWith(true, expect.any(Object), expect.any(Object));
     expect(screen.getByRole("button", { name: "Stop sharing" })).toBeInTheDocument();
+  });
+
+  it("shows a fullscreen button on a local video tile and requests fullscreen on click", async () => {
+    renderView();
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "Turn on camera" }));
+    const fullscreenButton = await screen.findByRole("button", { name: "Enter fullscreen" });
+    await user.click(fullscreenButton);
+    expect(HTMLElement.prototype.requestFullscreen).toHaveBeenCalled();
+  });
+
+  it("switches to an exit-fullscreen affordance once fullscreen is active, and can exit", async () => {
+    renderView();
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "Turn on camera" }));
+    const fullscreenButton = await screen.findByRole("button", { name: "Enter fullscreen" });
+    const tile = fullscreenButton.parentElement;
+
+    Object.defineProperty(document, "fullscreenElement", { value: tile, writable: true, configurable: true });
+    act(() => document.dispatchEvent(new Event("fullscreenchange")));
+
+    const exitButton = await screen.findByRole("button", { name: "Exit fullscreen" });
+    await user.click(exitButton);
+    expect(document.exitFullscreen).toHaveBeenCalled();
+  });
+
+  it("shows a fullscreen button on remote video tiles too", async () => {
+    renderView();
+    await screen.findByText(/Connected as theo/);
+    const remoteTrack = {
+      kind: "video",
+      sid: "remote-track-1",
+      attach: vi.fn(() => document.createElement("video")),
+      detach: vi.fn(() => []),
+    };
+    const publication = { source: "camera" };
+    const participant = { identity: "u2", name: "alice" };
+    act(() => roomHandlers.get("trackSubscribed")?.(remoteTrack, publication, participant));
+
+    expect(await screen.findByRole("button", { name: "Enter fullscreen" })).toBeInTheDocument();
   });
 
   it("publishes screen sharing in 1080p60 game mode", async () => {

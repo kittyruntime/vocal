@@ -113,6 +113,60 @@ function describeJoinError(error: unknown): string {
   return describeMediaError(error, "microphone");
 }
 
+// Built via DOM APIs rather than rendered through the <Icon> React component: these
+// buttons are appended to video tiles built with plain DOM calls (see TrackSubscribed
+// and the camera/screen-share toggles below), matching that imperative style instead
+// of mounting a nested React root just for one small icon. No innerHTML: every node is
+// created explicitly, so there's no HTML-string path to accidentally feed untrusted
+// data into later. Paths match lucide-react's maximize-2 / minimize-2 icons for visual
+// consistency with the rest of the UI.
+const SVG_NS = "http://www.w3.org/2000/svg";
+const FULLSCREEN_ENTER_PATHS = ["M15 3h6v6", "m21 3-7 7", "m3 21 7-7", "M9 21H3v-6"];
+const FULLSCREEN_EXIT_PATHS = ["m14 10 7-7", "M20 10h-6V4", "m3 21 7-7", "M4 14h6v6"];
+
+function buildFullscreenIcon(paths: string[]): SVGSVGElement {
+  const svg = document.createElementNS(SVG_NS, "svg");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("fill", "none");
+  svg.setAttribute("stroke", "currentColor");
+  svg.setAttribute("stroke-width", "2.1");
+  svg.setAttribute("stroke-linecap", "round");
+  svg.setAttribute("stroke-linejoin", "round");
+  svg.setAttribute("class", "icon");
+  svg.setAttribute("aria-hidden", "true");
+  for (const d of paths) {
+    const path = document.createElementNS(SVG_NS, "path");
+    path.setAttribute("d", d);
+    svg.append(path);
+  }
+  return svg;
+}
+
+// Appends a fullscreen toggle button to `tile` (a positioned video-tile/local-video
+// container). The button's fullscreen target is always its own parent element, so a
+// single delegated "fullscreenchange" listener (registered once by the component, see
+// the effect below) can keep every tile's icon in sync without per-tile listeners to
+// track and clean up as tiles are created/destroyed.
+function addFullscreenButton(tile: HTMLElement): void {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "tile-fullscreen-button";
+  button.setAttribute("aria-label", "Enter fullscreen");
+  button.title = "Enter fullscreen";
+  button.append(buildFullscreenIcon(FULLSCREEN_ENTER_PATHS));
+  button.addEventListener("click", (event) => {
+    event.stopPropagation();
+    const target = (event.currentTarget as HTMLButtonElement).parentElement;
+    if (!target) return;
+    if (document.fullscreenElement === target) {
+      void document.exitFullscreen();
+    } else {
+      void target.requestFullscreen?.().catch(() => {});
+    }
+  });
+  tile.append(button);
+}
+
 export function VoiceView({
   channel,
   currentUser,
@@ -143,6 +197,7 @@ export function VoiceView({
   const [callParticipants, setCallParticipants] = useState<CallParticipant[]>([]);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const roomRef = useRef<Room | null>(null);
+  const voiceViewRef = useRef<HTMLElement>(null);
   const audioRef = useRef<HTMLDivElement>(null);
   const remoteVideoRef = useRef<HTMLDivElement>(null);
   const localCameraRef = useRef<HTMLDivElement>(null);
@@ -269,6 +324,25 @@ export function VoiceView({
     return () => window.removeEventListener("keydown", closeOnEscape);
   }, [settingsOpen]);
 
+  // Keeps every tile's fullscreen button icon (enter/exit) in sync with the browser's
+  // actual fullscreen state, including when the user exits via Escape or the browser's
+  // own UI rather than clicking the button again. One delegated listener for the whole
+  // view instead of one per tile — see addFullscreenButton's comment for why.
+  useEffect(() => {
+    const syncFullscreenButtons = () => {
+      const buttons = voiceViewRef.current?.querySelectorAll<HTMLButtonElement>(".tile-fullscreen-button") ?? [];
+      for (const button of buttons) {
+        const active = document.fullscreenElement === button.parentElement;
+        button.replaceChildren(buildFullscreenIcon(active ? FULLSCREEN_EXIT_PATHS : FULLSCREEN_ENTER_PATHS));
+        const label = active ? "Exit fullscreen" : "Enter fullscreen";
+        button.setAttribute("aria-label", label);
+        button.title = label;
+      }
+    };
+    document.addEventListener("fullscreenchange", syncFullscreenButtons);
+    return () => document.removeEventListener("fullscreenchange", syncFullscreenButtons);
+  }, []);
+
   useEffect(() => {
     setSettings((value) => {
       const next = {
@@ -311,6 +385,7 @@ export function VoiceView({
           const label = document.createElement("figcaption");
           label.textContent = participant.name || participant.identity;
           tile.append(element, label);
+          addFullscreenButton(tile);
           remoteVideoRef.current?.append(tile);
         }
       },
@@ -518,6 +593,7 @@ export function VoiceView({
         label.className = "local-video-label";
         label.textContent = `${currentUser.username} (you)`;
         localCameraRef.current?.append(element, label);
+        if (localCameraRef.current) addFullscreenButton(localCameraRef.current);
       } else if (!enabled && previousTrack) {
         for (const element of previousTrack.detach()) element.remove();
       }
@@ -544,6 +620,7 @@ export function VoiceView({
         label.className = "local-video-label";
         label.textContent = `${currentUser.username} · Screen`;
         localScreenRef.current?.append(element, label);
+        if (localScreenRef.current) addFullscreenButton(localScreenRef.current);
       } else if (!enabled && previousTrack) {
         for (const element of previousTrack.detach()) element.remove();
       }
@@ -577,7 +654,7 @@ export function VoiceView({
   }, [channel.id, visible]);
 
   return (
-    <section className="voice-view" aria-label={`Voice channel ${channel.name}`} hidden={!visible}>
+    <section className="voice-view" aria-label={`Voice channel ${channel.name}`} hidden={!visible} ref={voiceViewRef}>
       <header className="chat-header"><span className="header-channel-icon"><Icon name="volume" size={21} /></span> {channel.name}</header>
       <div className="voice-stage">
         <div className={`voice-hero ${status === "connected" || status === "reconnecting" ? "is-connected" : ""}`}>
