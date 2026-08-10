@@ -11,6 +11,7 @@ vi.mock("../api/client", async () => {
     ...actual,
     listChannels: vi.fn(),
     listMessages: vi.fn(),
+    getChatSettings: vi.fn(),
     // MainLayout receives currentUser as a prop, but it still mounts inside AuthProvider
     // (to reach useAuth().signOut), whose own bootstrap effect calls getSetupStatus/getMe.
     // Mock those too so that effect doesn't fire real, unmocked fetches during this test.
@@ -50,6 +51,7 @@ beforeEach(() => {
   vi.stubGlobal("WebSocket", FakeWebSocket);
   vi.mocked(api.listChannels).mockResolvedValue([generalChannel]);
   vi.mocked(api.listMessages).mockResolvedValue([]);
+  vi.mocked(api.getChatSettings).mockResolvedValue({ maxImageSizeMb: 5, maxFileSizeMb: 10, maxMessageLength: 4000 });
   vi.mocked(api.getSetupStatus).mockResolvedValue({ done: true });
   vi.mocked(api.getMe).mockResolvedValue(admin);
 });

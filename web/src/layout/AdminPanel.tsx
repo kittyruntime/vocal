@@ -16,7 +16,7 @@ export function AdminPanel({ currentUser, onClose }: {
   onClose(): void;
 }) {
   const [users, setUsers] = useState<AdminUser[]>([]);
-  const [settings, setSettings] = useState<ServerSettings>({ registrationOpen: true, maxImageSizeMb: 5, maxFileSizeMb: 10 });
+  const [settings, setSettings] = useState<ServerSettings>({ registrationOpen: true, maxImageSizeMb: 5, maxFileSizeMb: 10, maxMessageLength: 4000 });
   const [error, setError] = useState("");
   const canManageServer = currentUser.capabilities.includes("manage_server");
   const canModerate = currentUser.capabilities.includes("moderate");
@@ -94,6 +94,13 @@ export function AdminPanel({ currentUser, onClose }: {
             <div className="attachment-limit-grid">
               <label>Images (MB)<input type="number" min="1" max="50" value={settings.maxImageSizeMb} onChange={(event) => setSettings({ ...settings, maxImageSizeMb: Number(event.target.value) })} onBlur={() => void saveUploadLimits(settings)} /></label>
               <label>Other files (MB)<input type="number" min="1" max="50" value={settings.maxFileSizeMb} onChange={(event) => setSettings({ ...settings, maxFileSizeMb: Number(event.target.value) })} onBlur={() => void saveUploadLimits(settings)} /></label>
+            </div>
+          </div> : null}
+          {canManageServer ? <div className="settings-section">
+            <h3>Message length</h3>
+            <p className="admin-setting-description">Maximum number of characters allowed in a single message.</p>
+            <div className="attachment-limit-grid single-setting">
+              <label>Characters per message<input type="number" min="100" max="10000" step="100" value={settings.maxMessageLength} onChange={(event) => setSettings({ ...settings, maxMessageLength: Number(event.target.value) })} onBlur={() => void saveUploadLimits(settings)} /></label>
             </div>
           </div> : null}
           <div className="settings-section">

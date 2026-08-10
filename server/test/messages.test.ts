@@ -99,6 +99,14 @@ describe("messages", () => {
     expect(res.statusCode).toBe(400);
   });
 
+  it("enforces the configured message length", async () => {
+    await pool.query("UPDATE server_settings SET max_message_length = 100 WHERE singleton = true");
+    const res = await app.inject({ method: "POST", url: `/api/channels/${channelId}/messages`,
+      headers: { cookie: adminCookie }, payload: { content: "x".repeat(101) } });
+    expect(res.statusCode).toBe(413);
+    expect(res.json()).toEqual({ error: "message exceeds the 100 character limit" });
+  });
+
   it("404 on posting to a nonexistent channel", async () => {
     const res = await app.inject({ method: "POST",
       url: "/api/channels/00000000-0000-0000-0000-000000000000/messages",

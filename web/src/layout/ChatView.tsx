@@ -12,12 +12,14 @@ const NEAR_BOTTOM_THRESHOLD_PX = 100;
 
 export function ChatView({
   channel,
+  maxMessageLength = 4000,
   messages,
   onMessagesLoaded,
   onMessagesPrepended,
   onOpenSidebar,
 }: {
   channel: Channel;
+  maxMessageLength?: number;
   messages: Message[];
   onMessagesLoaded(messages: Message[]): void;
   onMessagesPrepended(messages: Message[]): void;
@@ -189,8 +191,10 @@ export function ChatView({
             aria-label={`Message in ${channel.name}`}
             placeholder={`Send a message in #${channel.name}`}
             value={draft}
+            maxLength={maxMessageLength}
             onChange={(e) => setDraft(e.target.value)}
           />
+          {draft.length >= maxMessageLength * .8 ? <span className="composer-count" aria-label={`${draft.length} of ${maxMessageLength} characters`}>{draft.length}/{maxMessageLength}</span> : null}
         </div>
         <button type="submit" aria-label="Send" disabled={sending || (draft.trim().length === 0 && files.length === 0)}>
           <Icon name="send" size={18} /><span className="sr-only">Send</span>

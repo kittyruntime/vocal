@@ -13,14 +13,16 @@ const settingsSchema = z.object({
   registrationOpen: z.boolean().optional(),
   maxImageSizeMb: z.number().int().min(1).max(50).optional(),
   maxFileSizeMb: z.number().int().min(1).max(50).optional(),
+  maxMessageLength: z.number().int().min(100).max(10000).optional(),
 });
 
-type SettingsRow = { registration_open: boolean; max_image_size_mb: number; max_file_size_mb: number };
+type SettingsRow = { registration_open: boolean; max_image_size_mb: number; max_file_size_mb: number; max_message_length: number };
 function toSettings(row: SettingsRow | undefined) {
   return {
     registrationOpen: row?.registration_open ?? true,
     maxImageSizeMb: row?.max_image_size_mb ?? 5,
     maxFileSizeMb: row?.max_file_size_mb ?? 10,
+    maxMessageLength: row?.max_message_length ?? 4000,
   };
 }
 
@@ -55,7 +57,7 @@ export function registerAdminRoutes(
   });
 
   app.get("/api/admin/settings", { preHandler: [app.requireAuth, requireCapability("manage_server")] }, async () => {
-    const result = await pool.query<SettingsRow>("SELECT registration_open, max_image_size_mb, max_file_size_mb FROM server_settings WHERE singleton = true");
+    const result = await pool.query<SettingsRow>("SELECT registration_open, max_image_size_mb, max_file_size_mb, max_message_length FROM server_settings WHERE singleton = true");
     return toSettings(result.rows[0]);
   });
 
@@ -66,11 +68,18 @@ export function registerAdminRoutes(
       `UPDATE server_settings SET
          registration_open = COALESCE($1, registration_open),
          max_image_size_mb = COALESCE($2, max_image_size_mb),
-         max_file_size_mb = COALESCE($3, max_file_size_mb)
-       WHERE singleton = true RETURNING registration_open, max_image_size_mb, max_file_size_mb`,
-      [body.data.registrationOpen, body.data.maxImageSizeMb, body.data.maxFileSizeMb],
+         max_file_size_mb = COALESCE($3, max_file_size_mb),
+         max_message_length = COALESCE($4, max_message_length)
+       WHERE singleton = true RETURNING registration_open, max_image_size_mb, max_file_size_mb, max_message_length`,
+      [body.data.registrationOpen, body.data.maxImageSizeMb, body.data.maxFileSizeMb, body.data.maxMessageLength],
     );
     return toSettings(result.rows[0]);
+  });
+
+  app.get("/api/chat-settings", { preHandler: app.requireAuth }, async () => {
+    const result = await pool.query<SettingsRow>("SELECT registration_open, max_image_size_mb, max_file_size_mb, max_message_length FROM server_settings WHERE singleton = true");
+    const settings = toSettings(result.rows[0]);
+    return { maxImageSizeMb: settings.maxImageSizeMb, maxFileSizeMb: settings.maxFileSizeMb, maxMessageLength: settings.maxMessageLength };
   });
 
   app.get("/api/admin/users", { preHandler: [app.requireAuth, requireAnyCapability("manage_server", "moderate")] }, async () => {

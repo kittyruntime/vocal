@@ -15,7 +15,7 @@ const alice: AdminUser = { id: "u2", username: "alice", capabilities: [], create
 
 function renderPanel(users: AdminUser[] = [alice]) {
   vi.mocked(api.listAdminUsers).mockResolvedValue(users);
-  vi.mocked(api.getAdminSettings).mockResolvedValue({ registrationOpen: true, maxImageSizeMb: 5, maxFileSizeMb: 10 });
+  vi.mocked(api.getAdminSettings).mockResolvedValue({ registrationOpen: true, maxImageSizeMb: 5, maxFileSizeMb: 10, maxMessageLength: 4000 });
   return render(
     <AdminPanel currentUser={admin} onClose={vi.fn()} />,
   );
