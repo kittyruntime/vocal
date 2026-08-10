@@ -7,6 +7,7 @@ export type AppState = {
   channels: Channel[];
   selectedChannelId: string | null;
   messagesByChannel: Record<string, Message[]>;
+  unreadChannelIds: string[];
   onlineUserIds: string[];
   voiceOccupancy: Record<string, VoiceParticipant[]>;
   voiceSpeakingUserIds: string[];
@@ -18,6 +19,7 @@ export const initialAppState: AppState = {
   channels: [],
   selectedChannelId: null,
   messagesByChannel: {},
+  unreadChannelIds: [],
   onlineUserIds: [],
   voiceOccupancy: {},
   voiceSpeakingUserIds: [],
@@ -62,10 +64,14 @@ export function appReducer(state: AppState, action: AppAction): AppState {
         state.selectedChannelId === action.channelId
           ? (channels[0]?.id ?? null)
           : state.selectedChannelId;
-      return { ...state, channels, selectedChannelId };
+      return { ...state, channels, selectedChannelId, unreadChannelIds: state.unreadChannelIds.filter((id) => id !== action.channelId) };
     }
     case "channel/selected":
-      return { ...state, selectedChannelId: action.channelId };
+      return {
+        ...state,
+        selectedChannelId: action.channelId,
+        unreadChannelIds: state.unreadChannelIds.filter((id) => id !== action.channelId),
+      };
     case "messages/loaded":
       return {
         ...state,
@@ -81,9 +87,13 @@ export function appReducer(state: AppState, action: AppAction): AppState {
     case "message/received": {
       const { channelId } = action.message;
       const existing = state.messagesByChannel[channelId] ?? [];
+      const shouldMarkUnread = action.message.userId !== state.currentUser?.id && channelId !== state.selectedChannelId;
       return {
         ...state,
         messagesByChannel: { ...state.messagesByChannel, [channelId]: [...existing, action.message] },
+        unreadChannelIds: shouldMarkUnread && !state.unreadChannelIds.includes(channelId)
+          ? [...state.unreadChannelIds, channelId]
+          : state.unreadChannelIds,
       };
     }
     case "presence/sync":

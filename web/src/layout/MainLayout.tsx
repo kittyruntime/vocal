@@ -118,6 +118,7 @@ export function MainLayout({ currentUser }: { currentUser: CurrentUser }) {
             onlineUserIds={state.onlineUserIds}
             voiceOccupancy={state.voiceOccupancy}
             voiceSpeakingUserIds={state.voiceSpeakingUserIds}
+            unreadChannelIds={state.unreadChannelIds}
             currentUser={currentUser}
             onSelectChannel={selectChannel}
             onChannelCreated={(channel) => dispatch({ type: "channel/added", channel })}
