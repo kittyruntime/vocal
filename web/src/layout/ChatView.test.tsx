@@ -178,6 +178,29 @@ describe("ChatView", () => {
     expect(screen.getByRole("button", { name: "Send" })).toBeEnabled();
   });
 
+  it("adds an image pasted from the clipboard", () => {
+    vi.mocked(api.listMessages).mockResolvedValue([]);
+    renderChat([]);
+    const image = new File(["clipboard-image"], "image.png", { type: "image/png" });
+    const input = screen.getByLabelText("Message in général");
+    fireEvent.paste(input, {
+      clipboardData: {
+        items: [{ kind: "file", getAsFile: () => image }],
+      },
+    });
+    expect(screen.getByText("image.png")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Send" })).toBeEnabled();
+  });
+
+  it("keeps normal text paste behavior when the clipboard has no file", async () => {
+    vi.mocked(api.listMessages).mockResolvedValue([]);
+    renderChat([]);
+    const input = screen.getByLabelText("Message in général");
+    await userEvent.setup().click(input);
+    fireEvent.paste(input, { clipboardData: { items: [] } });
+    expect(screen.queryByLabelText("Files to send")).not.toBeInTheDocument();
+  });
+
   it("enforces the configured character limit in the composer", async () => {
     vi.mocked(api.listMessages).mockResolvedValue([]);
     render(
