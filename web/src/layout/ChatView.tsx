@@ -15,11 +15,13 @@ export function ChatView({
   messages,
   onMessagesLoaded,
   onMessagesPrepended,
+  onOpenSidebar,
 }: {
   channel: Channel;
   messages: Message[];
   onMessagesLoaded(messages: Message[]): void;
   onMessagesPrepended(messages: Message[]): void;
+  onOpenSidebar?(): void;
 }) {
   const { showToast } = useToast();
   const [draft, setDraft] = useState("");
@@ -121,7 +123,12 @@ export function ChatView({
 
   return (
     <div className="chat-view">
-      <header className="chat-header"><span className="header-channel-icon"><Icon name="hash" size={22} /></span> {channel.name}</header>
+      <header className="chat-header">
+        <button type="button" className="mobile-menu-button" aria-label="Open channel list" onClick={() => onOpenSidebar?.()}>
+          <Icon name="menu" size={20} />
+        </button>
+        <span className="header-channel-icon"><Icon name="hash" size={22} /></span> {channel.name}
+      </header>
       <div
         className="chat-messages"
         role="log"

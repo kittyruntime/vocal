@@ -5,6 +5,7 @@ import {
   Headphones,
   LogOut,
   Maximize2,
+  Menu,
   Mic,
   Minimize2,
   MonitorUp,
@@ -24,6 +25,7 @@ type IconName =
   | "headphones"
   | "logout"
   | "maximize"
+  | "menu"
   | "microphone"
   | "minimize"
   | "monitor"
@@ -41,6 +43,7 @@ const icons: Record<IconName, LucideIcon> = {
   headphones: Headphones,
   logout: LogOut,
   maximize: Maximize2,
+  menu: Menu,
   microphone: Mic,
   minimize: Minimize2,
   monitor: MonitorUp,

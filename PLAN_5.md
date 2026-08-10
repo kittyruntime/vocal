@@ -4,6 +4,9 @@ Dernière mise à jour : 2026-08-10 (nuit)
 
 ## Terminé
 
+- [x] Responsive mobile complet : sidebar en tiroir avec fond obscurci, fermeture par sélection/Échap, boutons tactiles, safe areas iOS et hauteur `100dvh`.
+- [x] Présence vocale locale immédiate et indicateur de parole synchronisé jusque dans la liste des participants de la sidebar.
+- [x] Passage direct d’un salon vocal à un autre : nettoyage complet de l’ancien appel puis connexion automatique au nouveau salon.
 - [x] Transitions : toasts avec entrée/sortie animées (état "leaving" avant retrait du DOM), messages de chat en fondu à l'arrivée, bandeau de connexion qui glisse à l'apparition, survol des salons de la sidebar adouci. Tout respecte `prefers-reduced-motion`.
 - [x] Plein écran par tuile vidéo (partage d'écran, caméra locale et distante) via la Fullscreen API native, bouton visible au survol, icône synchronisée sur l'état réel (y compris sortie via Échap ou l'UI du navigateur).
 - [x] Réglages d'un salon (nom, accès, qualité média par défaut, suppression) déplacés du panneau admin global vers une icône réglages par salon dans la sidebar (`ChannelSettingsModal.tsx`), visible aux admins uniquement. Le panneau admin ne garde que les réglages serveur (inscriptions, membres/rôles).
@@ -104,6 +107,12 @@ indépendantes (`manage_channels`, `manage_server`, `moderate`,
 permissions vit désormais dans `server/src/capabilities.ts` côté serveur et
 `web/src/api/client.ts` côté client ; il n'y a plus de notion de rôle nulle
 part dans le code.
+
+**Responsive et navigation vocale (fait) :** la sidebar devient un tiroir sur
+mobile, les safe areas sont prises en compte et les écrans chat/vocal exposent
+un bouton de navigation. La parole active remonte de `VoiceView` vers la
+sidebar. Le changement direct entre deux salons vocaux réinitialise désormais
+l’ancien appel avant de rejoindre automatiquement le nouveau.
 
 **Prochaine étape exacte :** reprendre le backlog de modération avancée —
 mute forcé par un détenteur de `moderate`, non contournable (API serveur

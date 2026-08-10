@@ -9,6 +9,7 @@ export type AppState = {
   messagesByChannel: Record<string, Message[]>;
   onlineUserIds: string[];
   voiceOccupancy: Record<string, VoiceParticipant[]>;
+  voiceSpeakingUserIds: string[];
   connectionStatus: ConnectionStatus;
 };
 
@@ -19,6 +20,7 @@ export const initialAppState: AppState = {
   messagesByChannel: {},
   onlineUserIds: [],
   voiceOccupancy: {},
+  voiceSpeakingUserIds: [],
   connectionStatus: "connecting",
 };
 
@@ -37,6 +39,7 @@ export type AppAction =
   | { type: "voice/sync"; channels: Record<string, VoiceParticipant[]> }
   | { type: "voice/joined"; channelId: string; participant: VoiceParticipant }
   | { type: "voice/left"; channelId: string; userId: string }
+  | { type: "voice/speaking"; userIds: string[] }
   | { type: "connection/status"; status: ConnectionStatus };
 
 export function appReducer(state: AppState, action: AppAction): AppState {
@@ -112,6 +115,8 @@ export function appReducer(state: AppState, action: AppAction): AppState {
       else voiceOccupancy[action.channelId] = occupants;
       return { ...state, voiceOccupancy };
     }
+    case "voice/speaking":
+      return { ...state, voiceSpeakingUserIds: action.userIds };
     case "connection/status":
       return { ...state, connectionStatus: action.status };
     default:

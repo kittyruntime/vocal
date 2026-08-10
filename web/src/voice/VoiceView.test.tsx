@@ -1,3 +1,4 @@
+import type { ComponentProps } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -104,8 +105,8 @@ beforeEach(() => {
   Object.defineProperty(document, "fullscreenElement", { value: null, writable: true, configurable: true });
 });
 
-function renderView() {
-  return render(<ToastProvider><VoiceView channel={channel} currentUser={currentUser} /></ToastProvider>);
+function renderView(extraProps: Partial<ComponentProps<typeof VoiceView>> = {}) {
+  return render(<ToastProvider><VoiceView channel={channel} currentUser={currentUser} {...extraProps} /></ToastProvider>);
 }
 
 describe("VoiceView", () => {
@@ -314,5 +315,59 @@ describe("VoiceView", () => {
 
     expect(screen.getByRole("radio", { name: /Push-to-talk/ })).toHaveAttribute("aria-checked", "true");
     expect(setMicrophoneEnabled).toHaveBeenLastCalledWith(false, expect.any(Object), expect.any(Object));
+  });
+
+  it("reports active speakers to the parent and clears them on leave", async () => {
+    const onSpeakingChange = vi.fn();
+    renderView({ onSpeakingChange });
+    await screen.findByText(/Connected as theo/);
+
+    act(() => roomHandlers.get("activeSpeakersChanged")?.([{ identity: "u2", name: "alice" }]));
+    expect(onSpeakingChange).toHaveBeenCalledWith(["u2"]);
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Leave" }));
+    await waitFor(() => expect(onSpeakingChange).toHaveBeenLastCalledWith([]));
+  });
+
+  it("reports self-presence to the parent on join and on leave", async () => {
+    const onSelfPresenceChange = vi.fn();
+    renderView({ onSelfPresenceChange });
+    await screen.findByText(/Connected as theo/);
+    expect(onSelfPresenceChange).toHaveBeenLastCalledWith(true);
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Leave" }));
+    await waitFor(() => expect(onSelfPresenceChange).toHaveBeenLastCalledWith(false));
+  });
+
+  it("clears self-presence when disconnected involuntarily", async () => {
+    const onSelfPresenceChange = vi.fn();
+    renderView({ onSelfPresenceChange });
+    await screen.findByText(/Connected as theo/);
+    onSelfPresenceChange.mockClear();
+
+    act(() => roomHandlers.get("disconnected")?.());
+    await waitFor(() => expect(onSelfPresenceChange).toHaveBeenCalledWith(false));
+  });
+
+  it("re-joins the new channel when switching directly between two voice channels while connected", async () => {
+    const onSelfPresenceChange = vi.fn();
+    const view = renderView({ onSelfPresenceChange });
+    await screen.findByText(/Connected as theo/);
+    expect(connect).toHaveBeenCalledTimes(1);
+
+    const otherChannel = { ...channel, id: "c3", name: "autre" };
+    view.rerender(
+      <ToastProvider>
+        <VoiceView channel={otherChannel} currentUser={currentUser} onSelfPresenceChange={onSelfPresenceChange} />
+      </ToastProvider>,
+    );
+
+    expect(disconnect).toHaveBeenCalledTimes(1);
+    expect(onSelfPresenceChange).toHaveBeenCalledWith(false);
+    await waitFor(() => expect(api.getVoiceToken).toHaveBeenCalledWith("c3"));
+    await screen.findByText(/Connected as theo/);
+    expect(connect).toHaveBeenCalledTimes(2);
   });
 });

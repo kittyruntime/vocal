@@ -12,6 +12,7 @@ export function Sidebar({
   selectedChannelId,
   onlineUserIds,
   voiceOccupancy,
+  voiceSpeakingUserIds,
   currentUser,
   onSelectChannel,
   onChannelCreated,
@@ -22,6 +23,7 @@ export function Sidebar({
   selectedChannelId: string | null;
   onlineUserIds: string[];
   voiceOccupancy: Record<string, VoiceParticipant[]>;
+  voiceSpeakingUserIds?: string[];
   currentUser: CurrentUser;
   onSelectChannel(channelId: string): void;
   onChannelCreated(channel: Channel): void;
@@ -56,6 +58,7 @@ export function Sidebar({
         title="Voice channels"
         channels={voiceChannels}
         voiceOccupancy={voiceOccupancy}
+        voiceSpeakingUserIds={voiceSpeakingUserIds}
         currentUserId={currentUser.id}
         selectedChannelId={selectedChannelId}
         onSelectChannel={onSelectChannel}
@@ -88,6 +91,7 @@ function ChannelGroup({
   title,
   channels,
   voiceOccupancy,
+  voiceSpeakingUserIds,
   currentUserId,
   selectedChannelId,
   onSelectChannel,
@@ -96,6 +100,7 @@ function ChannelGroup({
   title: string;
   channels: Channel[];
   voiceOccupancy: Record<string, VoiceParticipant[]>;
+  voiceSpeakingUserIds?: string[];
   currentUserId: string;
   selectedChannelId: string | null;
   onSelectChannel(channelId: string): void;
@@ -132,12 +137,15 @@ function ChannelGroup({
             </div>
             {channel.type === "voice" && occupants.length > 0 && (
               <ul className="voice-occupants" aria-label={`Participants in ${channel.name}`}>
-                {occupants.map((participant) => (
-                  <li key={participant.userId}>
-                    <span className="member-avatar">{participant.username.slice(0, 1).toUpperCase()}</span>
-                    {participant.userId === currentUserId ? `${participant.username} (you)` : participant.username}
-                  </li>
-                ))}
+                {occupants.map((participant) => {
+                  const speaking = voiceSpeakingUserIds?.includes(participant.userId) ?? false;
+                  return (
+                    <li key={participant.userId} className={speaking ? "is-speaking" : ""}>
+                      <span className="member-avatar">{participant.username.slice(0, 1).toUpperCase()}</span>
+                      {participant.userId === currentUserId ? `${participant.username} (you)` : participant.username}
+                    </li>
+                  );
+                })}
               </ul>
             )}
           </li>;
