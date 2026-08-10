@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, type FormEvent, type UIEvent } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type DragEvent, type FormEvent, type UIEvent } from "react";
 import type { Channel, Message } from "../api/client";
 import * as api from "../api/client";
 import { useToast } from "../toast/ToastContext";
@@ -29,12 +29,14 @@ export function ChatView({
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
+  const [dragActive, setDragActive] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
 
   const messagesRef = useRef<HTMLDivElement>(null);
   const composerInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const dragDepthRef = useRef(0);
   // Tells the scroll-restoration effect (below) why `messages` just changed, so it knows
   // whether to jump to the bottom, preserve the reading position, or leave things alone.
   const pendingScrollActionRef = useRef<"load" | "prepend" | null>(null);
@@ -111,6 +113,32 @@ export function ChatView({
     if (el.scrollTop < 40) void loadMore();
   }
 
+  function addFiles(values: File[]) {
+    if (values.length === 0) return;
+    setFiles((current) => [...current, ...values].slice(0, 10));
+  }
+
+  function handleDragEnter(event: DragEvent<HTMLDivElement>) {
+    if (!event.dataTransfer.types.includes("Files")) return;
+    event.preventDefault();
+    dragDepthRef.current += 1;
+    setDragActive(true);
+  }
+
+  function handleDragLeave(event: DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
+    if (dragDepthRef.current === 0) setDragActive(false);
+  }
+
+  function handleDrop(event: DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    dragDepthRef.current = 0;
+    setDragActive(false);
+    addFiles([...event.dataTransfer.files]);
+    requestAnimationFrame(() => composerInputRef.current?.focus());
+  }
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     const content = draft.trim();
@@ -129,7 +157,13 @@ export function ChatView({
   }
 
   return (
-    <div className="chat-view">
+    <div className={`chat-view ${dragActive ? "is-dragging-files" : ""}`} onDragEnter={handleDragEnter} onDragOver={(event) => {
+      if (event.dataTransfer.types.includes("Files")) {
+        event.preventDefault();
+        event.dataTransfer.dropEffect = "copy";
+      }
+    }} onDragLeave={handleDragLeave} onDrop={handleDrop}>
+      {dragActive ? <div className="chat-drop-overlay" role="status"><div><Icon name="upload" size={34} /><strong>Drop files here</strong><span>They will be added to your message</span></div></div> : null}
       <header className="chat-header">
         <button type="button" className="mobile-menu-button" aria-label="Open channel list" onClick={() => onOpenSidebar?.()}>
           <Icon name="menu" size={20} />
@@ -183,7 +217,7 @@ export function ChatView({
           <button type="button" className="composer-attach-button" aria-label="Attach files" onClick={() => fileInputRef.current?.click()}><Icon name="plus" size={20} /></button>
           <input ref={fileInputRef} className="sr-only" type="file" multiple onChange={(event) => {
             const selected = [...(event.target.files ?? [])];
-            setFiles((values) => [...values, ...selected].slice(0, 10));
+            addFiles(selected);
             event.target.value = "";
           }} />
           <input

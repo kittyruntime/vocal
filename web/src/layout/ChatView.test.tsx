@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ToastProvider } from "../toast/ToastContext";
 import { ChatView } from "./ChatView";
@@ -163,6 +163,19 @@ describe("ChatView", () => {
     expect(screen.getByText("notes.txt")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Send" }));
     await waitFor(() => expect(api.postMessage).toHaveBeenCalledWith("c1", "", [file]));
+  });
+
+  it("adds dropped files to the pending message", async () => {
+    vi.mocked(api.listMessages).mockResolvedValue([]);
+    renderChat([]);
+    const file = new File(["picture"], "dropped.png", { type: "image/png" });
+    const chat = screen.getByRole("log").closest(".chat-view")!;
+    fireEvent.dragEnter(chat, { dataTransfer: { types: ["Files"], files: [file] } });
+    expect(screen.getByText("Drop files here")).toBeInTheDocument();
+    fireEvent.drop(chat, { dataTransfer: { types: ["Files"], files: [file] } });
+    expect(screen.queryByText("Drop files here")).not.toBeInTheDocument();
+    expect(screen.getByText("dropped.png")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Send" })).toBeEnabled();
   });
 
   it("enforces the configured character limit in the composer", async () => {

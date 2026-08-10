@@ -295,6 +295,12 @@ summary:focus-visible {
 
 .main-content { position: relative; flex: 1; min-width: 0; min-height: 0; display: flex; background: #313338; }
 .chat-view, .voice-view { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+.chat-view { position: relative; }
+.chat-drop-overlay { position: absolute; inset: 8px; z-index: 10; display: grid; place-items: center; border: 2px dashed #5865f2; border-radius: 12px; background: rgb(35 36 40 / 92%); pointer-events: none; backdrop-filter: blur(3px); }
+.chat-drop-overlay > div { display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 28px; color: #b5bac1; text-align: center; }
+.chat-drop-overlay .icon { margin-bottom: 6px; color: #949cf7; }
+.chat-drop-overlay strong { color: #f2f3f5; font-size: 19px; }
+.chat-drop-overlay span { font-size: 13px; }
 .voice-view[hidden] { display: none; }
 .chat-header {
   height: 48px;
