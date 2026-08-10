@@ -1,11 +1,18 @@
 import { useState, type FormEvent } from "react";
-import type { Channel, CurrentUser } from "../api/client";
+import type { Capability, Channel, CurrentUser } from "../api/client";
 import * as api from "../api/client";
 import { useToast } from "../toast/ToastContext";
 import type { VoiceParticipant } from "../ws/protocol";
 import { Icon } from "../ui/Icon";
 import { AdminPanel } from "./AdminPanel";
 import { ChannelSettingsModal } from "./ChannelSettingsModal";
+
+const CAPABILITY_LABEL: Record<Capability, string> = {
+  manage_channels: "Channel managers only",
+  manage_server: "Server managers only",
+  moderate: "Moderators only",
+  publish_voice: "Voice members only",
+};
 
 export function Sidebar({
   channels,
@@ -36,6 +43,7 @@ export function Sidebar({
   const textChannels = channels.filter((c) => c.type === "text");
   const voiceChannels = channels.filter((c) => c.type === "voice");
   const [adminOpen, setAdminOpen] = useState(false);
+  const [createChannelOpen, setCreateChannelOpen] = useState(false);
   const [editingChannelId, setEditingChannelId] = useState<string | null>(null);
   const editingChannel = channels.find((c) => c.id === editingChannelId) ?? null;
   const canManageChannels = currentUser.capabilities.includes("manage_channels");
@@ -74,11 +82,15 @@ export function Sidebar({
         <button type="button" className="server-settings-button" onClick={() => setAdminOpen(true)}><Icon name="settings" size={15} /> {canManageServer ? "Server settings" : "Moderation"}</button>
       )}
       {canManageChannels && (
-        <CreateChannelForm
-          onCreated={onChannelCreated}
-          onError={() => showToast("Could not create the channel")}
-        />
+        <button type="button" className="create-channel-button" onClick={() => setCreateChannelOpen(true)}><Icon name="plus" size={16} /> Create channel</button>
       )}
+      {createChannelOpen ? (
+        <CreateChannelModal
+          onCreated={(channel) => { onChannelCreated(channel); setCreateChannelOpen(false); }}
+          onError={() => showToast("Could not create the channel")}
+          onClose={() => setCreateChannelOpen(false)}
+        />
+      ) : null}
       {adminOpen ? <AdminPanel currentUser={currentUser} onClose={() => setAdminOpen(false)} /> : null}
       {editingChannel ? (
         <ChannelSettingsModal
@@ -165,15 +177,18 @@ function ChannelGroup({
   );
 }
 
-function CreateChannelForm({
+function CreateChannelModal({
   onCreated,
   onError,
+  onClose,
 }: {
   onCreated(channel: Channel): void;
   onError(): void;
+  onClose(): void;
 }) {
   const [name, setName] = useState("");
   const [type, setType] = useState<Channel["type"]>("text");
+  const [requiredCapability, setRequiredCapability] = useState<Capability | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   async function handleSubmit(e: FormEvent) {
@@ -182,9 +197,8 @@ function CreateChannelForm({
     if (!trimmed) return;
     setSubmitting(true);
     try {
-      const channel = await api.createChannel({ name: trimmed, type });
+      const channel = await api.createChannel({ name: trimmed, type, requiredCapability });
       onCreated(channel);
-      setName("");
     } catch {
       onError();
     } finally {
@@ -193,27 +207,25 @@ function CreateChannelForm({
   }
 
   return (
-    <details className="create-channel">
-      <summary><Icon name="plus" size={15} /> Create a channel</summary>
-      <form onSubmit={handleSubmit}>
-      <input
-        aria-label="New channel name"
-        placeholder="new-channel"
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-      />
-      <select
-        aria-label="Channel type"
-        value={type}
-        onChange={(e) => setType(e.target.value as Channel["type"])}
-      >
-        <option value="text">Text</option>
-        <option value="voice">Voice</option>
-      </select>
-      <button type="submit" disabled={submitting}>
-        + Add
-      </button>
-      </form>
-    </details>
+    <div className="voice-modal-backdrop create-channel-backdrop" role="presentation" onMouseDown={(event) => {
+      if (event.target === event.currentTarget && !submitting) onClose();
+    }}>
+      <section className="voice-settings-modal create-channel-modal" role="dialog" aria-modal="true" aria-labelledby="create-channel-title">
+        <header><div><span>NEW CHANNEL</span><h2 id="create-channel-title">Create a channel</h2></div><button type="button" className="modal-close" aria-label="Close channel creation" onClick={onClose}><Icon name="close" size={18} /></button></header>
+        <form className="create-channel-form" onSubmit={handleSubmit}>
+          <fieldset>
+            <legend>Channel type</legend>
+            <div className="channel-type-options">
+              <button type="button" className={type === "text" ? "active" : ""} aria-pressed={type === "text"} onClick={() => setType("text")}><Icon name="hash" size={22} /><span><strong>Text</strong><small>Send messages, images and files</small></span></button>
+              <button type="button" className={type === "voice" ? "active" : ""} aria-pressed={type === "voice"} onClick={() => setType("voice")}><Icon name="volume" size={22} /><span><strong>Voice</strong><small>Talk, use cameras and share screens</small></span></button>
+            </div>
+          </fieldset>
+          <label>Channel name<div className="channel-name-field"><span aria-hidden="true">{type === "text" ? "#" : "◖))"}</span><input aria-label="New channel name" placeholder={type === "text" ? "new-channel" : "Voice lounge"} value={name} maxLength={64} autoFocus onChange={(event) => setName(event.target.value)} /></div></label>
+          <label>Who can access it?<select aria-label="New channel access" value={requiredCapability ?? ""} onChange={(event) => setRequiredCapability((event.target.value || null) as Capability | null)}><option value="">Everyone</option>{(Object.keys(CAPABILITY_LABEL) as Capability[]).map((capability) => <option key={capability} value={capability}>{CAPABILITY_LABEL[capability]}</option>)}</select></label>
+          <p className="create-channel-summary"><Icon name={type === "text" ? "hash" : "volume"} size={16} /> <span><strong>{name.trim() || (type === "text" ? "new-channel" : "Voice lounge")}</strong><small>{requiredCapability ? CAPABILITY_LABEL[requiredCapability] : "Visible to everyone"}</small></span></p>
+          <footer><button type="button" className="profile-cancel" onClick={onClose} disabled={submitting}>Cancel</button><button type="submit" disabled={submitting || !name.trim()}>{submitting ? "Creating…" : "Create channel"}</button></footer>
+        </form>
+      </section>
+    </div>
   );
 }
