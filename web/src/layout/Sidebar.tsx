@@ -36,10 +36,10 @@ export function Sidebar({
     <nav className="sidebar" aria-label="Channels">
       <div className="sidebar-server-name">
         <span>Vocal</span>
-        <span className="online-dot" aria-label={`${onlineUserIds.length} membres en ligne`} />
+        <span className="online-dot" aria-label={`${onlineUserIds.length} members online`} />
       </div>
       <ChannelGroup
-        title="Salons textuels"
+        title="Text channels"
         channels={textChannels}
         voiceOccupancy={voiceOccupancy}
         currentUserId={currentUser.id}
@@ -47,18 +47,18 @@ export function Sidebar({
         onSelectChannel={onSelectChannel}
       />
       <ChannelGroup
-        title="Salons vocaux"
+        title="Voice channels"
         channels={voiceChannels}
         voiceOccupancy={voiceOccupancy}
         currentUserId={currentUser.id}
         selectedChannelId={selectedChannelId}
         onSelectChannel={onSelectChannel}
       />
-      <p className="sidebar-presence"><span className="online-dot" /> {onlineUserIds.length} en ligne</p>
+      <p className="sidebar-presence"><span className="online-dot" /> {onlineUserIds.length} online</p>
       {currentUser.role === "admin" && (
-        <><button type="button" className="server-settings-button" onClick={() => setAdminOpen(true)}><Icon name="settings" size={15} /> Paramètres du serveur</button><CreateChannelForm
+        <><button type="button" className="server-settings-button" onClick={() => setAdminOpen(true)}><Icon name="settings" size={15} /> Server settings</button><CreateChannelForm
           onCreated={onChannelCreated}
-          onError={() => showToast("Impossible de créer le channel")}
+          onError={() => showToast("Could not create the channel")}
         />{adminOpen ? <AdminPanel channels={channels} currentUser={currentUser} onChannelUpdated={onChannelUpdated ?? (() => {})} onChannelDeleted={onChannelDeleted ?? (() => {})} onClose={() => setAdminOpen(false)} /> : null}</>
       )}
     </nav>
@@ -97,11 +97,11 @@ function ChannelGroup({
               <span className="channel-name">{channel.name}</span>
             </button>
             {channel.type === "voice" && occupants.length > 0 && (
-              <ul className="voice-occupants" aria-label={`Participants dans ${channel.name}`}>
+              <ul className="voice-occupants" aria-label={`Participants in ${channel.name}`}>
                 {occupants.map((participant) => (
                   <li key={participant.userId}>
                     <span className="member-avatar">{participant.username.slice(0, 1).toUpperCase()}</span>
-                    {participant.userId === currentUserId ? `${participant.username} (vous)` : participant.username}
+                    {participant.userId === currentUserId ? `${participant.username} (you)` : participant.username}
                   </li>
                 ))}
               </ul>
@@ -142,24 +142,24 @@ function CreateChannelForm({
 
   return (
     <details className="create-channel">
-      <summary><Icon name="plus" size={15} /> Créer un salon</summary>
+      <summary><Icon name="plus" size={15} /> Create a channel</summary>
       <form onSubmit={handleSubmit}>
       <input
-        aria-label="Nom du nouveau channel"
-        placeholder="nouveau-channel"
+        aria-label="New channel name"
+        placeholder="new-channel"
         value={name}
         onChange={(e) => setName(e.target.value)}
       />
       <select
-        aria-label="Type de channel"
+        aria-label="Channel type"
         value={type}
         onChange={(e) => setType(e.target.value as Channel["type"])}
       >
-        <option value="text">Textuel</option>
-        <option value="voice">Vocal</option>
+        <option value="text">Text</option>
+        <option value="voice">Voice</option>
       </select>
       <button type="submit" disabled={submitting}>
-        + Ajouter
+        + Add
       </button>
       </form>
     </details>

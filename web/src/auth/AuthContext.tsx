@@ -39,7 +39,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     } catch (err) {
       const message =
-        err instanceof ApiError ? err.message : "Impossible de contacter le serveur. Vérifie ta connexion.";
+        err instanceof ApiError ? err.message : "Could not reach the server. Check your connection.";
       setState({ phase: "error", message });
     }
   }, []);

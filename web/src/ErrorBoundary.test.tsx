@@ -14,7 +14,7 @@ describe("ErrorBoundary", () => {
         <Bomb />
       </ErrorBoundary>,
     );
-    expect(screen.getByRole("alert")).toHaveTextContent("Une erreur est survenue. Recharge la page.");
+    expect(screen.getByRole("alert")).toHaveTextContent("Something went wrong. Reload the page.");
     spy.mockRestore();
   });
 

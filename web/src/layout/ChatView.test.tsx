@@ -145,9 +145,9 @@ describe("ChatView", () => {
     vi.mocked(api.postMessage).mockResolvedValue(msg("1", "salut", "2026-01-01T00:00:01Z"));
     renderChat([]);
     const user = userEvent.setup();
-    const input = screen.getByLabelText("Message dans général");
+    const input = screen.getByLabelText("Message in général");
     await user.type(input, "salut");
-    await user.click(screen.getByRole("button", { name: "Envoyer" }));
+    await user.click(screen.getByRole("button", { name: "Send" }));
     await waitFor(() => expect(api.postMessage).toHaveBeenCalledWith("c1", "salut"));
     expect(input).toHaveValue("");
   });

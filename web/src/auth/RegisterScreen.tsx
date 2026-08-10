@@ -16,7 +16,7 @@ export function RegisterScreen({ inviteToken, onShowLogin }: { inviteToken?: str
     try {
       await signUp(username, password, inviteToken);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Erreur inattendue");
+      setError(err instanceof ApiError ? err.message : "Unexpected error");
     } finally {
       setSubmitting(false);
     }
@@ -25,10 +25,10 @@ export function RegisterScreen({ inviteToken, onShowLogin }: { inviteToken?: str
   return (
     <div className="auth-screen">
       <form className="auth-card" onSubmit={handleSubmit}>
-        <h1>Rejoindre Vocal</h1>
-        <label htmlFor="register-username">Nom d'utilisateur</label>
+        <h1>Join Vocal</h1>
+        <label htmlFor="register-username">Username</label>
         <input id="register-username" value={username} onChange={(e) => setUsername(e.target.value)} required />
-        <label htmlFor="register-password">Mot de passe</label>
+        <label htmlFor="register-password">Password</label>
         <input
           id="register-password"
           type="password"
@@ -42,10 +42,10 @@ export function RegisterScreen({ inviteToken, onShowLogin }: { inviteToken?: str
           </p>
         )}
         <button type="submit" disabled={submitting}>
-          Créer mon compte
+          Create my account
         </button>
         <button type="button" className="auth-link" onClick={onShowLogin}>
-          J’ai déjà un compte
+          I already have an account
         </button>
       </form>
     </div>

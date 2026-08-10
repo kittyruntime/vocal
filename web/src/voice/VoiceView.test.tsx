@@ -107,7 +107,7 @@ function renderView() {
 describe("VoiceView", () => {
   it("joins LiveKit and enables the microphone", async () => {
     renderView();
-    await screen.findByText(/Connecté en tant que theo/);
+    await screen.findByText(/Connected as theo/);
     expect(api.getVoiceToken).toHaveBeenCalledWith("c2");
     expect(connect).toHaveBeenCalledWith("ws://livekit", "jwt");
     expect(setMicrophoneEnabled).toHaveBeenCalledWith(true, expect.any(Object), expect.any(Object));
@@ -116,35 +116,35 @@ describe("VoiceView", () => {
   it("mutes and leaves the room", async () => {
     renderView();
     const user = userEvent.setup();
-    await user.click(await screen.findByRole("button", { name: "Couper le micro" }));
+    await user.click(await screen.findByRole("button", { name: "Mute microphone" }));
     expect(setMicrophoneEnabled).toHaveBeenLastCalledWith(false, expect.any(Object), expect.any(Object));
-    await user.click(screen.getByRole("button", { name: "Quitter" }));
+    await user.click(screen.getByRole("button", { name: "Leave" }));
     await waitFor(() => expect(disconnect).toHaveBeenCalled());
-    expect(screen.getByRole("button", { name: "Rejoindre" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Join" })).toBeInTheDocument();
   });
 
   it("controls deafen, camera, and screen sharing", async () => {
     renderView();
     const user = userEvent.setup();
-    await user.click(await screen.findByRole("button", { name: "Assourdir" }));
-    expect(screen.getByRole("button", { name: "Rétablir le son" })).toHaveAttribute("aria-pressed", "true");
+    await user.click(await screen.findByRole("button", { name: "Deafen" }));
+    expect(screen.getByRole("button", { name: "Undeafen" })).toHaveAttribute("aria-pressed", "true");
 
-    await user.click(screen.getByRole("button", { name: "Activer la caméra" }));
+    await user.click(screen.getByRole("button", { name: "Turn on camera" }));
     expect(setCameraEnabled).toHaveBeenCalledWith(true, expect.any(Object), expect.any(Object));
-    expect(screen.getByRole("button", { name: "Arrêter la caméra" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Stop camera" })).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "Partager l’écran" }));
+    await user.click(screen.getByRole("button", { name: "Share screen" }));
     expect(setScreenShareEnabled).toHaveBeenCalledWith(true, expect.any(Object), expect.any(Object));
-    expect(screen.getByRole("button", { name: "Arrêter le partage" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Stop sharing" })).toBeInTheDocument();
   });
 
   it("publishes screen sharing in 1080p60 game mode", async () => {
     renderView();
     const user = userEvent.setup();
-    await user.click(await screen.findByRole("button", { name: "Réglages" }));
-    await screen.findByRole("dialog", { name: "Voix & Vidéo" });
-    await user.selectOptions(screen.getByLabelText("Partage d’écran"), "game");
-    await user.click(screen.getByRole("button", { name: "Partager l’écran" }));
+    await user.click(await screen.findByRole("button", { name: "Settings" }));
+    await screen.findByRole("dialog", { name: "Voice & Video" });
+    await user.selectOptions(screen.getByLabelText("Screen share"), "game");
+    await user.click(screen.getByRole("button", { name: "Share screen" }));
 
     expect(setScreenShareEnabled).toHaveBeenLastCalledWith(
       true,
@@ -156,26 +156,26 @@ describe("VoiceView", () => {
   it("opens voice settings in a modal and closes it with Escape", async () => {
     renderView();
     const user = userEvent.setup();
-    await user.click(await screen.findByRole("button", { name: "Réglages" }));
-    expect(screen.getByRole("dialog", { name: "Voix & Vidéo" })).toBeVisible();
+    await user.click(await screen.findByRole("button", { name: "Settings" }));
+    expect(screen.getByRole("dialog", { name: "Voice & Video" })).toBeVisible();
 
     await user.keyboard("{Escape}");
-    expect(screen.queryByRole("dialog", { name: "Voix & Vidéo" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: "Voice & Video" })).not.toBeInTheDocument();
   });
 
   it("highlights the participant who is speaking", async () => {
     renderView();
-    const participantName = await screen.findByText("theo (vous)");
+    const participantName = await screen.findByText("theo (you)");
 
     act(() => roomHandlers.get("activeSpeakersChanged")?.([{ identity: "u1", name: "theo" }]));
 
     expect(participantName.closest(".voice-participant")).toHaveClass("is-speaking");
-    expect(screen.getByText("Parle")).toBeInTheDocument();
+    expect(screen.getByText("Speaking")).toBeInTheDocument();
   });
 
   it("keeps the voice session connected while the view is hidden", async () => {
     const view = renderView();
-    await screen.findByText(/Connecté en tant que theo/);
+    await screen.findByText(/Connected as theo/);
 
     view.rerender(
       <ToastProvider><VoiceView channel={channel} currentUser={currentUser} visible={false} /></ToastProvider>,
@@ -187,84 +187,84 @@ describe("VoiceView", () => {
 
   it("shows a reconnect banner while LiveKit reconnects and clears it once reconnected", async () => {
     renderView();
-    await screen.findByText(/Connecté en tant que theo/);
+    await screen.findByText(/Connected as theo/);
 
     act(() => roomHandlers.get("reconnecting")?.());
-    expect(screen.getByText(/Reconnexion en cours/)).toBeInTheDocument();
+    expect(screen.getByText(/Reconnecting/)).toBeInTheDocument();
 
     act(() => roomHandlers.get("reconnected")?.());
-    expect(screen.queryByText(/Reconnexion en cours/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Reconnecting/)).not.toBeInTheDocument();
   });
 
   it("shows a toast and returns to idle when the connection is lost after failed reconnection attempts", async () => {
     renderView();
-    await screen.findByText(/Connecté en tant que theo/);
+    await screen.findByText(/Connected as theo/);
 
     act(() => roomHandlers.get("reconnecting")?.());
     act(() => roomHandlers.get("disconnected")?.());
 
-    await screen.findByText("Connexion vocale perdue après plusieurs tentatives de reconnexion.");
-    expect(screen.getByRole("button", { name: "Rejoindre" })).toBeInTheDocument();
+    await screen.findByText("Voice connection lost after several reconnection attempts.");
+    expect(screen.getByRole("button", { name: "Join" })).toBeInTheDocument();
   });
 
   it("does not show the reconnection-loss toast for a graceful disconnect", async () => {
     renderView();
     const user = userEvent.setup();
-    await screen.findByText(/Connecté en tant que theo/);
+    await screen.findByText(/Connected as theo/);
 
-    await user.click(screen.getByRole("button", { name: "Quitter" }));
+    await user.click(screen.getByRole("button", { name: "Leave" }));
     await waitFor(() => expect(disconnect).toHaveBeenCalled());
 
-    expect(screen.queryByText("Connexion vocale perdue après plusieurs tentatives de reconnexion.")).not.toBeInTheDocument();
+    expect(screen.queryByText("Voice connection lost after several reconnection attempts.")).not.toBeInTheDocument();
   });
 
   it("shows a differentiated toast when the microphone permission is denied on join", async () => {
     setMicrophoneEnabled.mockRejectedValueOnce(Object.assign(new Error("denied"), { name: "NotAllowedError" }));
     renderView();
-    await screen.findByText("Autorisation du microphone refusée. Vérifie les réglages de ton navigateur.");
-    expect(screen.getByRole("button", { name: "Rejoindre" })).toBeInTheDocument();
+    await screen.findByText("Microphone permission denied. Check your browser settings.");
+    expect(screen.getByRole("button", { name: "Join" })).toBeInTheDocument();
   });
 
   it("shows a differentiated toast when no microphone is found on join", async () => {
     setMicrophoneEnabled.mockRejectedValueOnce(Object.assign(new Error("missing"), { name: "NotFoundError" }));
     renderView();
-    await screen.findByText("Aucun microphone détecté sur cet appareil.");
+    await screen.findByText("No microphone detected on this device.");
   });
 
   it("shows a network-loss toast when the initial connection is unreachable", async () => {
     connect.mockRejectedValueOnce(ConnectionError.serverUnreachable("no route to host"));
     renderView();
-    await screen.findByText("Connexion réseau impossible. Vérifie ta connexion et réessaie.");
+    await screen.findByText("Network connection failed. Check your connection and try again.");
   });
 
   it("falls back to a generic join error for an unrelated failure", async () => {
     connect.mockRejectedValueOnce(new Error("boom"));
     renderView();
-    await screen.findByText("Impossible d’activer le microphone.");
+    await screen.findByText("Could not enable the microphone.");
   });
 
   it("shows a differentiated toast when the camera permission is denied", async () => {
     renderView();
     const user = userEvent.setup();
-    await screen.findByText(/Connecté en tant que theo/);
+    await screen.findByText(/Connected as theo/);
     setCameraEnabled.mockRejectedValueOnce(Object.assign(new Error("denied"), { name: "NotAllowedError" }));
-    await user.click(screen.getByRole("button", { name: "Activer la caméra" }));
-    await screen.findByText("Autorisation de la caméra refusée. Vérifie les réglages de ton navigateur.");
+    await user.click(screen.getByRole("button", { name: "Turn on camera" }));
+    await screen.findByText("Camera permission denied. Check your browser settings.");
   });
 
   it("shows a cancelled toast when the screen-share picker is dismissed", async () => {
     renderView();
     const user = userEvent.setup();
-    await screen.findByText(/Connecté en tant que theo/);
+    await screen.findByText(/Connected as theo/);
     setScreenShareEnabled.mockRejectedValueOnce(Object.assign(new Error("cancel"), { name: "NotAllowedError" }));
-    await user.click(screen.getByRole("button", { name: "Partager l’écran" }));
-    await screen.findByText("Partage d’écran annulé.");
+    await user.click(screen.getByRole("button", { name: "Share screen" }));
+    await screen.findByText("Screen share cancelled.");
   });
 
   it("configures push-to-talk from voice settings", async () => {
     renderView();
     const user = userEvent.setup();
-    await user.click(await screen.findByRole("button", { name: "Réglages" }));
+    await user.click(await screen.findByRole("button", { name: "Settings" }));
     await user.click(screen.getByRole("radio", { name: /Push-to-talk/ }));
 
     expect(screen.getByRole("radio", { name: /Push-to-talk/ })).toHaveAttribute("aria-checked", "true");

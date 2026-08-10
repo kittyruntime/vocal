@@ -21,7 +21,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     if (this.state.hasError) {
       return (
         <div className="error-boundary-screen" role="alert">
-          Une erreur est survenue. Recharge la page.
+          Something went wrong. Reload the page.
         </div>
       );
     }

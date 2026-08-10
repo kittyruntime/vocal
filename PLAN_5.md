@@ -4,6 +4,7 @@ Dernière mise à jour : 2026-08-10 (soir)
 
 ## Terminé
 
+- [x] Interface entièrement traduite en anglais (composants + tests + `lang="en"`). Les noms de salons restent du contenu utilisateur, non traduits.
 - [x] SDK `livekit-client` chargé à la demande.
 - [x] Récupération d'un jeton vocal court auprès du backend.
 - [x] Présence vocale synchronisée par WebSocket et affichée dans la sidebar.

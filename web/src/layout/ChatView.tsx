@@ -45,7 +45,7 @@ export function ChatView({
         onMessagesLoaded([...page].reverse());
         setHasMore(page.length >= PAGE_SIZE);
       } catch {
-        if (!cancelled) showToast("Impossible de charger les messages");
+        if (!cancelled) showToast("Could not load messages");
       }
     })();
     return () => {
@@ -92,7 +92,7 @@ export function ChatView({
     } catch {
       pendingScrollActionRef.current = null;
       prependMetricsRef.current = null;
-      showToast("Impossible de charger l'historique");
+      showToast("Could not load history");
     } finally {
       setLoadingMore(false);
     }
@@ -113,7 +113,7 @@ export function ChatView({
       await api.postMessage(channel.id, content);
       setDraft("");
     } catch {
-      showToast("Le message n'a pas pu être envoyé");
+      showToast("The message could not be sent");
     } finally {
       setSending(false);
     }
@@ -125,15 +125,15 @@ export function ChatView({
       <div
         className="chat-messages"
         role="log"
-        aria-label="Historique des messages"
+        aria-label="Message history"
         onScroll={handleScroll}
         ref={messagesRef}
       >
         {messages.length === 0 && (
           <div className="chat-empty">
             <div className="chat-empty-icon"><Icon name="hash" size={38} /></div>
-            <h1>Bienvenue dans #{channel.name}</h1>
-            <p>C’est le début de ce salon.</p>
+            <h1>Welcome to #{channel.name}</h1>
+            <p>This is the beginning of this channel.</p>
           </div>
         )}
         {messages.map((message) => (
@@ -153,15 +153,15 @@ export function ChatView({
         <div className="composer-field">
           <span aria-hidden="true"><Icon name="plus" size={20} /></span>
           <input
-            aria-label={`Message dans ${channel.name}`}
-            placeholder={`Envoyer un message dans #${channel.name}`}
+            aria-label={`Message in ${channel.name}`}
+            placeholder={`Send a message in #${channel.name}`}
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             disabled={sending}
           />
         </div>
-        <button type="submit" aria-label="Envoyer" disabled={sending || draft.trim().length === 0}>
-          <Icon name="send" size={18} /><span className="sr-only">Envoyer</span>
+        <button type="submit" aria-label="Send" disabled={sending || draft.trim().length === 0}>
+          <Icon name="send" size={18} /><span className="sr-only">Send</span>
         </button>
       </form>
     </div>
@@ -171,5 +171,5 @@ export function ChatView({
 function formatMessageTime(value: string): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "";
-  return new Intl.DateTimeFormat("fr-FR", { hour: "2-digit", minute: "2-digit" }).format(date);
+  return new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit" }).format(date);
 }
