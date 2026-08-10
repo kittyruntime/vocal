@@ -6,6 +6,15 @@ export type MessagePayload = {
   avatarUrl: string | null;
   content: string;
   createdAt: string;
+  attachments?: MessageAttachmentPayload[];
+};
+
+export type MessageAttachmentPayload = {
+  id: string;
+  filename: string;
+  mimeType: string;
+  size: number;
+  url: string;
 };
 
 export type ChannelPayload = {

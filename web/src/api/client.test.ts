@@ -71,6 +71,17 @@ describe("api client", () => {
     expect(msg.content).toBe("hi");
   });
 
+  it("posts files as multipart data without forcing a JSON content type", async () => {
+    mockFetchOnce(201, { id: "m1", content: "photo", attachments: [] });
+    const file = new File(["image"], "photo.png", { type: "image/png" });
+    await postMessage("c1", "photo", [file]);
+    const [, init] = (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(init.body).toBeInstanceOf(FormData);
+    expect((init.body as FormData).get("content")).toBe("photo");
+    expect((init.body as FormData).getAll("files")).toHaveLength(1);
+    expect(init.headers).not.toHaveProperty("content-type");
+  });
+
   it("requests a short-lived token for a voice channel", async () => {
     mockFetchOnce(201, { token: "jwt", url: "ws://localhost:7880" });
     await expect(getVoiceToken("c2")).resolves.toEqual({ token: "jwt", url: "ws://localhost:7880" });

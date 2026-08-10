@@ -153,6 +153,18 @@ describe("ChatView", () => {
     expect(input).toHaveFocus();
   });
 
+  it("sends an attachment without requiring text", async () => {
+    vi.mocked(api.listMessages).mockResolvedValue([]);
+    vi.mocked(api.postMessage).mockResolvedValue({ ...msg("1", "", "2026-01-01T00:00:01Z"), attachments: [] });
+    renderChat([]);
+    const user = userEvent.setup();
+    const file = new File(["document"], "notes.txt", { type: "text/plain" });
+    await user.upload(screen.getByLabelText("Attach files").parentElement!.querySelector('input[type="file"]')!, file);
+    expect(screen.getByText("notes.txt")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Send" }));
+    await waitFor(() => expect(api.postMessage).toHaveBeenCalledWith("c1", "", [file]));
+  });
+
   it("loads older messages when scrolled to the top", async () => {
     vi.mocked(api.listMessages)
       .mockResolvedValueOnce([])

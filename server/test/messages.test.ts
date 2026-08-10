@@ -9,6 +9,17 @@ let app: FastifyInstance;
 let adminCookie: string;
 let channelId: string;
 
+function multipartBody(fields: Record<string, string>, file: { name: string; type: string; content: Buffer }) {
+  const boundary = "----vocal-test-boundary";
+  const chunks: Buffer[] = [];
+  for (const [name, value] of Object.entries(fields)) {
+    chunks.push(Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="${name}"\r\n\r\n${value}\r\n`));
+  }
+  chunks.push(Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="files"; filename="${file.name}"\r\nContent-Type: ${file.type}\r\n\r\n`));
+  chunks.push(file.content, Buffer.from(`\r\n--${boundary}--\r\n`));
+  return { payload: Buffer.concat(chunks), contentType: `multipart/form-data; boundary=${boundary}` };
+}
+
 async function login(username: string, password: string): Promise<string> {
   const res = await app.inject({ method: "POST", url: "/api/auth/login",
     payload: { username, password } });
@@ -46,6 +57,24 @@ describe("messages", () => {
     const raw = await pool.query("SELECT content_encrypted FROM messages LIMIT 1");
     expect(raw.rows[0].content_encrypted).not.toContain("secret message");
     expect(raw.rows[0].content_encrypted).toMatch(/^v1:/);
+  });
+
+  it("uploads, lists and serves an image attachment", async () => {
+    const upload = multipartBody({ content: "a picture" }, { name: "hello.png", type: "image/png", content: Buffer.from("fake-png") });
+    const posted = await app.inject({
+      method: "POST", url: `/api/channels/${channelId}/messages`,
+      headers: { cookie: adminCookie, "content-type": upload.contentType }, payload: upload.payload,
+    });
+    expect(posted.statusCode).toBe(201);
+    expect(posted.json().attachments).toMatchObject([{ filename: "hello.png", mimeType: "image/png", size: 8 }]);
+
+    const history = await app.inject({ method: "GET", url: `/api/channels/${channelId}/messages`, headers: { cookie: adminCookie } });
+    const attachment = history.json()[0].attachments[0];
+    expect(attachment.filename).toBe("hello.png");
+    const downloaded = await app.inject({ method: "GET", url: attachment.url, headers: { cookie: adminCookie } });
+    expect(downloaded.statusCode).toBe(200);
+    expect(downloaded.headers["content-type"]).toContain("image/png");
+    expect(downloaded.rawPayload).toEqual(Buffer.from("fake-png"));
   });
 
   it("returns history most-recent-first and paginates with before", async () => {
