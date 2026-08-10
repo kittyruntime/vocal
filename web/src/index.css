@@ -253,11 +253,28 @@ summary:focus-visible {
 .online-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #23a55a; }
 .sidebar-presence { margin: 14px 16px 8px; color: #949ba4; font-size: 12px; }
 
-.create-channel { margin: 6px 8px 16px; border-top: 1px solid #3f4147; padding-top: 10px; }
-.create-channel summary { display: flex; align-items: center; gap: 5px; color: #b5bac1; font-size: 13px; cursor: pointer; list-style: none; }
-.create-channel summary::-webkit-details-marker { display: none; }
-.create-channel form { display: grid; gap: 7px; margin-top: 9px; }
-.create-channel button { padding: 8px; }
+.create-channel-button { width: calc(100% - 16px); display: flex; align-items: center; justify-content: center; gap: 7px; margin: 6px 8px 12px; padding: 9px; border: 1px solid #4e5058; border-radius: 5px; background: transparent; color: #b5bac1; cursor: pointer; font-size: 13px; font-weight: 600; }
+.create-channel-button:hover { border-color: #5865f2; background: rgb(88 101 242 / 10%); color: #fff; }
+.create-channel-backdrop { position: fixed; z-index: 30; }
+.create-channel-modal { width: min(560px, 100%); }
+.create-channel-form { min-height: 0; overflow-y: auto; display: grid; gap: 20px; padding: 22px 24px 0; }
+.create-channel-form fieldset { min-width: 0; margin: 0; padding: 0; border: 0; }
+.create-channel-form legend, .create-channel-form > label { width: 100%; display: grid; gap: 7px; margin-bottom: 8px; color: #b5bac1; font-size: 11px; font-weight: 700; letter-spacing: .035em; text-transform: uppercase; }
+.channel-type-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.channel-type-options button { min-width: 0; display: flex; align-items: center; gap: 12px; padding: 14px; border: 1px solid #1e1f22; border-radius: 7px; background: #2b2d31; color: #b5bac1; cursor: pointer; text-align: left; }
+.channel-type-options button.active { border-color: #5865f2; background: rgb(88 101 242 / 12%); color: #fff; box-shadow: inset 3px 0 #5865f2; }
+.channel-type-options span { min-width: 0; display: flex; flex-direction: column; }
+.channel-type-options strong { font-size: 14px; }
+.channel-type-options small { color: #949ba4; font-size: 11px; line-height: 1.35; }
+.create-channel-form select { width: 100%; min-height: 42px; padding: 9px 10px; border: 1px solid #1e1f22; border-radius: 4px; background: #1e1f22; color: #dbdee1; }
+.create-channel-summary { display: flex; align-items: center; gap: 10px; margin: 0; padding: 11px 12px; border-radius: 6px; background: #2b2d31; color: #b5bac1; }
+.create-channel-summary > span { display: flex; flex-direction: column; }
+.create-channel-summary strong { color: #f2f3f5; font-size: 13px; }
+.create-channel-summary small { color: #949ba4; font-size: 11px; }
+.create-channel-form footer { position: sticky; bottom: 0; display: flex; justify-content: flex-end; gap: 10px; margin: 0 -24px; padding: 16px 24px; background: #2b2d31; }
+.create-channel-form footer button { padding: 9px 14px; border: 0; border-radius: 4px; background: #5865f2; color: #fff; cursor: pointer; }
+.create-channel-form footer .profile-cancel { background: transparent; }
+.create-channel-form footer button:disabled { opacity: .45; cursor: default; }
 
 .user-bar {
   min-height: 56px;

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ToastProvider } from "../toast/ToastContext";
 import { Sidebar } from "./Sidebar";
@@ -65,12 +65,12 @@ describe("Sidebar", () => {
 
   it("shows the create-channel form only to admins", () => {
     renderSidebar(admin);
-    expect(screen.getByLabelText("New channel name")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Create channel" })).toBeInTheDocument();
   });
 
   it("hides the create-channel form from non-admins", () => {
     renderSidebar(member);
-    expect(screen.queryByLabelText("New channel name")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Create channel" })).not.toBeInTheDocument();
   });
 
   it("shows a per-channel settings icon for admins, opening that channel's settings", async () => {
@@ -91,9 +91,27 @@ describe("Sidebar", () => {
     const onCreated = vi.fn();
     renderSidebar(admin, vi.fn(), onCreated);
     const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Create channel" }));
+    const dialog = screen.getByRole("dialog", { name: "Create a channel" });
+    expect(dialog).toBeInTheDocument();
     await user.type(screen.getByLabelText("New channel name"), "annonces");
-    await user.click(screen.getByRole("button", { name: "+ Add" }));
+    await user.click(within(dialog).getByRole("button", { name: "Create channel" }));
     await waitFor(() => expect(onCreated).toHaveBeenCalledWith(created));
-    expect(api.createChannel).toHaveBeenCalledWith({ name: "annonces", type: "text" });
+    expect(api.createChannel).toHaveBeenCalledWith({ name: "annonces", type: "text", requiredCapability: null });
+  });
+
+  it("creates a restricted voice channel from the modal", async () => {
+    const created: Channel = { id: "c3", name: "staff voice", type: "voice", requiredCapability: "moderate", position: 2, createdAt: "now" };
+    vi.mocked(api.createChannel).mockResolvedValue(created);
+    const onCreated = vi.fn();
+    renderSidebar(admin, vi.fn(), onCreated);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Create channel" }));
+    const dialog = screen.getByRole("dialog", { name: "Create a channel" });
+    await user.click(screen.getByRole("button", { name: /^Voice/ }));
+    await user.type(screen.getByLabelText("New channel name"), "staff voice");
+    await user.selectOptions(screen.getByLabelText("New channel access"), "moderate");
+    await user.click(within(dialog).getByRole("button", { name: "Create channel" }));
+    await waitFor(() => expect(api.createChannel).toHaveBeenCalledWith({ name: "staff voice", type: "voice", requiredCapability: "moderate" }));
   });
 });
