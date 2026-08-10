@@ -10,6 +10,7 @@ import { ChatView } from "./ChatView";
 import { UserBar } from "./UserBar";
 import { ConnectionBanner } from "./ConnectionBanner";
 import { playAppSound } from "../audio/sounds";
+import { Icon } from "../ui/Icon";
 
 const VoiceView = lazy(() => import("../voice/VoiceView").then((module) => ({ default: module.VoiceView })));
 
@@ -18,7 +19,17 @@ export function MainLayout({ currentUser }: { currentUser: CurrentUser }) {
   const { showToast } = useToast();
   const [state, dispatch] = useReducer(appReducer, { ...initialAppState, currentUser });
   const [retainedVoiceChannel, setRetainedVoiceChannel] = useState<Channel | null>(null);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const joinedVoiceChannelIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!mobileSidebarOpen) return;
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setMobileSidebarOpen(false);
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [mobileSidebarOpen]);
 
   useEffect(() => {
     api
@@ -81,6 +92,7 @@ export function MainLayout({ currentUser }: { currentUser: CurrentUser }) {
 
   const selectChannel = useCallback((channelId: string) => {
     dispatch({ type: "channel/selected", channelId });
+    setMobileSidebarOpen(false);
   }, []);
 
   const selectedChannel = state.channels.find((c) => c.id === state.selectedChannelId) ?? null;
@@ -94,12 +106,16 @@ export function MainLayout({ currentUser }: { currentUser: CurrentUser }) {
     <div className="app-shell">
       {state.connectionStatus !== "open" && <ConnectionBanner status={state.connectionStatus} />}
       <div className="main-layout">
-        <aside className="sidebar-column">
+        {mobileSidebarOpen && (
+          <div className="sidebar-backdrop" role="presentation" onClick={() => setMobileSidebarOpen(false)} />
+        )}
+        <aside className={`sidebar-column ${mobileSidebarOpen ? "is-open" : ""}`}>
           <Sidebar
             channels={state.channels}
             selectedChannelId={state.selectedChannelId}
             onlineUserIds={state.onlineUserIds}
             voiceOccupancy={state.voiceOccupancy}
+            voiceSpeakingUserIds={state.voiceSpeakingUserIds}
             currentUser={currentUser}
             onSelectChannel={selectChannel}
             onChannelCreated={(channel) => dispatch({ type: "channel/added", channel })}
@@ -119,9 +135,15 @@ export function MainLayout({ currentUser }: { currentUser: CurrentUser }) {
               onMessagesPrepended={(messages) =>
                 dispatch({ type: "messages/prepended", channelId: selectedChannel.id, messages })
               }
+              onOpenSidebar={() => setMobileSidebarOpen(true)}
             />
           ) : selectedChannel?.type !== "voice" ? (
-            <div className="no-channel">No channel</div>
+            <div className="no-channel">
+              <button type="button" className="mobile-menu-button" aria-label="Open channel list" onClick={() => setMobileSidebarOpen(true)}>
+                <Icon name="menu" size={20} />
+              </button>
+              No channel
+            </div>
           ) : null}
           {voiceChannel ? (
             <Suspense fallback={<div className="no-channel">Loading voice…</div>}>
@@ -129,6 +151,19 @@ export function MainLayout({ currentUser }: { currentUser: CurrentUser }) {
                 channel={voiceChannel}
                 currentUser={currentUser}
                 visible={selectedChannel?.type === "voice"}
+                onOpenSidebar={() => setMobileSidebarOpen(true)}
+                onSpeakingChange={(userIds) => dispatch({ type: "voice/speaking", userIds })}
+                onSelfPresenceChange={(present) => {
+                  if (present) {
+                    dispatch({
+                      type: "voice/joined",
+                      channelId: voiceChannel.id,
+                      participant: { userId: currentUser.id, username: currentUser.username },
+                    });
+                  } else {
+                    dispatch({ type: "voice/left", channelId: voiceChannel.id, userId: currentUser.id });
+                  }
+                }}
               />
             </Suspense>
           ) : null}

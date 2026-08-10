@@ -171,10 +171,16 @@ export function VoiceView({
   channel,
   currentUser,
   visible = true,
+  onOpenSidebar,
+  onSpeakingChange,
+  onSelfPresenceChange,
 }: {
   channel: Channel;
   currentUser: CurrentUser;
   visible?: boolean;
+  onOpenSidebar?(): void;
+  onSpeakingChange?(userIds: string[]): void;
+  onSelfPresenceChange?(present: boolean): void;
 }) {
   const { showToast } = useToast();
   const [status, setStatus] = useState<VoiceStatus>("idle");
@@ -207,7 +213,7 @@ export function VoiceView({
   const meterCleanupRef = useRef<(() => Promise<void>) | null>(null);
   const meterFrameRef = useRef<number | null>(null);
   const pttPressedRef = useRef(false);
-  const lastVisibleChannelRef = useRef<string | null>(null);
+  const autoJoinedChannelRef = useRef<string | null>(null);
   const voiceGateRef = useRef<VoiceGateProcessor | null>(null);
   const settingsRef = useRef(settings);
   const lastVoiceActivityRef = useRef(0);
@@ -285,11 +291,11 @@ export function VoiceView({
     localScreenRef.current?.replaceChildren();
   }
 
-  async function leaveRoom() {
-    const room = roomRef.current;
-    roomRef.current = null;
-    if (room) await room.disconnect();
-    clearMedia();
+  // Shared by every path that ends a room connection (voluntary leave,
+  // involuntary disconnect, and switching to a different voice channel while
+  // still connected) so none of them can drift out of sync with each other
+  // and leave stale "connected" UI state behind.
+  function resetCallState() {
     setStatus("idle");
     setMicrophoneEnabled(false);
     setDeafened(false);
@@ -303,16 +309,32 @@ export function VoiceView({
     setCallParticipants([]);
     activeSpeakersRef.current.clear();
     stopMeter();
+    onSpeakingChange?.([]);
+    onSelfPresenceChange?.(false);
   }
 
+  async function leaveRoom() {
+    const room = roomRef.current;
+    roomRef.current = null;
+    if (room) await room.disconnect();
+    clearMedia();
+    resetCallState();
+  }
+
+  // Runs whenever `channel.id` changes, including switching directly from one
+  // voice channel to another while still connected -- VoiceView isn't
+  // remounted in that case (same component, new prop), so without this the
+  // old room would be dropped but `status` would stay stuck on "connected"
+  // and the auto-join effect below would never join the new channel.
   useEffect(() => {
     return () => {
       const room = roomRef.current;
       roomRef.current = null;
       if (room) void room.disconnect();
       clearMedia();
-      stopMeter();
+      resetCallState();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [channel.id]);
 
   useEffect(() => {
@@ -413,6 +435,7 @@ export function VoiceView({
       const activeIds = new Set(speakers.map((participant) => participant.identity));
       updateSpeakingTiles(activeIds);
       setActiveSpeakerIds(activeIds);
+      onSpeakingChange?.([...activeIds]);
     });
     const refreshParticipants = () => {
       const localIdentity = room.localParticipant.identity || currentUser.id;
@@ -442,16 +465,8 @@ export function VoiceView({
         const lostAfterReconnecting = reconnectingRef.current;
         reconnectingRef.current = false;
         roomRef.current = null;
-        setStatus("idle");
-        setMicrophoneEnabled(false);
-        setCameraEnabled(false);
-        setScreenShareEnabled(false);
-        setParticipantCount(1);
-        setRemoteVideoCount(0);
-        setRemoteScreenCount(0);
-        setActiveSpeakerIds(new Set());
-        setCallParticipants([]);
         clearMedia();
+        resetCallState();
         if (lostAfterReconnecting) {
           showToast("Voice connection lost after several reconnection attempts.");
         }
@@ -474,6 +489,7 @@ export function VoiceView({
       setDevices(await Room.getLocalDevices(undefined, false));
       refreshParticipants();
       setStatus("connected");
+      onSelfPresenceChange?.(true);
     } catch (error) {
       await room.disconnect();
       if (roomRef.current === room) roomRef.current = null;
@@ -643,19 +659,34 @@ export function VoiceView({
   const hasScreenShare = screenShareEnabled || remoteScreenCount > 0;
   const localSpeaking = microphoneEnabled && audioLevel >= settings.vadThreshold;
 
+  // Deliberately keyed on `status` too: switching directly from one voice
+  // channel to another (channel.id changes while still connected) doesn't
+  // remount this component, so the effect above disconnects the old room and
+  // schedules status back to "idle" -- this effect has to re-run once that
+  // state update lands (a separate commit; `status` read here during the
+  // same commit as the channel switch is still the stale "connected" value)
+  // to actually join the new channel. `autoJoinedChannelRef` only remembers
+  // the id we already attempted, so a channel switch (new id) always gets a
+  // fresh attempt while a failed join on the same channel doesn't auto-retry.
   useEffect(() => {
     if (!visible) {
-      lastVisibleChannelRef.current = null;
+      autoJoinedChannelRef.current = null;
       return;
     }
-    if (lastVisibleChannelRef.current === channel.id) return;
-    lastVisibleChannelRef.current = channel.id;
-    if (status === "idle") void joinRoom();
-  }, [channel.id, visible]);
+    if (status !== "idle") return;
+    if (autoJoinedChannelRef.current === channel.id) return;
+    autoJoinedChannelRef.current = channel.id;
+    void joinRoom();
+  }, [channel.id, visible, status]);
 
   return (
     <section className="voice-view" aria-label={`Voice channel ${channel.name}`} hidden={!visible} ref={voiceViewRef}>
-      <header className="chat-header"><span className="header-channel-icon"><Icon name="volume" size={21} /></span> {channel.name}</header>
+      <header className="chat-header">
+        <button type="button" className="mobile-menu-button" aria-label="Open channel list" onClick={() => onOpenSidebar?.()}>
+          <Icon name="menu" size={20} />
+        </button>
+        <span className="header-channel-icon"><Icon name="volume" size={21} /></span> {channel.name}
+      </header>
       <div className="voice-stage">
         <div className={`voice-hero ${status === "connected" || status === "reconnecting" ? "is-connected" : ""}`}>
           <div className="voice-hero-icon"><Icon name="volume" size={28} /></div>
