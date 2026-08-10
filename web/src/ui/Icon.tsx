@@ -16,6 +16,7 @@ import {
   Plus,
   Send,
   Settings,
+  Smile,
   Volume2,
   Upload,
   Users,
@@ -41,6 +42,7 @@ type IconName =
   | "plus"
   | "send"
   | "settings"
+  | "smile"
   | "volume"
   | "upload"
   | "users"
@@ -64,6 +66,7 @@ const icons: Record<IconName, LucideIcon> = {
   plus: Plus,
   send: Send,
   settings: Settings,
+  smile: Smile,
   volume: Volume2,
   upload: Upload,
   users: Users,

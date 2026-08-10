@@ -153,6 +153,19 @@ describe("ChatView", () => {
     expect(input).toHaveFocus();
   });
 
+  it("inserts an emote in the composer and keeps keyboard focus", async () => {
+    vi.mocked(api.listMessages).mockResolvedValue([]);
+    renderChat([]);
+    const user = userEvent.setup();
+    const input = screen.getByLabelText("Message in général");
+    await user.type(input, "salut ");
+    await user.click(screen.getByRole("button", { name: "Choose an emote" }));
+    expect(screen.getByRole("dialog", { name: "Emotes" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Insert 😀" }));
+    expect(input).toHaveValue("salut 😀");
+    await waitFor(() => expect(input).toHaveFocus());
+  });
+
   it("sends an attachment without requiring text", async () => {
     vi.mocked(api.listMessages).mockResolvedValue([]);
     vi.mocked(api.postMessage).mockResolvedValue({ ...msg("1", "", "2026-01-01T00:00:01Z"), attachments: [] });

@@ -5,6 +5,12 @@ import { useToast } from "../toast/ToastContext";
 import { Icon } from "../ui/Icon";
 
 const PAGE_SIZE = 50;
+const EMOTES = [
+  "😀", "😂", "🥹", "😍", "🥰", "😎", "🤔", "🫡",
+  "😭", "😤", "😡", "🤯", "🥳", "😴", "👀", "💀",
+  "👍", "👎", "👏", "🙌", "🙏", "🤝", "💪", "🫶",
+  "❤️", "💙", "💜", "🔥", "✨", "🎉", "✅", "🚀",
+];
 
 // How close to the bottom (in px) the user has to be scrolled for a newly-arrived message to
 // auto-scroll the view. Keeps someone who scrolled up to read history from being yanked down.
@@ -32,12 +38,14 @@ export function ChatView({
   const [sending, setSending] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
   const [dragActive, setDragActive] = useState(false);
+  const [emotesOpen, setEmotesOpen] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
 
   const messagesRef = useRef<HTMLDivElement>(null);
   const composerInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const emotesRef = useRef<HTMLDivElement>(null);
   const dragDepthRef = useRef(0);
   // Tells the scroll-restoration effect (below) why `messages` just changed, so it knows
   // whether to jump to the bottom, preserve the reading position, or leave things alone.
@@ -64,6 +72,25 @@ export function ChatView({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [channel.id]);
+
+  useEffect(() => {
+    if (!emotesOpen) return;
+    function closeEmotes(event: MouseEvent) {
+      if (!emotesRef.current?.contains(event.target as Node)) setEmotesOpen(false);
+    }
+    function closeEmotesWithKeyboard(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setEmotesOpen(false);
+        composerInputRef.current?.focus();
+      }
+    }
+    document.addEventListener("pointerdown", closeEmotes);
+    document.addEventListener("keydown", closeEmotesWithKeyboard);
+    return () => {
+      document.removeEventListener("pointerdown", closeEmotes);
+      document.removeEventListener("keydown", closeEmotesWithKeyboard);
+    };
+  }, [emotesOpen]);
 
   // Restore/adjust the scroll position whenever the rendered message list changes, based on
   // why it changed (see pendingScrollActionRef above).
@@ -169,6 +196,20 @@ export function ChatView({
     }
   }
 
+  function insertEmote(emote: string) {
+    const input = composerInputRef.current;
+    const start = input?.selectionStart ?? draft.length;
+    const end = input?.selectionEnd ?? start;
+    const nextDraft = `${draft.slice(0, start)}${emote}${draft.slice(end)}`.slice(0, maxMessageLength);
+    setDraft(nextDraft);
+    setEmotesOpen(false);
+    requestAnimationFrame(() => {
+      input?.focus();
+      const cursor = Math.min(start + emote.length, nextDraft.length);
+      input?.setSelectionRange(cursor, cursor);
+    });
+  }
+
   return (
     <div className={`chat-view ${dragActive ? "is-dragging-files" : ""}`} onPaste={handlePaste} onDragEnter={handleDragEnter} onDragOver={(event) => {
       if (event.dataTransfer.types.includes("Files")) {
@@ -242,6 +283,13 @@ export function ChatView({
             onChange={(e) => setDraft(e.target.value)}
           />
           {draft.length >= maxMessageLength * .8 ? <span className="composer-count" aria-label={`${draft.length} of ${maxMessageLength} characters`}>{draft.length}/{maxMessageLength}</span> : null}
+          <div className="composer-emotes" ref={emotesRef}>
+            <button type="button" className={`composer-emote-button ${emotesOpen ? "active" : ""}`} aria-label="Choose an emote" aria-expanded={emotesOpen} onClick={() => setEmotesOpen((open) => !open)}><Icon name="smile" size={21} /></button>
+            {emotesOpen ? <div className="emote-picker" role="dialog" aria-label="Emotes">
+              <strong>Emotes</strong>
+              <div className="emote-grid">{EMOTES.map((emote) => <button type="button" key={emote} aria-label={`Insert ${emote}`} onClick={() => insertEmote(emote)}>{emote}</button>)}</div>
+            </div> : null}
+          </div>
         </div>
         <button type="submit" aria-label="Send" disabled={sending || (draft.trim().length === 0 && files.length === 0)}>
           <Icon name="send" size={18} /><span className="sr-only">Send</span>
