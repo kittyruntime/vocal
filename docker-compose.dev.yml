@@ -11,7 +11,19 @@ services:
       - pgdata:/var/lib/postgresql/data
   livekit:
     image: livekit/livekit-server:latest
-    command: --dev
+    command: --dev --bind 0.0.0.0
+    environment:
+      LIVEKIT_CONFIG: |
+        port: 7880
+        bind_addresses: ["0.0.0.0"]
+        keys:
+          devkey: secret
+        webhook:
+          api_key: devkey
+          urls:
+            - http://host.docker.internal:3000/api/voice/webhook
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "7880:7880"
       - "7881:7881"
