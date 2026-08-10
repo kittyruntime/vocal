@@ -66,9 +66,17 @@ export function registerWsRoute(
       socket.close(1008, "unauthorized");
       return;
     }
+    // Compute the voice occupancy snapshot BEFORE registering the socket with the
+    // hub. hub.add() makes this socket eligible to receive live voice.joined /
+    // voice.left broadcasts from concurrent webhook deliveries; if that await'ed
+    // DB query ran after hub.add(), a broadcast could land in the gap and this
+    // socket would then send a stale voice.sync that appears to "undo" an event
+    // the client already received. No await may occur between hub.add() and the
+    // final socket.send() below — both sends are queued back-to-back.
+    const channels = await visibleVoiceOccupancy(pool, user.role, voicePresence.allOccupancy());
+
     hub.add(user.id, user.role, socket);
     socket.send(JSON.stringify({ type: "presence.sync", userIds: hub.onlineUserIds() }));
-    const channels = await visibleVoiceOccupancy(pool, user.role, voicePresence.allOccupancy());
     socket.send(JSON.stringify({ type: "voice.sync", channels }));
 
     socket.on("message", (raw: Buffer) => {

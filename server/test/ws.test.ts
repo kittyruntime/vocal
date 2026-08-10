@@ -26,9 +26,32 @@ function openWsWithHeaders(headers: Record<string, string>): WebSocket {
   return new WebSocket(`${baseUrl}/ws`, { headers });
 }
 
+const messageQueues = new WeakMap<WebSocket, { queue: unknown[]; waiters: Array<(v: unknown) => void> }>();
+
+// Deliberately not `ws.once("message", ...)`: the server (see ws/route.ts's
+// hub.add -> presence.sync -> voice.sync sequence) can send two frames
+// back-to-back with no real I/O gap between them. When that happens, Node's
+// `ws` client can deliver both frames within the same synchronous "message"
+// emit burst. A `.once()` listener re-armed via the next `await`'s microtask
+// continuation isn't attached in time to catch the second frame, so it's
+// silently dropped — not a server bug, but a test-harness race. This queues
+// any message that arrives with no pending waiter, so delivery order is
+// preserved no matter how the frames were batched on the wire.
 function nextMessage(ws: WebSocket): Promise<any> {
+  let state = messageQueues.get(ws);
+  if (!state) {
+    state = { queue: [], waiters: [] };
+    messageQueues.set(ws, state);
+    ws.on("message", (data) => {
+      const parsed: unknown = JSON.parse(data.toString());
+      const waiter = state!.waiters.shift();
+      if (waiter) waiter(parsed);
+      else state!.queue.push(parsed);
+    });
+  }
+  if (state.queue.length > 0) return Promise.resolve(state.queue.shift());
   return new Promise((resolve, reject) => {
-    ws.once("message", (data) => resolve(JSON.parse(data.toString())));
+    state!.waiters.push(resolve as (v: unknown) => void);
     ws.once("error", reject);
   });
 }
@@ -271,8 +294,11 @@ describe("websocket", () => {
     await pool.query("UPDATE users SET role = 'moderator' WHERE username = $1", ["bob"]);
     const modCookie = `sid=${regB.cookies.find((c) => c.name === "sid")!.value}`;
 
-    // Connect and drain presence.sync one socket at a time so any
-    // presence.online noise from a later connect has no listener to land on.
+    // Connect one socket at a time, draining both its own presence.sync /
+    // voice.sync snapshot and the presence.online broadcast each new
+    // connection fans out to every already-connected socket (nextMessage
+    // queues messages, so these must be explicitly drained rather than
+    // relying on them arriving with no listener attached).
     const wsAdmin = openWs(adminCookie);
     await new Promise((r) => wsAdmin.once("open", r));
     await nextMessage(wsAdmin); // presence.sync
@@ -280,11 +306,14 @@ describe("websocket", () => {
 
     const wsMod = openWs(modCookie);
     await new Promise((r) => wsMod.once("open", r));
+    await nextMessage(wsAdmin); // presence.online (bob connects)
     await nextMessage(wsMod); // presence.sync
     await nextMessage(wsMod); // voice.sync
 
     const wsMember = openWs(memberCookie);
     await new Promise((r) => wsMember.once("open", r));
+    await nextMessage(wsAdmin); // presence.online (alice connects)
+    await nextMessage(wsMod); // presence.online (alice connects)
     await nextMessage(wsMember); // presence.sync
     await nextMessage(wsMember); // voice.sync
 
@@ -339,6 +368,7 @@ describe("websocket", () => {
 
     const wsMember = openWs(memberCookie);
     await new Promise((r) => wsMember.once("open", r));
+    await nextMessage(wsAdmin); // presence.online (alice connects)
     await nextMessage(wsMember); // presence.sync
     await nextMessage(wsMember); // voice.sync
 

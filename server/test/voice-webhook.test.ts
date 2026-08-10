@@ -22,9 +22,32 @@ function openWs(cookie: string): WebSocket {
   return new WebSocket(`${baseUrl}/ws`, { headers: { cookie } });
 }
 
+const messageQueues = new WeakMap<WebSocket, { queue: unknown[]; waiters: Array<(v: unknown) => void> }>();
+
+// Deliberately not `ws.once("message", ...)`: the server can send two
+// frames back-to-back with no real I/O gap between them (see ws/route.ts's
+// hub.add -> presence.sync -> voice.sync sequence). When that happens,
+// Node's `ws` client can deliver both frames within the same synchronous
+// "message" emit burst, and a `.once()` listener re-armed via the next
+// `await`'s microtask continuation isn't attached in time to catch the
+// second frame — silently dropping it. This queues any message that
+// arrives with no pending waiter, preserving delivery regardless of how
+// frames were batched on the wire.
 function nextMessage(ws: WebSocket): Promise<any> {
+  let state = messageQueues.get(ws);
+  if (!state) {
+    state = { queue: [], waiters: [] };
+    messageQueues.set(ws, state);
+    ws.on("message", (data) => {
+      const parsed: unknown = JSON.parse(data.toString());
+      const waiter = state!.waiters.shift();
+      if (waiter) waiter(parsed);
+      else state!.queue.push(parsed);
+    });
+  }
+  if (state.queue.length > 0) return Promise.resolve(state.queue.shift());
   return new Promise((resolve, reject) => {
-    ws.once("message", (data) => resolve(JSON.parse(data.toString())));
+    state!.waiters.push(resolve as (v: unknown) => void);
     ws.once("error", reject);
   });
 }
