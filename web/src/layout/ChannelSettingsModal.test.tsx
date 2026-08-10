@@ -30,7 +30,7 @@ describe("ChannelSettingsModal", () => {
     const nameInput = screen.getByLabelText("Name of general");
     await user.clear(nameInput);
     await user.type(nameInput, "renamed");
-    await user.click(screen.getByRole("button", { name: "Save" }));
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
     expect(api.updateChannel).toHaveBeenCalledWith("c1", expect.objectContaining({ name: "renamed" }));
     expect(onUpdated).toHaveBeenCalledWith(updated);
     expect(onClose).toHaveBeenCalled();
@@ -38,6 +38,9 @@ describe("ChannelSettingsModal", () => {
 
   it("does not show quality settings for a text channel", () => {
     render(<ChannelSettingsModal channel={textChannel} onUpdated={vi.fn()} onDeleted={vi.fn()} onClose={vi.fn()} />);
+    expect(screen.getByRole("heading", { name: "Settings for #general" })).toBeInTheDocument();
+    expect(screen.getByText("Who can access this channel?")).toBeInTheDocument();
+    expect(screen.getByText("Every server member can see and open this channel.")).toBeInTheDocument();
     expect(screen.queryByText("Default media quality")).not.toBeInTheDocument();
   });
 
@@ -50,7 +53,7 @@ describe("ChannelSettingsModal", () => {
     vi.mocked(api.deleteChannel).mockResolvedValue(undefined);
     const onDeleted = vi.fn();
     render(<ChannelSettingsModal channel={textChannel} onUpdated={vi.fn()} onDeleted={onDeleted} onClose={vi.fn()} />);
-    await userEvent.setup().click(screen.getByRole("button", { name: "Delete" }));
+    await userEvent.setup().click(screen.getByRole("button", { name: "Delete channel" }));
     expect(api.deleteChannel).toHaveBeenCalledWith("c1");
     expect(onDeleted).toHaveBeenCalledWith("c1");
   });
@@ -58,7 +61,7 @@ describe("ChannelSettingsModal", () => {
   it("does not delete when the confirmation is declined", async () => {
     vi.mocked(window.confirm).mockReturnValue(false);
     render(<ChannelSettingsModal channel={textChannel} onUpdated={vi.fn()} onDeleted={vi.fn()} onClose={vi.fn()} />);
-    await userEvent.setup().click(screen.getByRole("button", { name: "Delete" }));
+    await userEvent.setup().click(screen.getByRole("button", { name: "Delete channel" }));
     expect(api.deleteChannel).not.toHaveBeenCalled();
   });
 
