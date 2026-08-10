@@ -2,7 +2,7 @@ import { useState, type FormEvent } from "react";
 import { useAuth } from "./AuthContext";
 import { ApiError } from "../api/client";
 
-export function LoginScreen({ onShowRegister }: { onShowRegister(): void }) {
+export function LoginScreen({ onShowRegister, registrationOpen = true }: { onShowRegister(): void; registrationOpen?: boolean }) {
   const { signIn } = useAuth();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -44,9 +44,7 @@ export function LoginScreen({ onShowRegister }: { onShowRegister(): void }) {
         <button type="submit" disabled={submitting}>
           Se connecter
         </button>
-        <button type="button" className="auth-link" onClick={onShowRegister}>
-          Créer un compte
-        </button>
+        {registrationOpen ? <button type="button" className="auth-link" onClick={onShowRegister}>Créer un compte</button> : <p className="registration-closed">Les inscriptions sont fermées.</p>}
       </form>
     </div>
   );

@@ -25,6 +25,7 @@ export const initialAppState: AppState = {
 export type AppAction =
   | { type: "channels/set"; channels: Channel[] }
   | { type: "channel/added"; channel: Channel }
+  | { type: "channel/updated"; channel: Channel }
   | { type: "channel/removed"; channelId: string }
   | { type: "channel/selected"; channelId: string }
   | { type: "messages/loaded"; channelId: string; messages: Message[] }
@@ -49,6 +50,8 @@ export function appReducer(state: AppState, action: AppAction): AppState {
       return state.channels.some((c) => c.id === action.channel.id)
         ? state
         : { ...state, channels: [...state.channels, action.channel] };
+    case "channel/updated":
+      return { ...state, channels: state.channels.map((channel) => channel.id === action.channel.id ? action.channel : channel) };
     case "channel/removed": {
       const channels = state.channels.filter((c) => c.id !== action.channelId);
       const selectedChannelId =

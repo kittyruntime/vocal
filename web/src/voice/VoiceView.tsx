@@ -74,7 +74,12 @@ export function VoiceView({
   const [cameraEnabled, setCameraEnabled] = useState(false);
   const [screenShareEnabled, setScreenShareEnabled] = useState(false);
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
-  const [settings, setSettings] = useState(loadSettings);
+  const [settings, setSettings] = useState(() => ({
+    ...loadSettings(),
+    audioQuality: channel.defaultAudioQuality ?? "standard",
+    cameraQuality: channel.defaultCameraQuality ?? "standard",
+    screenQuality: channel.defaultScreenQuality ?? "standard",
+  }));
   const [audioLevel, setAudioLevel] = useState(0);
   const [participantCount, setParticipantCount] = useState(1);
   const [remoteVideoCount, setRemoteVideoCount] = useState(0);
@@ -92,6 +97,7 @@ export function VoiceView({
   const meterCleanupRef = useRef<(() => Promise<void>) | null>(null);
   const meterFrameRef = useRef<number | null>(null);
   const pttPressedRef = useRef(false);
+  const lastVisibleChannelRef = useRef<string | null>(null);
 
   function saveSettings(next: typeof settings) {
     setSettings(next);
@@ -180,6 +186,15 @@ export function VoiceView({
     window.addEventListener("keydown", closeOnEscape);
     return () => window.removeEventListener("keydown", closeOnEscape);
   }, [settingsOpen]);
+
+  useEffect(() => {
+    setSettings((value) => ({
+      ...value,
+      audioQuality: channel.defaultAudioQuality ?? "standard",
+      cameraQuality: channel.defaultCameraQuality ?? "standard",
+      screenQuality: channel.defaultScreenQuality ?? "standard",
+    }));
+  }, [channel.id]);
 
   async function joinRoom() {
     if (status !== "idle") return;
@@ -447,6 +462,16 @@ export function VoiceView({
   const hasScreenShare = screenShareEnabled || remoteScreenCount > 0;
   const localSpeaking = microphoneEnabled && audioLevel >= settings.vadThreshold;
 
+  useEffect(() => {
+    if (!visible) {
+      lastVisibleChannelRef.current = null;
+      return;
+    }
+    if (lastVisibleChannelRef.current === channel.id) return;
+    lastVisibleChannelRef.current = channel.id;
+    if (status === "idle") void joinRoom();
+  }, [channel.id, visible]);
+
   return (
     <section className="voice-view" aria-label={`Salon vocal ${channel.name}`} hidden={!visible}>
       <header className="chat-header"><span className="header-channel-icon"><Icon name="volume" size={21} /></span> {channel.name}</header>
@@ -487,9 +512,6 @@ export function VoiceView({
           <>
           <div className="voice-controls" aria-label="Contrôles du salon vocal">
             <button type="button" title={microphoneEnabled ? "Couper le micro" : "Rétablir le micro"} aria-label={settings.pushToTalk ? (microphoneEnabled ? "Vous parlez…" : "Maintenez Espace") : (microphoneEnabled ? "Couper le micro" : "Rétablir le micro")} className={!microphoneEnabled ? "control-off" : ""} onClick={() => void toggleMicrophone()}>
-              <Icon name="microphone" size={19} />
-            </button>
-            <button type="button" title={settings.pushToTalk ? "Désactiver le push-to-talk" : "Activer le push-to-talk"} aria-label={settings.pushToTalk ? "Désactiver PTT" : "Activer PTT"} aria-pressed={settings.pushToTalk} onClick={() => void togglePushToTalk()}>
               <Icon name="microphone" size={19} />
             </button>
             <button type="button" title={deafened ? "Rétablir le son" : "Assourdir"} aria-label={deafened ? "Rétablir le son" : "Assourdir"} className={deafened ? "control-off" : ""} aria-pressed={deafened} onClick={toggleDeafen}>
@@ -544,6 +566,19 @@ export function VoiceView({
                   <QualitySelect label="Audio" value={settings.audioQuality} profiles={audioProfiles} onChange={(quality) => selectQuality("audio", quality)} />
                   <QualitySelect label="Webcam" value={settings.cameraQuality} profiles={cameraProfiles} onChange={(quality) => selectQuality("camera", quality)} />
                   <QualitySelect<ScreenQuality> label="Partage d’écran" value={settings.screenQuality} profiles={screenProfiles} onChange={(quality) => selectQuality("screen", quality)} />
+                </div>
+              </div>
+              <div className="settings-section">
+                <h3>Mode d’entrée</h3>
+                <div className="input-mode-options" role="radiogroup" aria-label="Mode d’entrée audio">
+                  <button type="button" role="radio" aria-checked={!settings.pushToTalk} className={!settings.pushToTalk ? "active" : ""} onClick={() => settings.pushToTalk && void togglePushToTalk()}>
+                    <span>Détection vocale</span>
+                    <small>Le micro s’active automatiquement selon le seuil choisi.</small>
+                  </button>
+                  <button type="button" role="radio" aria-checked={settings.pushToTalk} className={settings.pushToTalk ? "active" : ""} onClick={() => !settings.pushToTalk && void togglePushToTalk()}>
+                    <span>Push-to-talk</span>
+                    <small>Maintenez la barre Espace pour parler.</small>
+                  </button>
                 </div>
               </div>
               <div className="settings-section voice-detection-section">

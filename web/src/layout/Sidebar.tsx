@@ -4,6 +4,7 @@ import * as api from "../api/client";
 import { useToast } from "../toast/ToastContext";
 import type { VoiceParticipant } from "../ws/protocol";
 import { Icon } from "../ui/Icon";
+import { AdminPanel } from "./AdminPanel";
 
 export function Sidebar({
   channels,
@@ -13,6 +14,8 @@ export function Sidebar({
   currentUser,
   onSelectChannel,
   onChannelCreated,
+  onChannelUpdated,
+  onChannelDeleted,
 }: {
   channels: Channel[];
   selectedChannelId: string | null;
@@ -21,10 +24,13 @@ export function Sidebar({
   currentUser: CurrentUser;
   onSelectChannel(channelId: string): void;
   onChannelCreated(channel: Channel): void;
+  onChannelUpdated?(channel: Channel): void;
+  onChannelDeleted?(channelId: string): void;
 }) {
   const { showToast } = useToast();
   const textChannels = channels.filter((c) => c.type === "text");
   const voiceChannels = channels.filter((c) => c.type === "voice");
+  const [adminOpen, setAdminOpen] = useState(false);
 
   return (
     <nav className="sidebar" aria-label="Channels">
@@ -50,10 +56,10 @@ export function Sidebar({
       />
       <p className="sidebar-presence"><span className="online-dot" /> {onlineUserIds.length} en ligne</p>
       {currentUser.role === "admin" && (
-        <CreateChannelForm
+        <><button type="button" className="server-settings-button" onClick={() => setAdminOpen(true)}><Icon name="settings" size={15} /> Paramètres du serveur</button><CreateChannelForm
           onCreated={onChannelCreated}
           onError={() => showToast("Impossible de créer le channel")}
-        />
+        />{adminOpen ? <AdminPanel channels={channels} currentUser={currentUser} onChannelUpdated={onChannelUpdated ?? (() => {})} onChannelDeleted={onChannelDeleted ?? (() => {})} onClose={() => setAdminOpen(false)} /> : null}</>
       )}
     </nav>
   );

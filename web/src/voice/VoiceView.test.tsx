@@ -73,7 +73,6 @@ function renderView() {
 describe("VoiceView", () => {
   it("joins LiveKit and enables the microphone", async () => {
     renderView();
-    await userEvent.setup().click(screen.getByRole("button", { name: "Rejoindre" }));
     await screen.findByText(/Connecté en tant que theo/);
     expect(api.getVoiceToken).toHaveBeenCalledWith("c2");
     expect(connect).toHaveBeenCalledWith("ws://livekit", "jwt");
@@ -83,7 +82,6 @@ describe("VoiceView", () => {
   it("mutes and leaves the room", async () => {
     renderView();
     const user = userEvent.setup();
-    await user.click(screen.getByRole("button", { name: "Rejoindre" }));
     await user.click(await screen.findByRole("button", { name: "Couper le micro" }));
     expect(setMicrophoneEnabled).toHaveBeenLastCalledWith(false, expect.any(Object), expect.any(Object));
     await user.click(screen.getByRole("button", { name: "Quitter" }));
@@ -94,8 +92,6 @@ describe("VoiceView", () => {
   it("controls deafen, camera, and screen sharing", async () => {
     renderView();
     const user = userEvent.setup();
-    await user.click(screen.getByRole("button", { name: "Rejoindre" }));
-
     await user.click(await screen.findByRole("button", { name: "Assourdir" }));
     expect(screen.getByRole("button", { name: "Rétablir le son" })).toHaveAttribute("aria-pressed", "true");
 
@@ -111,7 +107,6 @@ describe("VoiceView", () => {
   it("publishes screen sharing in 1080p60 game mode", async () => {
     renderView();
     const user = userEvent.setup();
-    await user.click(screen.getByRole("button", { name: "Rejoindre" }));
     await user.click(await screen.findByRole("button", { name: "Réglages" }));
     await screen.findByRole("dialog", { name: "Voix & Vidéo" });
     await user.selectOptions(screen.getByLabelText("Partage d’écran"), "game");
@@ -127,7 +122,6 @@ describe("VoiceView", () => {
   it("opens voice settings in a modal and closes it with Escape", async () => {
     renderView();
     const user = userEvent.setup();
-    await user.click(screen.getByRole("button", { name: "Rejoindre" }));
     await user.click(await screen.findByRole("button", { name: "Réglages" }));
     expect(screen.getByRole("dialog", { name: "Voix & Vidéo" })).toBeVisible();
 
@@ -137,7 +131,6 @@ describe("VoiceView", () => {
 
   it("highlights the participant who is speaking", async () => {
     renderView();
-    await userEvent.setup().click(screen.getByRole("button", { name: "Rejoindre" }));
     const participantName = await screen.findByText("theo (vous)");
 
     act(() => roomHandlers.get("activeSpeakersChanged")?.([{ identity: "u1", name: "theo" }]));
@@ -148,7 +141,6 @@ describe("VoiceView", () => {
 
   it("keeps the voice session connected while the view is hidden", async () => {
     const view = renderView();
-    await userEvent.setup().click(screen.getByRole("button", { name: "Rejoindre" }));
     await screen.findByText(/Connecté en tant que theo/);
 
     view.rerender(
@@ -157,5 +149,15 @@ describe("VoiceView", () => {
 
     expect(view.container.querySelector(".voice-view")).not.toBeVisible();
     expect(disconnect).not.toHaveBeenCalled();
+  });
+
+  it("configures push-to-talk from voice settings", async () => {
+    renderView();
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "Réglages" }));
+    await user.click(screen.getByRole("radio", { name: /Push-to-talk/ }));
+
+    expect(screen.getByRole("radio", { name: /Push-to-talk/ })).toHaveAttribute("aria-checked", "true");
+    expect(setMicrophoneEnabled).toHaveBeenLastCalledWith(false, expect.any(Object), expect.any(Object));
   });
 });

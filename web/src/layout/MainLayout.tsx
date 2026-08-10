@@ -90,6 +90,8 @@ export function MainLayout({ currentUser }: { currentUser: CurrentUser }) {
             currentUser={currentUser}
             onSelectChannel={selectChannel}
             onChannelCreated={(channel) => dispatch({ type: "channel/added", channel })}
+            onChannelUpdated={(channel) => dispatch({ type: "channel/updated", channel })}
+            onChannelDeleted={(channelId) => dispatch({ type: "channel/removed", channelId })}
           />
           <UserBar currentUser={currentUser} onSignOut={signOut} />
         </aside>

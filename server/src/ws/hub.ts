@@ -8,6 +8,7 @@ export interface WsLike {
 export interface WsHub {
   add(userId: string, role: Role, socket: WsLike): void;
   remove(userId: string, socket: WsLike): void;
+  updateRole(userId: string, role: Role): void;
   broadcast(event: ServerEvent): void;
   broadcastToRole(minRole: Role, event: ServerEvent): void;
   onlineUserIds(): string[];
@@ -55,6 +56,10 @@ export function createHub(): WsHub {
         byUser.delete(userId);
         this.broadcast({ type: "presence.offline", userId });
       }
+    },
+    updateRole(userId, role) {
+      const entry = byUser.get(userId);
+      if (entry) entry.role = role;
     },
     broadcast(event) {
       for (const { sockets } of byUser.values()) {

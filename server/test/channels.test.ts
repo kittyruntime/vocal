@@ -92,6 +92,13 @@ describe("channels", () => {
     expect(list.json()).toHaveLength(0);
   });
 
+  it("updates channel permissions and voice quality defaults", async () => {
+    const created = await app.inject({ method: "POST", url: "/api/channels", headers: { cookie: adminCookie }, payload: { name: "vocal", type: "voice" } });
+    const updated = await app.inject({ method: "PATCH", url: `/api/channels/${created.json().id}`, headers: { cookie: adminCookie }, payload: { name: "gaming", minRole: "moderator", defaultAudioQuality: "high", defaultCameraQuality: "high", defaultScreenQuality: "game" } });
+    expect(updated.statusCode).toBe(200);
+    expect(updated.json()).toMatchObject({ name: "gaming", minRole: "moderator", defaultAudioQuality: "high", defaultCameraQuality: "high", defaultScreenQuality: "game" });
+  });
+
   it("rejects a malformed channel id on delete", async () => {
     const res = await app.inject({ method: "DELETE", url: "/api/channels/not-a-uuid",
       headers: { cookie: adminCookie } });

@@ -9,7 +9,12 @@ export type Channel = {
   minRole: Role;
   position: number;
   createdAt: string;
+  defaultAudioQuality?: "low" | "standard" | "high";
+  defaultCameraQuality?: "low" | "standard" | "high";
+  defaultScreenQuality?: "low" | "standard" | "high" | "game";
 };
+export type AdminUser = CurrentUser & { createdAt: string };
+export type ServerSettings = { registrationOpen: boolean };
 
 export type Message = {
   id: string;
@@ -53,6 +58,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 export function getSetupStatus(): Promise<{ done: boolean }> {
   return request("/api/setup");
 }
+export function getRegistrationStatus(): Promise<ServerSettings> { return request("/api/registration-status"); }
 
 export function setup(username: string, password: string): Promise<{ ok: true }> {
   return request("/api/setup", { method: "POST", body: JSON.stringify({ username, password }) });
@@ -83,6 +89,23 @@ export function listChannels(): Promise<Channel[]> {
 
 export function createChannel(input: { name: string; type: "text" | "voice"; minRole?: Role }): Promise<Channel> {
   return request("/api/channels", { method: "POST", body: JSON.stringify(input) });
+}
+
+export function updateChannel(channelId: string, input: Partial<Pick<Channel, "name" | "minRole" | "defaultAudioQuality" | "defaultCameraQuality" | "defaultScreenQuality">>): Promise<Channel> {
+  return request(`/api/channels/${channelId}`, { method: "PATCH", body: JSON.stringify(input) });
+}
+
+export function deleteChannel(channelId: string): Promise<void> {
+  return request(`/api/channels/${channelId}`, { method: "DELETE" });
+}
+
+export function getAdminSettings(): Promise<ServerSettings> { return request("/api/admin/settings"); }
+export function updateAdminSettings(settings: ServerSettings): Promise<ServerSettings> {
+  return request("/api/admin/settings", { method: "PATCH", body: JSON.stringify(settings) });
+}
+export function listAdminUsers(): Promise<AdminUser[]> { return request("/api/admin/users"); }
+export function updateUserRole(userId: string, role: Role): Promise<AdminUser> {
+  return request(`/api/admin/users/${userId}`, { method: "PATCH", body: JSON.stringify({ role }) });
 }
 
 export function listMessages(channelId: string, opts?: { before?: string; limit?: number }): Promise<Message[]> {

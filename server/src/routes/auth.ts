@@ -87,6 +87,10 @@ export function registerAuthRoutes(app: FastifyInstance, pool: pg.Pool): void {
     const schema = credentialsSchema.extend({ inviteToken: z.string().min(1).optional() });
     const body = schema.safeParse(req.body);
     if (!body.success) return reply.code(400).send({ error: "invalid payload" });
+    const settings = await pool.query<{ registration_open: boolean }>("SELECT registration_open FROM server_settings WHERE singleton = true");
+    if (settings.rows[0]?.registration_open === false && !body.data.inviteToken) {
+      return reply.code(403).send({ error: "registration closed" });
+    }
     const client = await pool.connect();
     try {
       await client.query("BEGIN");
