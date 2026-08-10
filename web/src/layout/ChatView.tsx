@@ -120,7 +120,7 @@ export function ChatView({
 
   return (
     <div className="chat-view">
-      <header className="chat-header"># {channel.name}</header>
+      <header className="chat-header"><span className="header-channel-icon">#</span> {channel.name}</header>
       <div
         className="chat-messages"
         role="log"
@@ -128,25 +128,47 @@ export function ChatView({
         onScroll={handleScroll}
         ref={messagesRef}
       >
-        {messages.map((message) => (
-          <div key={message.id} className="chat-message">
-            <span className="chat-author">{message.username}</span>
-            <span className="chat-content">{message.content}</span>
+        {messages.length === 0 && (
+          <div className="chat-empty">
+            <div className="chat-empty-icon">#</div>
+            <h1>Bienvenue dans #{channel.name}</h1>
+            <p>C’est le début de ce salon.</p>
           </div>
+        )}
+        {messages.map((message) => (
+          <article key={message.id} className="chat-message">
+            <span className="message-avatar" aria-hidden="true">{message.username.slice(0, 1).toUpperCase()}</span>
+            <div className="message-body">
+              <div className="message-meta">
+                <span className="chat-author">{message.username}</span>
+                <time dateTime={message.createdAt}>{formatMessageTime(message.createdAt)}</time>
+              </div>
+              <div className="chat-content">{message.content}</div>
+            </div>
+          </article>
         ))}
       </div>
       <form className="chat-composer" onSubmit={handleSubmit}>
-        <input
-          aria-label={`Message dans ${channel.name}`}
-          placeholder={`Écrire dans #${channel.name}`}
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          disabled={sending}
-        />
-        <button type="submit" disabled={sending || draft.trim().length === 0}>
-          Envoyer
+        <div className="composer-field">
+          <span aria-hidden="true">＋</span>
+          <input
+            aria-label={`Message dans ${channel.name}`}
+            placeholder={`Envoyer un message dans #${channel.name}`}
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            disabled={sending}
+          />
+        </div>
+        <button type="submit" aria-label="Envoyer" disabled={sending || draft.trim().length === 0}>
+          ➤<span className="sr-only">Envoyer</span>
         </button>
       </form>
     </div>
   );
+}
+
+function formatMessageTime(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return new Intl.DateTimeFormat("fr-FR", { hour: "2-digit", minute: "2-digit" }).format(date);
 }

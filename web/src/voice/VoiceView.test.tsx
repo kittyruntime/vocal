@@ -11,11 +11,14 @@ const setMicrophoneEnabled = vi.fn();
 const setCameraEnabled = vi.fn();
 const setScreenShareEnabled = vi.fn();
 const getTrackPublication = vi.fn();
+const switchActiveDevice = vi.fn();
 
 vi.mock("livekit-client", () => ({
   Room: class {
+    static getLocalDevices() { return Promise.resolve([]); }
     connect = connect;
     disconnect = disconnect;
+    switchActiveDevice = switchActiveDevice;
     localParticipant = { setMicrophoneEnabled, setCameraEnabled, setScreenShareEnabled, getTrackPublication };
     on() { return this; }
   },
@@ -30,6 +33,7 @@ vi.mock("livekit-client", () => ({
     Kind: { Audio: "audio", Video: "video" },
     Source: { Camera: "camera", ScreenShare: "screen_share" },
   },
+  createAudioAnalyser: vi.fn(),
 }));
 
 vi.mock("../api/client", async () => {
@@ -45,6 +49,7 @@ beforeEach(() => {
   vi.mocked(api.getVoiceToken).mockResolvedValue({ token: "jwt", url: "ws://livekit" });
   connect.mockResolvedValue(undefined);
   disconnect.mockResolvedValue(undefined);
+  switchActiveDevice.mockResolvedValue(true);
   setMicrophoneEnabled.mockResolvedValue(undefined);
   getTrackPublication.mockReturnValue(undefined);
   const videoTrack = {
