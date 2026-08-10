@@ -10,9 +10,10 @@ import { CAPABILITIES } from "../capabilities.js";
 // wrong-password login and avoiding a timing side-channel for username
 // enumeration.
 const DUMMY_HASH_PROMISE: Promise<string> = hashPassword("dummy-password-for-timing-normalization");
+const USERNAME_PATTERN = /^[\p{L}\p{N}_.-]+$/u;
 
 const credentialsSchema = z.object({
-  username: z.string().min(2).max(32).regex(/^[a-zA-Z0-9_.-]+$/),
+  username: z.string().min(2).max(32).regex(USERNAME_PATTERN),
   password: z.string().min(8).max(256),
 });
 
@@ -20,12 +21,12 @@ const credentialsSchema = z.object({
 // password-strength policy (min length) — a too-short guess is still just a
 // wrong password (401), not a malformed request (400).
 const loginSchema = z.object({
-  username: z.string().min(2).max(32).regex(/^[a-zA-Z0-9_.-]+$/),
+  username: z.string().min(2).max(32).regex(USERNAME_PATTERN),
   password: z.string().min(1).max(256),
 });
 
 const profileSchema = z.object({
-  username: z.string().trim().min(2).max(32).regex(/^[a-zA-Z0-9_.-]+$/),
+  username: z.string().trim().min(2).max(32).regex(USERNAME_PATTERN),
   email: z.union([z.string().trim().email().max(254), z.literal(""), z.null()]).transform((value) => value || null),
   description: z.string().trim().max(190),
   avatarUrl: z.union([
@@ -33,6 +34,7 @@ const profileSchema = z.object({
     z.null(),
   ]),
 });
+const userIdSchema = z.object({ id: z.uuid() });
 
 function setSidCookie(reply: any, token: string, expiresAt: Date): void {
   reply.setCookie("sid", token, {
@@ -175,6 +177,19 @@ export function registerAuthRoutes(app: FastifyInstance, pool: pg.Pool): void {
   });
 
   app.get("/api/me", { preHandler: app.requireAuth }, async (req) => req.user);
+
+  app.get("/api/users/:id/avatar", { preHandler: app.requireAuth }, async (req, reply) => {
+    const params = userIdSchema.safeParse(req.params);
+    if (!params.success) return reply.code(404).send({ error: "avatar not found" });
+    const result = await pool.query<{ avatar_url: string | null }>("SELECT avatar_url FROM users WHERE id = $1", [params.data.id]);
+    const encoded = result.rows[0]?.avatar_url;
+    const match = encoded?.match(/^data:(image\/(?:png|jpeg|webp|gif));base64,(.+)$/);
+    if (!match) return reply.code(404).send({ error: "avatar not found" });
+    return reply
+      .type(match[1])
+      .header("Cache-Control", "private, no-cache")
+      .send(Buffer.from(match[2], "base64"));
+  });
 
   app.patch("/api/me", { preHandler: app.requireAuth }, async (req, reply) => {
     const body = profileSchema.safeParse(req.body);

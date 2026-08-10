@@ -14,11 +14,12 @@ export function loadLiveKitConfig(): LiveKitConfig {
 
 export async function mintVoiceToken(
   config: LiveKitConfig,
-  input: { channelId: string; userId: string; username: string; canPublish: boolean },
+  input: { channelId: string; userId: string; username: string; avatarUrl?: string | null; canPublish: boolean },
 ): Promise<{ token: string; url: string }> {
   const at = new AccessToken(config.apiKey, config.apiSecret, {
     identity: input.userId,
     name: input.username,
+    metadata: JSON.stringify({ avatarUrl: input.avatarUrl ?? null }),
     ttl: "2m",
   });
   at.addGrant({

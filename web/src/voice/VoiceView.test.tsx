@@ -16,11 +16,12 @@ const setScreenShareEnabled = vi.fn();
 const getTrackPublication = vi.fn();
 const switchActiveDevice = vi.fn();
 const roomHandlers = new Map<string, (...args: unknown[]) => void>();
+const remoteParticipants = new Map<string, any>();
 
 vi.mock("livekit-client", () => ({
   Room: class {
     static getLocalDevices() { return Promise.resolve([]); }
-    remoteParticipants = new Map();
+    remoteParticipants = remoteParticipants;
     connect = connect;
     disconnect = disconnect;
     switchActiveDevice = switchActiveDevice;
@@ -87,6 +88,7 @@ const currentUser: CurrentUser = { id: "u1", username: "theo", capabilities: [] 
 beforeEach(() => {
   vi.clearAllMocks();
   roomHandlers.clear();
+  remoteParticipants.clear();
   localStorage.clear();
   vi.mocked(api.getVoiceToken).mockResolvedValue({ token: "jwt", url: "ws://livekit" });
   connect.mockResolvedValue(undefined);
@@ -110,6 +112,32 @@ function renderView(extraProps: Partial<ComponentProps<typeof VoiceView>> = {}) 
 }
 
 describe("VoiceView", () => {
+  it("hydrates participants and already-published tracks when joining an occupied room", async () => {
+    const existingTrack = {
+      sid: "track-existing",
+      kind: "video",
+      attach: vi.fn(() => document.createElement("video")),
+      detach: vi.fn(() => []),
+    };
+    const participant = {
+      identity: "u2",
+      name: "alice",
+      trackPublications: new Map([["track-existing", { source: "screen_share", track: existingTrack }]]),
+    };
+    remoteParticipants.set(participant.identity, participant);
+    const onParticipantsChange = vi.fn();
+
+    renderView({ onParticipantsChange });
+
+    await screen.findByRole("button", { name: "Mute microphone" });
+    expect(onParticipantsChange).toHaveBeenLastCalledWith([
+      { userId: "u1", username: "theo", avatarUrl: null },
+      { userId: "u2", username: "alice", avatarUrl: null },
+    ]);
+    expect(screen.getByLabelText("Channel videos").querySelectorAll(".screen-share")).toHaveLength(1);
+    expect(existingTrack.attach).toHaveBeenCalledOnce();
+  });
+
   it("joins LiveKit and enables the microphone", async () => {
     renderView();
     await screen.findByRole("button", { name: "Mute microphone" });

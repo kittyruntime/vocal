@@ -155,6 +155,11 @@ export function MainLayout({ currentUser }: { currentUser: CurrentUser }) {
                 visible={selectedChannel?.type === "voice"}
                 onOpenSidebar={() => setMobileSidebarOpen(true)}
                 onSpeakingChange={(userIds) => dispatch({ type: "voice/speaking", userIds })}
+                onParticipantsChange={(participants) => dispatch({
+                  type: "voice/channel-synced",
+                  channelId: voiceChannel.id,
+                  participants,
+                })}
                 onSelfPresenceChange={(present) => {
                   if (present) {
                     dispatch({

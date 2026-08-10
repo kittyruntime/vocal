@@ -37,6 +37,7 @@ export type AppAction =
   | { type: "presence/online"; userId: string }
   | { type: "presence/offline"; userId: string }
   | { type: "voice/sync"; channels: Record<string, VoiceParticipant[]> }
+  | { type: "voice/channel-synced"; channelId: string; participants: VoiceParticipant[] }
   | { type: "voice/joined"; channelId: string; participant: VoiceParticipant }
   | { type: "voice/left"; channelId: string; userId: string }
   | { type: "voice/speaking"; userIds: string[] }
@@ -95,6 +96,12 @@ export function appReducer(state: AppState, action: AppAction): AppState {
       return { ...state, onlineUserIds: state.onlineUserIds.filter((id) => id !== action.userId) };
     case "voice/sync":
       return { ...state, voiceOccupancy: action.channels };
+    case "voice/channel-synced": {
+      const voiceOccupancy = { ...state.voiceOccupancy };
+      if (action.participants.length === 0) delete voiceOccupancy[action.channelId];
+      else voiceOccupancy[action.channelId] = action.participants;
+      return { ...state, voiceOccupancy };
+    }
     case "voice/joined": {
       const occupants = state.voiceOccupancy[action.channelId] ?? [];
       if (occupants.some((participant) => participant.userId === action.participant.userId)) return state;

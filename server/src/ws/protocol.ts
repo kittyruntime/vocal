@@ -17,7 +17,7 @@ export type ChannelPayload = {
   createdAt: string;
 };
 
-export type VoiceParticipantPayload = { userId: string; username: string };
+export type VoiceParticipantPayload = { userId: string; username: string; avatarUrl?: string | null };
 
 export type ServerEvent =
   | { type: "presence.sync"; userIds: string[] }

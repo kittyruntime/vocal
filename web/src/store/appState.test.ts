@@ -78,6 +78,16 @@ describe("appReducer", () => {
     });
   });
 
+  it("replaces one channel with a LiveKit participant snapshot", () => {
+    const initial: AppState = {
+      ...initialAppState,
+      voiceOccupancy: { c1: [{ userId: "u3", username: "bob" }], c2: [{ userId: "stale", username: "stale" }] },
+    };
+    const participants = [{ userId: "u1", username: "theo" }, { userId: "u2", username: "alice" }];
+    const state = appReducer(initial, { type: "voice/channel-synced", channelId: "c2", participants });
+    expect(state.voiceOccupancy).toEqual({ c1: initial.voiceOccupancy.c1, c2: participants });
+  });
+
   it("voice join and leave events are idempotent and remove empty rooms", () => {
     const participant = { userId: "u1", username: "theo" };
     const joined = appReducer(initialAppState, { type: "voice/joined", channelId: "c2", participant });
