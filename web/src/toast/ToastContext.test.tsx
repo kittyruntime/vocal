@@ -25,6 +25,23 @@ describe("ToastProvider", () => {
     await waitFor(() => expect(screen.queryByText("Oups")).not.toBeInTheDocument());
   });
 
+  it("plays a brief leaving transition before actually removing the toast", async () => {
+    const user = userEvent.setup({ delay: null });
+    render(
+      <ToastProvider>
+        <Trigger message="Oups" />
+      </ToastProvider>,
+    );
+    await user.click(screen.getByRole("button"));
+    vi.advanceTimersByTime(5000);
+    await waitFor(() => expect(screen.getByText("Oups")).toHaveClass("is-leaving"));
+    // Still mounted right after entering the leaving state -- the exit
+    // animation needs a moment to actually play before removal.
+    expect(screen.getByText("Oups")).toBeInTheDocument();
+    vi.advanceTimersByTime(180);
+    await waitFor(() => expect(screen.queryByText("Oups")).not.toBeInTheDocument());
+  });
+
   it("throws when useToast is used outside a provider", () => {
     const Bare = () => {
       useToast();
