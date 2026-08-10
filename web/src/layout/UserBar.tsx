@@ -7,14 +7,19 @@ function describeCapabilities(capabilities: CurrentUser["capabilities"]): string
   return "Member";
 }
 
-export function UserBar({ currentUser, onSignOut }: { currentUser: CurrentUser; onSignOut(): void }) {
+export function UserBar({ currentUser, onOpenProfile, onSignOut }: { currentUser: CurrentUser; onOpenProfile(): void; onSignOut(): void }) {
   return (
     <div className="user-bar">
-      <span className="user-avatar" aria-hidden="true">{currentUser.username.slice(0, 1).toUpperCase()}</span>
+      <button type="button" className="user-profile-button" aria-label="Edit profile" onClick={onOpenProfile}>
+        <span className="user-avatar" aria-hidden="true">{currentUser.avatarUrl ? <img src={currentUser.avatarUrl} alt="" /> : currentUser.username.slice(0, 1).toUpperCase()}</span>
+      </button>
       <div className="user-identity">
         <span className="user-name">{currentUser.username}</span>
         <span className="user-role">{describeCapabilities(currentUser.capabilities)}</span>
       </div>
+      <button type="button" className="user-action" aria-label="User settings" title="User settings" onClick={onOpenProfile}>
+        <Icon name="settings" />
+      </button>
       <button type="button" className="user-action" aria-label="Log out" title="Log out" onClick={() => void onSignOut()}>
         <Icon name="logout" />
       </button>

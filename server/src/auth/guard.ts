@@ -3,7 +3,15 @@ import type pg from "pg";
 import { getSessionUser } from "./sessions.js";
 import type { Capability } from "../capabilities.js";
 
-export type SessionUser = { id: string; username: string; capabilities: Capability[]; voiceMuted: boolean };
+export type SessionUser = {
+  id: string;
+  username: string;
+  email: string | null;
+  avatarUrl: string | null;
+  description: string;
+  capabilities: Capability[];
+  voiceMuted: boolean;
+};
 
 declare module "fastify" {
   interface FastifyRequest { user?: SessionUser }

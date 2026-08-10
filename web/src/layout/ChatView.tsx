@@ -147,7 +147,7 @@ export function ChatView({
         )}
         {messages.map((message) => (
           <article key={message.id} className="chat-message">
-            <span className="message-avatar" aria-hidden="true">{message.username.slice(0, 1).toUpperCase()}</span>
+            <span className="message-avatar" aria-hidden="true">{message.avatarUrl ? <img src={message.avatarUrl} alt="" /> : message.username.slice(0, 1).toUpperCase()}</span>
             <div className="message-body">
               <div className="message-meta">
                 <span className="chat-author">{message.username}</span>

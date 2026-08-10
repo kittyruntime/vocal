@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { ApiError, getSetupStatus, login, getMe, getVoiceToken, listChannels, postMessage, register } from "./client";
+import { ApiError, getSetupStatus, login, getMe, getVoiceToken, listChannels, postMessage, register, updateProfile } from "./client";
 
 function mockFetchOnce(status: number, body: unknown) {
   vi.stubGlobal(
@@ -44,6 +44,15 @@ describe("api client", () => {
   it("getMe rejects with an ApiError instance when unauthenticated", async () => {
     mockFetchOnce(401, { error: "authentication required" });
     await expect(getMe()).rejects.toBeInstanceOf(ApiError);
+  });
+
+  it("updates the current profile", async () => {
+    mockFetchOnce(200, { id: "u1", username: "theophile" });
+    await updateProfile({ username: "theophile", email: "theo@example.com", description: "Hello", avatarUrl: null });
+    const [url, init] = (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(url).toBe("/api/me");
+    expect(init.method).toBe("PATCH");
+    expect(JSON.parse(init.body)).toEqual({ username: "theophile", email: "theo@example.com", description: "Hello", avatarUrl: null });
   });
 
   it("listChannels returns the parsed array", async () => {
