@@ -403,8 +403,8 @@ summary:focus-visible {
 .emote-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 3px; }
 .emote-grid button { width: 32px; height: 32px; display: grid; place-items: center; padding: 0; border: 0; border-radius: var(--radius-sm); background: transparent; font-size: 21px; line-height: 1; transition: background-color 100ms ease, transform 100ms ease; }
 .emote-grid button:hover, .emote-grid button:focus-visible { background: var(--bg-active); transform: scale(1.15); }
-.chat-composer button { width: 44px; display: grid; place-items: center; border: 0; border-radius: 8px; background: #5865f2; color: #fff; cursor: pointer; }
-.chat-composer button:disabled { opacity: .35; cursor: default; }
+.chat-composer > button { width: 44px; display: grid; place-items: center; border: 0; border-radius: 8px; background: #5865f2; color: #fff; cursor: pointer; }
+.chat-composer > button:disabled { opacity: .35; cursor: default; }
 .no-channel { flex: 1; display: grid; place-items: center; gap: 12px; color: #949ba4; }
 
 /* Voice and video */
