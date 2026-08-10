@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ToastProvider } from "../toast/ToastContext";
 import { VoiceView } from "./VoiceView";
@@ -12,6 +12,7 @@ const setCameraEnabled = vi.fn();
 const setScreenShareEnabled = vi.fn();
 const getTrackPublication = vi.fn();
 const switchActiveDevice = vi.fn();
+const roomHandlers = new Map<string, (...args: unknown[]) => void>();
 
 vi.mock("livekit-client", () => ({
   Room: class {
@@ -21,7 +22,7 @@ vi.mock("livekit-client", () => ({
     disconnect = disconnect;
     switchActiveDevice = switchActiveDevice;
     localParticipant = { setMicrophoneEnabled, setCameraEnabled, setScreenShareEnabled, getTrackPublication };
-    on() { return this; }
+    on(event: string, handler: (...args: unknown[]) => void) { roomHandlers.set(event, handler); return this; }
   },
   RoomEvent: {
     TrackSubscribed: "trackSubscribed",
@@ -49,6 +50,7 @@ const currentUser = { id: "u1", username: "theo", role: "member" } as const;
 
 beforeEach(() => {
   vi.clearAllMocks();
+  roomHandlers.clear();
   localStorage.clear();
   vi.mocked(api.getVoiceToken).mockResolvedValue({ token: "jwt", url: "ws://livekit" });
   connect.mockResolvedValue(undefined);
@@ -131,6 +133,17 @@ describe("VoiceView", () => {
 
     await user.keyboard("{Escape}");
     expect(screen.queryByRole("dialog", { name: "Voix & Vidéo" })).not.toBeInTheDocument();
+  });
+
+  it("highlights the participant who is speaking", async () => {
+    renderView();
+    await userEvent.setup().click(screen.getByRole("button", { name: "Rejoindre" }));
+    const participantName = await screen.findByText("theo (vous)");
+
+    act(() => roomHandlers.get("activeSpeakersChanged")?.([{ identity: "u1", name: "theo" }]));
+
+    expect(participantName.closest(".voice-participant")).toHaveClass("is-speaking");
+    expect(screen.getByText("Parle")).toBeInTheDocument();
   });
 
   it("keeps the voice session connected while the view is hidden", async () => {

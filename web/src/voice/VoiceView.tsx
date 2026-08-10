@@ -19,6 +19,7 @@ import { audioProfiles, cameraProfiles, screenProfiles, type MediaQuality, type 
 
 type VoiceStatus = "idle" | "connecting" | "connected";
 type DeviceSelections = Partial<Record<MediaDeviceKind, string>>;
+type CallParticipant = { identity: string; name: string; local: boolean };
 type VoiceSettings = {
   devices: DeviceSelections;
   vadThreshold: number;
@@ -78,7 +79,8 @@ export function VoiceView({
   const [participantCount, setParticipantCount] = useState(1);
   const [remoteVideoCount, setRemoteVideoCount] = useState(0);
   const [remoteScreenCount, setRemoteScreenCount] = useState(0);
-  const [activeSpeakerLabels, setActiveSpeakerLabels] = useState<string[]>([]);
+  const [activeSpeakerIds, setActiveSpeakerIds] = useState<Set<string>>(() => new Set());
+  const [callParticipants, setCallParticipants] = useState<CallParticipant[]>([]);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const roomRef = useRef<Room | null>(null);
   const audioRef = useRef<HTMLDivElement>(null);
@@ -154,7 +156,8 @@ export function VoiceView({
     setParticipantCount(1);
     setRemoteVideoCount(0);
     setRemoteScreenCount(0);
-    setActiveSpeakerLabels([]);
+    setActiveSpeakerIds(new Set());
+    setCallParticipants([]);
     activeSpeakersRef.current.clear();
     stopMeter();
   }
@@ -230,12 +233,25 @@ export function VoiceView({
       }
     });
     room.on(RoomEvent.ActiveSpeakersChanged, (speakers: Participant[]) => {
-      updateSpeakingTiles(new Set(speakers.map((participant) => participant.identity)));
-      setActiveSpeakerLabels(speakers.map((participant) => participant.name || participant.identity));
+      const activeIds = new Set(speakers.map((participant) => participant.identity));
+      updateSpeakingTiles(activeIds);
+      setActiveSpeakerIds(activeIds);
     });
-    const refreshParticipantCount = () => setParticipantCount(room.remoteParticipants.size + 1);
-    room.on(RoomEvent.ParticipantConnected, refreshParticipantCount);
-    room.on(RoomEvent.ParticipantDisconnected, refreshParticipantCount);
+    const refreshParticipants = () => {
+      const localIdentity = room.localParticipant.identity || currentUser.id;
+      const participants: CallParticipant[] = [
+        { identity: localIdentity, name: room.localParticipant.name || currentUser.username, local: true },
+        ...[...room.remoteParticipants.values()].map((participant) => ({
+          identity: participant.identity,
+          name: participant.name || participant.identity,
+          local: false,
+        })),
+      ];
+      setCallParticipants(participants);
+      setParticipantCount(participants.length);
+    };
+    room.on(RoomEvent.ParticipantConnected, refreshParticipants);
+    room.on(RoomEvent.ParticipantDisconnected, refreshParticipants);
     room.on(RoomEvent.Disconnected, () => {
       if (roomRef.current === room) {
         roomRef.current = null;
@@ -246,7 +262,8 @@ export function VoiceView({
         setParticipantCount(1);
         setRemoteVideoCount(0);
         setRemoteScreenCount(0);
-        setActiveSpeakerLabels([]);
+        setActiveSpeakerIds(new Set());
+        setCallParticipants([]);
         clearMedia();
       }
     });
@@ -262,7 +279,7 @@ export function VoiceView({
       setMicrophoneEnabled(!settings.pushToTalk);
       if (microphone?.audioTrack) startMeter(microphone.audioTrack);
       setDevices(await Room.getLocalDevices(undefined, false));
-      setParticipantCount(room.remoteParticipants.size + 1);
+      refreshParticipants();
       setStatus("connected");
     } catch (error) {
       await room.disconnect();
@@ -378,7 +395,10 @@ export function VoiceView({
         const element = publication.track.attach();
         element.muted = true;
         element.setAttribute("playsinline", "");
-        localCameraRef.current?.append(element);
+        const label = document.createElement("span");
+        label.className = "local-video-label";
+        label.textContent = `${currentUser.username} (vous)`;
+        localCameraRef.current?.append(element, label);
       } else if (!enabled && previousTrack) {
         for (const element of previousTrack.detach()) element.remove();
       }
@@ -401,7 +421,10 @@ export function VoiceView({
         const element = publication.track.attach();
         element.muted = true;
         element.setAttribute("playsinline", "");
-        localScreenRef.current?.append(element);
+        const label = document.createElement("span");
+        label.className = "local-video-label";
+        label.textContent = `${currentUser.username} · Écran`;
+        localScreenRef.current?.append(element, label);
       } else if (!enabled && previousTrack) {
         for (const element of previousTrack.detach()) element.remove();
       }
@@ -423,9 +446,6 @@ export function VoiceView({
   const hasVideo = cameraEnabled || screenShareEnabled || remoteVideoCount > 0;
   const hasScreenShare = screenShareEnabled || remoteScreenCount > 0;
   const localSpeaking = microphoneEnabled && audioLevel >= settings.vadThreshold;
-  const speakingLabels = localSpeaking && !activeSpeakerLabels.includes(currentUser.username)
-    ? [currentUser.username, ...activeSpeakerLabels]
-    : activeSpeakerLabels;
 
   return (
     <section className="voice-view" aria-label={`Salon vocal ${channel.name}`} hidden={!visible}>
@@ -436,27 +456,25 @@ export function VoiceView({
           <h1>{channel.name}</h1>
           <p>{status === "connected" ? `${participantCount} participant${participantCount > 1 ? "s" : ""} · Connecté en tant que ${currentUser.username}` : "Rejoignez le salon pour parler, partager votre caméra ou votre écran."}</p>
         </div>
-        {status === "connected" ? (
-          <div className={`speaking-indicator ${speakingLabels.length > 0 ? "is-active" : ""}`} role="status">
-            <i aria-hidden="true" />
-            {speakingLabels.length > 0
-              ? `${speakingLabels.slice(0, 2).join(" et ")}${speakingLabels.length > 2 ? ` +${speakingLabels.length - 2}` : ""} ${speakingLabels.length > 1 ? "parlent" : "parle"}`
-              : "Personne ne parle"}
-          </div>
-        ) : null}
         {status === "connected" && !hasVideo ? (
-          <div className="call-audio-view">
-            <div className="call-avatar-wrap">
-              <span className={`call-avatar ${microphoneEnabled ? "is-live" : ""}`}>{currentUser.username.slice(0, 1).toUpperCase()}</span>
-              <i /><i />
-            </div>
-            <strong>Appel vocal en cours</strong>
-            <span>{microphoneEnabled ? "Votre micro est actif" : "Votre micro est coupé"}</span>
+          <div className="voice-participant-grid" aria-label="Participants à l’appel">
+            {callParticipants.map((participant) => {
+              const speaking = activeSpeakerIds.has(participant.identity) || (participant.local && localSpeaking);
+              return (
+                <article key={participant.identity} className={`voice-participant ${speaking ? "is-speaking" : ""}`}>
+                  <div className="participant-avatar-wrap">
+                    <span className="participant-avatar">{participant.name.slice(0, 1).toUpperCase()}</span>
+                  </div>
+                  <strong>{participant.name}{participant.local ? " (vous)" : ""}</strong>
+                  <span>{speaking ? "Parle" : "En écoute"}</span>
+                </article>
+              );
+            })}
           </div>
         ) : null}
         <div className={`video-grid ${hasScreenShare ? "has-screen-share" : ""} ${!hasVideo ? "is-empty" : ""}`} aria-label="Vidéos du salon">
-          <div ref={localScreenRef} className="local-video local-screen" data-participant-id={currentUser.id} />
-          <div ref={localCameraRef} className="local-video" data-participant-id={currentUser.id} />
+          <div ref={localScreenRef} className={`local-video local-screen ${localSpeaking ? "is-speaking" : ""}`} data-participant-id={currentUser.id} />
+          <div ref={localCameraRef} className={`local-video ${localSpeaking ? "is-speaking" : ""}`} data-participant-id={currentUser.id} />
           <div ref={remoteVideoRef} className="remote-videos" />
         </div>
         {status === "idle" ? (
@@ -468,33 +486,26 @@ export function VoiceView({
         ) : (
           <>
           <div className="voice-controls" aria-label="Contrôles du salon vocal">
-            <button type="button" className={!microphoneEnabled ? "control-off" : ""} onClick={() => void toggleMicrophone()}>
-              <Icon name="microphone" size={16} />
-              {settings.pushToTalk ? (microphoneEnabled ? "Vous parlez…" : "Maintenez Espace") : (microphoneEnabled ? "Couper le micro" : "Rétablir le micro")}
+            <button type="button" title={microphoneEnabled ? "Couper le micro" : "Rétablir le micro"} aria-label={settings.pushToTalk ? (microphoneEnabled ? "Vous parlez…" : "Maintenez Espace") : (microphoneEnabled ? "Couper le micro" : "Rétablir le micro")} className={!microphoneEnabled ? "control-off" : ""} onClick={() => void toggleMicrophone()}>
+              <Icon name="microphone" size={19} />
             </button>
-            <button type="button" aria-pressed={settings.pushToTalk} onClick={() => void togglePushToTalk()}>
-              <Icon name="microphone" size={16} />
-              {settings.pushToTalk ? "Désactiver PTT" : "Activer PTT"}
+            <button type="button" title={settings.pushToTalk ? "Désactiver le push-to-talk" : "Activer le push-to-talk"} aria-label={settings.pushToTalk ? "Désactiver PTT" : "Activer PTT"} aria-pressed={settings.pushToTalk} onClick={() => void togglePushToTalk()}>
+              <Icon name="microphone" size={19} />
             </button>
-            <button type="button" className={deafened ? "control-off" : ""} aria-pressed={deafened} onClick={toggleDeafen}>
-              <Icon name="headphones" size={16} />
-              {deafened ? "Rétablir le son" : "Assourdir"}
+            <button type="button" title={deafened ? "Rétablir le son" : "Assourdir"} aria-label={deafened ? "Rétablir le son" : "Assourdir"} className={deafened ? "control-off" : ""} aria-pressed={deafened} onClick={toggleDeafen}>
+              <Icon name="headphones" size={19} />
             </button>
-            <button type="button" className={!cameraEnabled ? "control-off" : ""} aria-pressed={cameraEnabled} onClick={() => void toggleCamera()}>
-              <Icon name="camera" size={16} />
-              {cameraEnabled ? "Arrêter la caméra" : "Activer la caméra"}
+            <button type="button" title={cameraEnabled ? "Arrêter la caméra" : "Activer la caméra"} aria-label={cameraEnabled ? "Arrêter la caméra" : "Activer la caméra"} className={!cameraEnabled ? "control-off" : ""} aria-pressed={cameraEnabled} onClick={() => void toggleCamera()}>
+              <Icon name="camera" size={19} />
             </button>
-            <button type="button" className={!screenShareEnabled ? "control-off" : ""} aria-pressed={screenShareEnabled} onClick={() => void toggleScreenShare()}>
-              <Icon name="monitor" size={16} />
-              {screenShareEnabled ? "Arrêter le partage" : "Partager l’écran"}
+            <button type="button" title={screenShareEnabled ? "Arrêter le partage" : "Partager l’écran"} aria-label={screenShareEnabled ? "Arrêter le partage" : "Partager l’écran"} className={!screenShareEnabled ? "control-off" : ""} aria-pressed={screenShareEnabled} onClick={() => void toggleScreenShare()}>
+              <Icon name="monitor" size={19} />
             </button>
-            <button type="button" aria-haspopup="dialog" onClick={() => setSettingsOpen(true)}>
-              <Icon name="settings" size={16} />
-              Réglages
+            <button type="button" title="Réglages" aria-label="Réglages" aria-haspopup="dialog" onClick={() => setSettingsOpen(true)}>
+              <Icon name="settings" size={19} />
             </button>
-            <button type="button" className="voice-danger" onClick={() => void leaveRoom()}>
-              <Icon name="phone" size={16} />
-              Quitter
+            <button type="button" title="Quitter" aria-label="Quitter" className="voice-danger" onClick={() => void leaveRoom()}>
+              <Icon name="phone" size={20} />
             </button>
           </div>
           </>

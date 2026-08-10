@@ -38,6 +38,8 @@ Dernière mise à jour : 2026-08-10
 - [x] Session vocale persistante pendant la navigation dans les salons textuels.
 - [x] Indicateur nominatif du locuteur actif en vue audio, vidéo et partage.
 - [x] Paramètres voix/vidéo déplacés dans une modale inspirée de Discord.
+- [x] Tuiles nominatives par participant avec anneau ou cadre vert sur le locuteur actif.
+- [x] Barre d’appel compacte à contrôles circulaires inspirée de Discord.
 
 ## À faire ensuite
 
