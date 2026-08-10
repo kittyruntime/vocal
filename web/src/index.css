@@ -147,6 +147,10 @@ summary:focus-visible {
   letter-spacing: -.01em;
   box-shadow: 0 1px 0 rgb(0 0 0 / 20%);
 }
+.sidebar-server-actions { display: flex; align-items: center; gap: 9px; }
+.sidebar-server-actions .online-dot { flex: 0 0 8px; }
+.server-settings-button { width: 30px; height: 30px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 5px; background: transparent; color: #b5bac1; cursor: pointer; }
+.server-settings-button:hover { background: #3f4147; color: #fff; }
 
 .channel-group { padding: 12px 8px 0; }
 .channel-group h2 {
@@ -540,8 +544,6 @@ summary:focus-visible {
 .voice-meter i { position: absolute; top: 0; bottom: 0; width: 2px; background: #f0b232; }
 .voice-detection-section > input[type="range"] { width: 100%; accent-color: #5865f2; }
 .remote-audio { display: none; }
-.server-settings-button { width: calc(100% - 16px); display: flex; align-items: center; gap: 7px; margin: 4px 8px; padding: 8px; border: 0; border-radius: 4px; background: transparent; color: #b5bac1; cursor: pointer; font-size: 12px; font-weight: 600; }
-.server-settings-button:hover { background: #35373c; color: #f2f3f5; }
 .admin-backdrop { position: fixed; }
 .admin-modal { width: min(900px, 100%); }
 .settings-tabs { flex: 0 0 auto; display: flex; gap: 4px; padding: 8px 14px; border-bottom: 1px solid #242528; background: #2b2d31; }
