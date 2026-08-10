@@ -65,7 +65,7 @@ export function MainLayout({ currentUser }: { currentUser: CurrentUser }) {
             dispatch({ type: "channel/removed", channelId: event.channelId });
             break;
           case "voice.sync":
-            dispatch({ type: "voice/sync", channels: event.channels });
+            dispatch({ type: "voice/sync", channels: event.channels, preserveChannelId: joinedVoiceChannelIdRef.current });
             joinedVoiceChannelIdRef.current = Object.entries(event.channels)
               .find(([, participants]) => participants.some((participant) => participant.userId === currentUser.id))?.[0] ?? null;
             break;
@@ -163,12 +163,14 @@ export function MainLayout({ currentUser }: { currentUser: CurrentUser }) {
                 })}
                 onSelfPresenceChange={(present) => {
                   if (present) {
+                    joinedVoiceChannelIdRef.current = voiceChannel.id;
                     dispatch({
                       type: "voice/joined",
                       channelId: voiceChannel.id,
                       participant: { userId: currentUser.id, username: currentUser.username },
                     });
                   } else {
+                    if (joinedVoiceChannelIdRef.current === voiceChannel.id) joinedVoiceChannelIdRef.current = null;
                     dispatch({ type: "voice/left", channelId: voiceChannel.id, userId: currentUser.id });
                   }
                 }}
