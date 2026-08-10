@@ -4,10 +4,17 @@ import * as api from "../api/client";
 import { Icon } from "../ui/Icon";
 
 const CAPABILITY_LABEL: Record<Capability, string> = {
-  manage_channels: "Can manage channels",
-  manage_server: "Can manage the server",
-  moderate: "Can moderate",
-  publish_voice: "Can publish in voice",
+  manage_channels: "Channel managers only",
+  manage_server: "Server managers only",
+  moderate: "Moderators only",
+  publish_voice: "Voice members only",
+};
+
+const CAPABILITY_HELP: Record<Capability, string> = {
+  manage_channels: "Only members allowed to create and configure channels will see it.",
+  manage_server: "Only members with full server-management access will see it.",
+  moderate: "Only members with moderation permission will see it.",
+  publish_voice: "Only members allowed to publish audio and video will see it.",
 };
 
 export function ChannelSettingsModal({ channel, onUpdated, onDeleted, onClose }: {
@@ -59,8 +66,8 @@ export function ChannelSettingsModal({ channel, onUpdated, onDeleted, onClose }:
       <section className="voice-settings-modal channel-settings-modal" role="dialog" aria-modal="true" aria-labelledby="channel-settings-title">
         <header>
           <div>
-            <span>CHANNEL SETTINGS</span>
-            <h2 id="channel-settings-title">{channel.name}</h2>
+            <span>{channel.type === "text" ? "TEXT CHANNEL" : "VOICE CHANNEL"}</span>
+            <h2 id="channel-settings-title">Settings for {channel.type === "text" ? "#" : ""}{channel.name}</h2>
           </div>
           <button type="button" className="modal-close" aria-label="Close channel settings" autoFocus onClick={onClose}>
             <Icon name="close" size={20} />
@@ -69,18 +76,28 @@ export function ChannelSettingsModal({ channel, onUpdated, onDeleted, onClose }:
         <div className="voice-settings-content">
           {error ? <p className="admin-error" role="alert">{error}</p> : null}
           <div className="settings-section">
-            <div className="admin-channel-head">
-              <input aria-label={`Name of ${channel.name}`} value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} />
-              <select
-                aria-label={`Access to ${channel.name}`}
-                value={draft.requiredCapability ?? ""}
-                onChange={(event) => setDraft({ ...draft, requiredCapability: (event.target.value || null) as Capability | null })}
-              >
-                <option value="">Everyone</option>
-                {(Object.keys(CAPABILITY_LABEL) as Capability[]).map((capability) => (
-                  <option key={capability} value={capability}>{CAPABILITY_LABEL[capability]}</option>
-                ))}
-              </select>
+            <h3>Overview</h3>
+            <div className="channel-overview-fields">
+              <label>
+                Channel name
+                <div className="channel-name-field"><span aria-hidden="true">{channel.type === "text" ? "#" : "◖))"}</span><input aria-label={`Name of ${channel.name}`} value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} /></div>
+              </label>
+              <label>
+                Who can access this channel?
+                <select
+                  aria-label={`Access to ${channel.name}`}
+                  value={draft.requiredCapability ?? ""}
+                  onChange={(event) => setDraft({ ...draft, requiredCapability: (event.target.value || null) as Capability | null })}
+                >
+                  <option value="">Everyone</option>
+                  {(Object.keys(CAPABILITY_LABEL) as Capability[]).map((capability) => (
+                    <option key={capability} value={capability}>{CAPABILITY_LABEL[capability]}</option>
+                  ))}
+                </select>
+              </label>
+              <p className="channel-access-help">
+                {draft.requiredCapability ? CAPABILITY_HELP[draft.requiredCapability] : "Every server member can see and open this channel."}
+              </p>
             </div>
           </div>
           {channel.type === "voice" ? (
@@ -93,9 +110,13 @@ export function ChannelSettingsModal({ channel, onUpdated, onDeleted, onClose }:
               </div>
             </div>
           ) : null}
-          <div className="admin-channel-actions">
-            <button type="button" className="danger-link" disabled={busy} onClick={() => void remove()}>Delete</button>
-            <button type="button" disabled={busy} onClick={() => void save()}>Save</button>
+          <div className="settings-section channel-danger-zone">
+            <div><h3>Delete channel</h3><p>This permanently deletes the channel{channel.type === "text" ? " and its message history" : ""}.</p></div>
+            <button type="button" className="danger-link" disabled={busy} onClick={() => void remove()}>Delete channel</button>
+          </div>
+          <div className="admin-channel-actions channel-settings-actions">
+            <button type="button" className="profile-cancel" disabled={busy} onClick={onClose}>Cancel</button>
+            <button type="button" disabled={busy || !draft.name.trim()} onClick={() => void save()}>{busy ? "Saving…" : "Save changes"}</button>
           </div>
         </div>
       </section>

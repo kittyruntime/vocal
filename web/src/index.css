@@ -206,6 +206,20 @@ summary:focus-visible {
 .channel-settings-button:focus-visible { opacity: 1; }
 .channel-settings-button:hover { background: #35373c; color: #dbdee1; }
 .channel-settings-modal { width: min(480px, 100%); }
+.channel-overview-fields { display: grid; gap: 16px; }
+.channel-overview-fields > label { display: grid; gap: 7px; color: #b5bac1; font-size: 11px; font-weight: 700; letter-spacing: .035em; text-transform: uppercase; }
+.channel-overview-fields input, .channel-overview-fields select { width: 100%; min-height: 42px; outline: 0; }
+.channel-name-field { display: flex; align-items: center; overflow: hidden; border: 1px solid #1e1f22; border-radius: 4px; background: #1e1f22; }
+.channel-name-field:focus-within { border-color: #5865f2; }
+.channel-name-field span { padding-left: 12px; color: #80848e; font-size: 17px; }
+.channel-name-field input { border: 0; background: transparent; color: #dbdee1; }
+.channel-access-help { margin: -8px 0 0; color: #949ba4; font-size: 12px; line-height: 1.45; }
+.channel-danger-zone { display: flex; align-items: center; justify-content: space-between; gap: 18px; }
+.channel-danger-zone h3 { margin-bottom: 4px; color: #f23f42; }
+.channel-danger-zone p { margin: 0; color: #949ba4; font-size: 12px; }
+.channel-danger-zone button { flex: 0 0 auto; padding: 9px 12px; border: 1px solid #da373c; border-radius: 4px; background: transparent; color: #f23f42; cursor: pointer; }
+.channel-danger-zone button:hover { background: #da373c; color: #fff; }
+.channel-settings-actions { position: sticky; bottom: 0; margin: 0 -24px -26px; padding: 14px 24px; background: #2b2d31; }
 .admin-hint { color: #949ba4; font-size: 12px; line-height: 1.5; }
 .admin-hint .icon { vertical-align: -2px; }
 

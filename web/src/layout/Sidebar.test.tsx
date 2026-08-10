@@ -77,7 +77,7 @@ describe("Sidebar", () => {
     renderSidebar(admin);
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: "Settings for salle" }));
-    expect(await screen.findByRole("dialog", { name: "salle" })).toBeInTheDocument();
+    expect(await screen.findByRole("dialog", { name: "Settings for salle" })).toBeInTheDocument();
   });
 
   it("hides the per-channel settings icon from non-admins", () => {
