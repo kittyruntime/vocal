@@ -82,11 +82,50 @@ describe("websocket", () => {
     const sync = await nextMessage(ws);
     expect(sync.type).toBe("presence.sync");
     expect(Array.isArray(sync.userIds)).toBe(true);
+    await nextMessage(ws); // voice.sync
     ws.send(JSON.stringify({ type: "ping" }));
     const pong = await nextMessage(ws);
     expect(pong).toEqual({ type: "pong" });
     ws.close();
     await closed(ws);
+  });
+
+  it("sends voice.sync on connect, filtered to channels the user's role can see", async () => {
+    const adminCookie = await loginCookie("theo", "correct horse battery");
+
+    const publicVoice = await app.inject({ method: "POST", url: "/api/channels",
+      headers: { cookie: adminCookie }, payload: { name: "salle", type: "voice" } });
+    const publicId = publicVoice.json().id;
+
+    const staffVoice = await app.inject({ method: "POST", url: "/api/channels",
+      headers: { cookie: adminCookie },
+      payload: { name: "staff-voice", type: "voice", minRole: "moderator" } });
+    const staffId = staffVoice.json().id;
+
+    // Someone already "in" both voice channels before the member connects —
+    // simulated directly since joining for real needs Task 4's webhook.
+    const wsAdmin = openWs(adminCookie);
+    await new Promise((r) => wsAdmin.once("open", r));
+    const adminSync = await nextMessage(wsAdmin); // presence.sync
+    expect(adminSync.type).toBe("presence.sync");
+
+    const inv = await app.inject({ method: "POST", url: "/api/invites", headers: { cookie: adminCookie } });
+    const reg = await app.inject({ method: "POST", url: "/api/auth/register",
+      payload: { inviteToken: inv.json().token, username: "alice", password: "alicepass123" } });
+    const memberCookie = `sid=${reg.cookies.find((c) => c.name === "sid")!.value}`;
+
+    const wsMember = openWs(memberCookie);
+    await new Promise((r) => wsMember.once("open", r));
+    await nextMessage(wsMember); // presence.sync
+    const voiceSync = await nextMessage(wsMember);
+    expect(voiceSync.type).toBe("voice.sync");
+    expect(voiceSync.channels).toEqual({});
+    expect(voiceSync.channels[staffId]).toBeUndefined();
+    expect(publicId).toBeTruthy(); // publicId exists, no occupants yet either
+
+    wsAdmin.close();
+    wsMember.close();
+    await Promise.all([closed(wsAdmin), closed(wsMember)]);
   });
 
   it("ignores non-object JSON payloads instead of crashing", async () => {
@@ -95,6 +134,7 @@ describe("websocket", () => {
     await new Promise((r) => ws.once("open", r));
     const sync = await nextMessage(ws);
     expect(sync.type).toBe("presence.sync");
+    await nextMessage(ws); // voice.sync
 
     ws.send("null");
     expect(ws.readyState).toBe(WebSocket.OPEN);
@@ -113,6 +153,7 @@ describe("websocket", () => {
     const wsA = openWs(cookieA);
     await new Promise((r) => wsA.once("open", r));
     await nextMessage(wsA); // presence.sync
+    await nextMessage(wsA); // voice.sync
 
     // second user
     const inv = await app.inject({ method: "POST", url: "/api/invites",
@@ -148,6 +189,7 @@ describe("websocket", () => {
     const ws = openWs(cookie);
     await new Promise((r) => ws.once("open", r));
     await nextMessage(ws); // presence.sync
+    await nextMessage(ws); // voice.sync
 
     const eventP = nextMessage(ws);
     const res = await app.inject({ method: "POST", url: `/api/channels/${channelId}/messages`,
@@ -169,6 +211,7 @@ describe("websocket", () => {
     const ws = openWs(cookie);
     await new Promise((r) => ws.once("open", r));
     await nextMessage(ws); // presence.sync
+    await nextMessage(ws); // voice.sync
 
     const eventP = nextMessage(ws);
     const res = await app.inject({ method: "POST", url: "/api/channels",
@@ -215,14 +258,17 @@ describe("websocket", () => {
     const wsAdmin = openWs(adminCookie);
     await new Promise((r) => wsAdmin.once("open", r));
     await nextMessage(wsAdmin); // presence.sync
+    await nextMessage(wsAdmin); // voice.sync
 
     const wsMod = openWs(modCookie);
     await new Promise((r) => wsMod.once("open", r));
     await nextMessage(wsMod); // presence.sync
+    await nextMessage(wsMod); // voice.sync
 
     const wsMember = openWs(memberCookie);
     await new Promise((r) => wsMember.once("open", r));
     await nextMessage(wsMember); // presence.sync
+    await nextMessage(wsMember); // voice.sync
 
     const adminEventP = nextMessage(wsAdmin);
     const modEventP = nextMessage(wsMod);
@@ -271,10 +317,12 @@ describe("websocket", () => {
     const wsAdmin = openWs(adminCookie);
     await new Promise((r) => wsAdmin.once("open", r));
     await nextMessage(wsAdmin); // presence.sync
+    await nextMessage(wsAdmin); // voice.sync
 
     const wsMember = openWs(memberCookie);
     await new Promise((r) => wsMember.once("open", r));
     await nextMessage(wsMember); // presence.sync
+    await nextMessage(wsMember); // voice.sync
 
     const adminEventP = nextMessage(wsAdmin);
     const memberEventP = nextMessage(wsMember);
@@ -312,6 +360,7 @@ describe("websocket", () => {
     const ws = openWs(cookie);
     await new Promise((r) => ws.once("open", r));
     await nextMessage(ws); // presence.sync
+    await nextMessage(ws); // voice.sync
 
     const eventP = nextMessage(ws);
     const res = await app.inject({ method: "DELETE", url: `/api/channels/${channelId}`,

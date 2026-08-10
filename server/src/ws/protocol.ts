@@ -22,6 +22,9 @@ export type ServerEvent =
   | { type: "presence.offline"; userId: string }
   | { type: "message.created"; message: MessagePayload }
   | { type: "channel.created"; channel: ChannelPayload }
-  | { type: "channel.deleted"; channelId: string };
+  | { type: "channel.deleted"; channelId: string }
+  | { type: "voice.sync"; channels: Record<string, string[]> }
+  | { type: "voice.joined"; channelId: string; userId: string }
+  | { type: "voice.left"; channelId: string; userId: string };
 
 export type ClientEvent = { type: "ping" };

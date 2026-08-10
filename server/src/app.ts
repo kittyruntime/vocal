@@ -13,6 +13,7 @@ import { loadMasterKey } from "./crypto/messages.js";
 import { registerMessageRoutes } from "./routes/messages.js";
 import { loadLiveKitConfig } from "./voice/tokens.js";
 import { registerVoiceTokenRoute } from "./routes/voice.js";
+import { createVoicePresence } from "./voice/presence.js";
 
 export async function buildApp(
   opts: { pool: pg.Pool },
@@ -24,6 +25,7 @@ export async function buildApp(
   const hub = createHub();
   const key = loadMasterKey();
   const liveKitConfig = loadLiveKitConfig();
+  const voicePresence = createVoicePresence();
   app.setErrorHandler((err: FastifyError, _req, reply) => {
     if (typeof err.statusCode === "number") {
       reply.code(err.statusCode).send({ error: err.message });
@@ -42,6 +44,6 @@ export async function buildApp(
   registerChannelRoutes(app, opts.pool, hub);
   registerMessageRoutes(app, opts.pool, key, hub);
   registerVoiceTokenRoute(app, opts.pool, liveKitConfig);
-  registerWsRoute(app, opts.pool, hub);
+  registerWsRoute(app, opts.pool, hub, voicePresence);
   return { app, hub };
 }

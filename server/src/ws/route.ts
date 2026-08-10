@@ -1,7 +1,9 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import type pg from "pg";
 import { getSessionUser } from "../auth/sessions.js";
+import { hasAtLeastRole, type Role } from "../roles.js";
 import type { WsHub } from "./hub.js";
+import type { VoicePresence } from "../voice/presence.js";
 
 function parseCookie(header: string | undefined, name: string): string | undefined {
   if (!header) return undefined;
@@ -32,7 +34,27 @@ function isAllowedOrigin(req: FastifyRequest): boolean {
   }
 }
 
-export function registerWsRoute(app: FastifyInstance, pool: pg.Pool, hub: WsHub): void {
+// Returns the subset of `occupancy` (channelId -> userIds) for voice channels
+// whose min_role is satisfied by `role`, skipping empty entries.
+async function visibleVoiceOccupancy(
+  pool: pg.Pool, role: Role, occupancy: Record<string, string[]>,
+): Promise<Record<string, string[]>> {
+  const res = await pool.query<{ id: string; min_role: string }>(
+    "SELECT id, min_role FROM channels WHERE type = 'voice'",
+  );
+  const visible: Record<string, string[]> = {};
+  for (const row of res.rows) {
+    const occupants = occupancy[row.id];
+    if (occupants && occupants.length > 0 && hasAtLeastRole(role, row.min_role as Role)) {
+      visible[row.id] = occupants;
+    }
+  }
+  return visible;
+}
+
+export function registerWsRoute(
+  app: FastifyInstance, pool: pg.Pool, hub: WsHub, voicePresence: VoicePresence,
+): void {
   app.get("/ws", { websocket: true }, async (socket, req) => {
     if (!isAllowedOrigin(req)) {
       socket.close(1008, "bad origin");
@@ -46,6 +68,8 @@ export function registerWsRoute(app: FastifyInstance, pool: pg.Pool, hub: WsHub)
     }
     hub.add(user.id, user.role, socket);
     socket.send(JSON.stringify({ type: "presence.sync", userIds: hub.onlineUserIds() }));
+    const channels = await visibleVoiceOccupancy(pool, user.role, voicePresence.allOccupancy());
+    socket.send(JSON.stringify({ type: "voice.sync", channels }));
 
     socket.on("message", (raw: Buffer) => {
       let event: unknown;
