@@ -4,6 +4,7 @@ import { z } from "zod";
 import { hasAtLeastRole, type Role } from "../roles.js";
 import { createMessage, listMessages } from "../messages/store.js";
 import type { WsHub } from "../ws/hub.js";
+import { channelMinRole } from "../channels/lookup.js";
 
 const idSchema = z.object({ id: z.uuid() });
 const postSchema = z.object({ content: z.string().min(1).max(4000) });
@@ -11,14 +12,6 @@ const querySchema = z.object({
   before: z.string().datetime().optional(),
   limit: z.coerce.number().int().min(1).max(100).optional(),
 });
-
-// Returns the channel's min_role, or null if the channel doesn't exist.
-async function channelMinRole(pool: pg.Pool, channelId: string): Promise<Role | null> {
-  const res = await pool.query<{ min_role: string }>(
-    "SELECT min_role FROM channels WHERE id = $1", [channelId],
-  );
-  return (res.rows[0]?.min_role as Role | undefined) ?? null;
-}
 
 export function registerMessageRoutes(
   app: FastifyInstance, pool: pg.Pool, key: Buffer, hub: WsHub,
