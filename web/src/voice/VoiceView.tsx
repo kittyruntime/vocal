@@ -24,7 +24,7 @@ import { shouldOpenVoiceGate, VoiceGateProcessor } from "./VoiceGateProcessor";
 type VoiceStatus = "idle" | "connecting" | "connected" | "reconnecting";
 type MediaKind = "microphone" | "camera" | "screen";
 type DeviceSelections = Partial<Record<MediaDeviceKind, string>>;
-type CallParticipant = { identity: string; name: string; local: boolean };
+type CallParticipant = { identity: string; name: string; avatarUrl: string | null; local: boolean };
 type VoiceSettings = {
   devices: DeviceSelections;
   vadThreshold: number;
@@ -173,6 +173,7 @@ export function VoiceView({
   visible = true,
   onOpenSidebar,
   onSpeakingChange,
+  onParticipantsChange,
   onSelfPresenceChange,
 }: {
   channel: Channel;
@@ -180,6 +181,7 @@ export function VoiceView({
   visible?: boolean;
   onOpenSidebar?(): void;
   onSpeakingChange?(userIds: string[]): void;
+  onParticipantsChange?(participants: { userId: string; username: string; avatarUrl?: string | null }[]): void;
   onSelfPresenceChange?(present: boolean): void;
 }) {
   const { showToast } = useToast();
@@ -383,31 +385,44 @@ export function VoiceView({
     const room = new Room({ adaptiveStream: true, dynacast: true });
     roomRef.current = room;
 
+    const syncRemoteVideoCounts = () => {
+      const tiles = [...(remoteVideoRef.current?.querySelectorAll<HTMLElement>(".video-tile") ?? [])];
+      setRemoteVideoCount(tiles.length);
+      setRemoteScreenCount(tiles.filter((tile) => tile.classList.contains("screen-share")).length);
+    };
+
+    const attachRemoteTrack = (
+      track: RemoteTrack, publication: RemoteTrackPublication, participant: RemoteParticipant,
+    ) => {
+      if (track.kind === Track.Kind.Audio) {
+        if (audioRef.current?.querySelector(`[data-track-sid="${track.sid}"]`)) return;
+        const element = track.attach();
+        element.dataset.trackSid = track.sid;
+        element.muted = deafenedRef.current;
+        audioRef.current?.append(element);
+        return;
+      }
+      if (track.kind !== Track.Kind.Video) return;
+      if (remoteVideoRef.current?.querySelector(`[data-track-sid="${track.sid}"]`)) return;
+      const tile = document.createElement("figure");
+      tile.className = publication.source === Track.Source.ScreenShare ? "video-tile screen-share" : "video-tile";
+      tile.dataset.trackSid = track.sid;
+      tile.dataset.participantId = participant.identity;
+      tile.classList.toggle("is-speaking", activeSpeakersRef.current.has(participant.identity));
+      const element = track.attach();
+      element.setAttribute("playsinline", "");
+      const label = document.createElement("figcaption");
+      label.textContent = participant.name || participant.identity;
+      tile.append(element, label);
+      addFullscreenButton(tile);
+      remoteVideoRef.current?.append(tile);
+      syncRemoteVideoCounts();
+    };
+
     room.on(
       RoomEvent.TrackSubscribed,
       (track: RemoteTrack, publication: RemoteTrackPublication, participant: RemoteParticipant) => {
-        if (track.kind === Track.Kind.Audio) {
-          const element = track.attach();
-          element.muted = deafenedRef.current;
-          audioRef.current?.append(element);
-          return;
-        }
-        if (track.kind === Track.Kind.Video) {
-          setRemoteVideoCount((count) => count + 1);
-          if (publication.source === Track.Source.ScreenShare) setRemoteScreenCount((count) => count + 1);
-          const tile = document.createElement("figure");
-          tile.className = publication.source === Track.Source.ScreenShare ? "video-tile screen-share" : "video-tile";
-          tile.dataset.trackSid = track.sid;
-          tile.dataset.participantId = participant.identity;
-          tile.classList.toggle("is-speaking", activeSpeakersRef.current.has(participant.identity));
-          const element = track.attach();
-          element.setAttribute("playsinline", "");
-          const label = document.createElement("figcaption");
-          label.textContent = participant.name || participant.identity;
-          tile.append(element, label);
-          addFullscreenButton(tile);
-          remoteVideoRef.current?.append(tile);
-        }
+        attachRemoteTrack(track, publication, participant);
       },
     );
     room.on(RoomEvent.TrackUnsubscribed, (track: RemoteTrack, publication: RemoteTrackPublication) => {
@@ -415,10 +430,7 @@ export function VoiceView({
       for (const child of remoteVideoRef.current?.children ?? []) {
         if ((child as HTMLElement).dataset.trackSid === track.sid) child.remove();
       }
-      if (track.kind === Track.Kind.Video) {
-        setRemoteVideoCount((count) => Math.max(0, count - 1));
-        if (publication.source === Track.Source.ScreenShare) setRemoteScreenCount((count) => Math.max(0, count - 1));
-      }
+      if (track.kind === Track.Kind.Video) syncRemoteVideoCounts();
     });
     room.on(RoomEvent.LocalTrackUnpublished, (publication: LocalTrackPublication) => {
       if (publication.source === Track.Source.Camera) {
@@ -438,14 +450,22 @@ export function VoiceView({
     const refreshParticipants = () => {
       const localIdentity = room.localParticipant.identity || currentUser.id;
       const participants: CallParticipant[] = [
-        { identity: localIdentity, name: room.localParticipant.name || currentUser.username, local: true },
-        ...[...room.remoteParticipants.values()].map((participant) => ({
-          identity: participant.identity,
-          name: participant.name || participant.identity,
-          local: false,
-        })),
+        { identity: localIdentity, name: room.localParticipant.name || currentUser.username, avatarUrl: currentUser.avatarUrl ?? null, local: true },
+        ...[...room.remoteParticipants.values()].map((participant) => {
+          let avatarUrl: string | null = null;
+          try {
+            const metadata = JSON.parse(participant.metadata || "{}");
+            if (typeof metadata.avatarUrl === "string") avatarUrl = metadata.avatarUrl;
+          } catch { /* Participant metadata is optional. */ }
+          return { identity: participant.identity, name: participant.name || participant.identity, avatarUrl, local: false };
+        }),
       ];
       setCallParticipants(participants);
+      onParticipantsChange?.(participants.map((participant) => ({
+        userId: participant.identity,
+        username: participant.name,
+        avatarUrl: participant.avatarUrl,
+      })));
     };
     room.on(RoomEvent.ParticipantConnected, refreshParticipants);
     room.on(RoomEvent.ParticipantDisconnected, refreshParticipants);
@@ -473,6 +493,11 @@ export function VoiceView({
     try {
       const { token, url } = await api.getVoiceToken(channel.id);
       await room.connect(url, token);
+      for (const participant of room.remoteParticipants.values()) {
+        for (const publication of participant.trackPublications.values()) {
+          if (publication.track) attachRemoteTrack(publication.track, publication, participant);
+        }
+      }
       for (const [kind, deviceId] of Object.entries(settings.devices)) {
         if (deviceId) await room.switchActiveDevice(kind as MediaDeviceKind, deviceId, false);
       }
@@ -709,7 +734,7 @@ export function VoiceView({
               return (
                 <article key={participant.identity} className={`voice-participant ${speaking ? "is-speaking" : ""}`}>
                   <div className="participant-avatar-wrap">
-                    <span className="participant-avatar">{participant.name.slice(0, 1).toUpperCase()}</span>
+                    <span className="participant-avatar">{participant.avatarUrl ? <img src={participant.avatarUrl} alt="" /> : participant.name.slice(0, 1).toUpperCase()}</span>
                   </div>
                   <strong>{participant.name}{participant.local ? " (you)" : ""}</strong>
                 </article>

@@ -86,7 +86,7 @@ export function ProfileModal({ currentUser, onClose, onSaved }: {
           </div>
           <input ref={fileInputRef} className="sr-only" type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={(event) => void selectAvatar(event)} />
           <div className="profile-fields">
-            <label>Username<input value={username} onChange={(event) => setUsername(event.target.value)} minLength={2} maxLength={32} pattern="[a-zA-Z0-9_.-]+" required /></label>
+            <label>Username<input value={username} onChange={(event) => setUsername(event.target.value)} minLength={2} maxLength={32} required /></label>
             <label>Email<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} maxLength={254} placeholder="you@example.com" /></label>
             <label className="profile-description">About me<textarea aria-label="About me" value={description} onChange={(event) => setDescription(event.target.value)} maxLength={190} rows={4} placeholder="A few words about you…" /><small>{description.length}/190</small></label>
             <div className="profile-avatar-actions">

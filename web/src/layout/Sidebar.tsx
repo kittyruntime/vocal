@@ -142,7 +142,7 @@ function ChannelGroup({
                   const speaking = voiceSpeakingUserIds?.includes(participant.userId) ?? false;
                   return (
                     <li key={participant.userId} className={speaking ? "is-speaking" : ""}>
-                      <span className="member-avatar">{participant.username.slice(0, 1).toUpperCase()}</span>
+                      <span className="member-avatar">{participant.avatarUrl ? <img src={participant.avatarUrl} alt="" /> : participant.username.slice(0, 1).toUpperCase()}</span>
                       {participant.userId === currentUserId ? `${participant.username} (you)` : participant.username}
                     </li>
                   );

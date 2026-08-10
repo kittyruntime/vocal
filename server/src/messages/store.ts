@@ -16,7 +16,7 @@ function toPayload(row: Row, key: Buffer): MessagePayload {
     channelId: row.channel_id,
     userId: row.user_id,
     username: row.username,
-    avatarUrl: row.avatar_url,
+    avatarUrl: row.avatar_url ? `/api/users/${row.user_id}/avatar` : null,
     content: decryptMessage(row.content_encrypted, key),
     createdAt: row.created_at.toISOString(),
   };

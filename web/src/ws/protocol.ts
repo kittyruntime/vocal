@@ -1,6 +1,6 @@
 import type { Channel, Message } from "../api/client";
 
-export type VoiceParticipant = { userId: string; username: string };
+export type VoiceParticipant = { userId: string; username: string; avatarUrl?: string | null };
 
 export type ServerEvent =
   | { type: "presence.sync"; userIds: string[] }

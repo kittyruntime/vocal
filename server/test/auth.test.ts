@@ -121,6 +121,10 @@ describe("profile", () => {
     expect(update.json()).toMatchObject({ username: "theophile", email: "theo@example.com", description: "Building Vocal", avatarUrl });
     const me = await app.inject({ method: "GET", url: "/api/me", headers: { cookie } });
     expect(me.json()).toMatchObject({ username: "theophile", email: "theo@example.com", description: "Building Vocal", avatarUrl });
+    const avatar = await app.inject({ method: "GET", url: `/api/users/${me.json().id}/avatar`, headers: { cookie } });
+    expect(avatar.statusCode).toBe(200);
+    expect(avatar.headers["content-type"]).toContain("image/png");
+    expect(avatar.rawPayload).toEqual(Buffer.from("avatar"));
   });
 
   it("allows a profile without an email address", async () => {
@@ -132,6 +136,18 @@ describe("profile", () => {
     });
     expect(update.statusCode).toBe(200);
     expect(update.json()).toMatchObject({ email: null, description: "No public email" });
+  });
+
+  it("accepts accented letters in usernames", async () => {
+    const setup = await app.inject({ method: "POST", url: "/api/setup",
+      payload: { username: "theo", password: "correct horse battery" } });
+    const cookie = sidCookie(setup);
+    const update = await app.inject({ method: "PATCH", url: "/api/me", headers: { cookie },
+      payload: { username: "Théophile", email: null, description: "", avatarUrl: null } });
+    expect(update.statusCode).toBe(200);
+    const login = await app.inject({ method: "POST", url: "/api/auth/login",
+      payload: { username: "Théophile", password: "correct horse battery" } });
+    expect(login.statusCode).toBe(200);
   });
 
   it("rejects duplicate usernames and invalid profile images", async () => {

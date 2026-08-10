@@ -27,6 +27,7 @@ export function registerVoiceTokenRoute(
     }
     const { token, url } = await mintVoiceToken(liveKitConfig, {
       channelId: params.data.id, userId: req.user!.id, username: req.user!.username,
+      avatarUrl: req.user!.avatarUrl ? `/api/users/${req.user!.id}/avatar` : null,
       canPublish: req.user!.capabilities.includes("publish_voice") && !req.user!.voiceMuted,
     });
     return reply.code(201).send({ token, url });
@@ -68,7 +69,16 @@ export function registerVoiceWebhookRoute(
         const requiredCapability = await channelRequiredCapability(pool, channelId);
         if (requiredCapability !== undefined) {
           if (event.event === "participant_joined") {
-            const participant = { userId, username: event.participant?.name || userId };
+            let avatarUrl: string | null = null;
+            try {
+              const metadata = JSON.parse(event.participant?.metadata || "{}");
+              if (typeof metadata.avatarUrl === "string") avatarUrl = metadata.avatarUrl;
+            } catch { /* Participant metadata is optional. */ }
+            const participant = {
+              userId,
+              username: event.participant?.name || userId,
+              ...(avatarUrl ? { avatarUrl } : {}),
+            };
             voicePresence.join(channelId, participant);
             hub.broadcastToCapability(requiredCapability, { type: "voice.joined", channelId, participant });
           } else {
