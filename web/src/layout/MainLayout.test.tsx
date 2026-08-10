@@ -70,9 +70,9 @@ describe("MainLayout", () => {
   it("loads channels and hides the reconnecting banner once the socket opens", async () => {
     renderLayout();
     expect(await screen.findByRole("button", { name: /général/ })).toBeInTheDocument();
-    expect(screen.getByText("Connexion…")).toBeInTheDocument();
+    expect(screen.getByText("Connecting…")).toBeInTheDocument();
     FakeWebSocket.instances[0].emit("open");
-    await waitFor(() => expect(screen.queryByText("Connexion…")).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByText("Connecting…")).not.toBeInTheDocument());
   });
 
   it("updates presence from WebSocket events", async () => {
@@ -81,9 +81,9 @@ describe("MainLayout", () => {
     const socket = FakeWebSocket.instances[0];
     socket.emit("open");
     socket.sendServerEvent({ type: "presence.sync", userIds: ["u1"] });
-    await waitFor(() => expect(screen.getByText("1 en ligne")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("1 online")).toBeInTheDocument());
     socket.sendServerEvent({ type: "presence.online", userId: "u2" });
-    await waitFor(() => expect(screen.getByText("2 en ligne")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("2 online")).toBeInTheDocument());
   });
 
   it("appends an incoming message to the selected channel", async () => {

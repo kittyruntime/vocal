@@ -33,7 +33,7 @@ describe("AdminPanel moderation", () => {
     vi.mocked(api.kickUser).mockResolvedValue({ ok: true });
     renderPanel();
     const user = userEvent.setup();
-    await user.click(await screen.findByRole("button", { name: "Expulser" }));
+    await user.click(await screen.findByRole("button", { name: "Kick" }));
     await waitFor(() => expect(api.kickUser).toHaveBeenCalledWith("u2"));
   });
 
@@ -41,7 +41,7 @@ describe("AdminPanel moderation", () => {
     vi.mocked(window.confirm).mockReturnValue(false);
     renderPanel();
     const user = userEvent.setup();
-    await user.click(await screen.findByRole("button", { name: "Expulser" }));
+    await user.click(await screen.findByRole("button", { name: "Kick" }));
     expect(api.kickUser).not.toHaveBeenCalled();
   });
 
@@ -50,9 +50,9 @@ describe("AdminPanel moderation", () => {
     vi.mocked(api.banUser).mockResolvedValue(banned);
     renderPanel();
     const user = userEvent.setup();
-    await user.click(await screen.findByRole("button", { name: "Bannir" }));
-    expect(await screen.findByText("Banni")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Débannir" })).toBeInTheDocument();
+    await user.click(await screen.findByRole("button", { name: "Ban" }));
+    expect(await screen.findByText("Banned")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Unban" })).toBeInTheDocument();
   });
 
   it("unbans a user without a confirmation prompt", async () => {
@@ -60,7 +60,7 @@ describe("AdminPanel moderation", () => {
     vi.mocked(api.unbanUser).mockResolvedValue({ ...alice, bannedAt: null });
     renderPanel([{ ...alice, bannedAt: "2026-08-10T00:00:00Z" }]);
     const user = userEvent.setup();
-    await user.click(await screen.findByRole("button", { name: "Débannir" }));
+    await user.click(await screen.findByRole("button", { name: "Unban" }));
     await waitFor(() => expect(api.unbanUser).toHaveBeenCalledWith("u2"));
     expect(window.confirm).not.toHaveBeenCalled();
   });
@@ -69,8 +69,8 @@ describe("AdminPanel moderation", () => {
     vi.mocked(api.banUser).mockRejectedValue(new api.ApiError(409, "cannot ban yourself"));
     renderPanel();
     const user = userEvent.setup();
-    await user.click(await screen.findByRole("button", { name: "Bannir" }));
-    expect(await screen.findByText("Tu ne peux pas te bannir toi-même.")).toBeInTheDocument();
+    await user.click(await screen.findByRole("button", { name: "Ban" }));
+    expect(await screen.findByText("You cannot ban yourself.")).toBeInTheDocument();
   });
 
   it("hides moderation actions for the current admin's own row", async () => {

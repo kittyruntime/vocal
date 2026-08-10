@@ -40,11 +40,11 @@ beforeEach(() => vi.mocked(api.createChannel).mockReset());
 describe("Sidebar", () => {
   it("groups channels by type and shows the presence count", () => {
     renderSidebar(admin);
-    expect(screen.getByText("Salons textuels")).toBeInTheDocument();
-    expect(screen.getByText("Salons vocaux")).toBeInTheDocument();
+    expect(screen.getByText("Text channels")).toBeInTheDocument();
+    expect(screen.getByText("Voice channels")).toBeInTheDocument();
     expect(screen.getByText("général", { exact: false })).toBeInTheDocument();
-    expect(screen.getByText("1 en ligne")).toBeInTheDocument();
-    expect(screen.getByText("theo (vous)")).toBeInTheDocument();
+    expect(screen.getByText("1 online")).toBeInTheDocument();
+    expect(screen.getByText("theo (you)")).toBeInTheDocument();
     expect(screen.getByText("alice")).toBeInTheDocument();
   });
 
@@ -57,12 +57,12 @@ describe("Sidebar", () => {
 
   it("shows the create-channel form only to admins", () => {
     renderSidebar(admin);
-    expect(screen.getByLabelText("Nom du nouveau channel")).toBeInTheDocument();
+    expect(screen.getByLabelText("New channel name")).toBeInTheDocument();
   });
 
   it("hides the create-channel form from non-admins", () => {
     renderSidebar(member);
-    expect(screen.queryByLabelText("Nom du nouveau channel")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("New channel name")).not.toBeInTheDocument();
   });
 
   it("creates a channel and reports it back to the parent", async () => {
@@ -71,8 +71,8 @@ describe("Sidebar", () => {
     const onCreated = vi.fn();
     renderSidebar(admin, vi.fn(), onCreated);
     const user = userEvent.setup();
-    await user.type(screen.getByLabelText("Nom du nouveau channel"), "annonces");
-    await user.click(screen.getByRole("button", { name: "+ Ajouter" }));
+    await user.type(screen.getByLabelText("New channel name"), "annonces");
+    await user.click(screen.getByRole("button", { name: "+ Add" }));
     await waitFor(() => expect(onCreated).toHaveBeenCalledWith(created));
     expect(api.createChannel).toHaveBeenCalledWith({ name: "annonces", type: "text" });
   });

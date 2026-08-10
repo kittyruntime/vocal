@@ -16,7 +16,7 @@ export function LoginScreen({ onShowRegister, registrationOpen = true }: { onSho
     try {
       await signIn(username, password);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Erreur inattendue");
+      setError(err instanceof ApiError ? err.message : "Unexpected error");
     } finally {
       setSubmitting(false);
     }
@@ -25,10 +25,10 @@ export function LoginScreen({ onShowRegister, registrationOpen = true }: { onSho
   return (
     <div className="auth-screen">
       <form className="auth-card" onSubmit={handleSubmit}>
-        <h1>Connexion</h1>
-        <label htmlFor="login-username">Nom d'utilisateur</label>
+        <h1>Log in</h1>
+        <label htmlFor="login-username">Username</label>
         <input id="login-username" value={username} onChange={(e) => setUsername(e.target.value)} required />
-        <label htmlFor="login-password">Mot de passe</label>
+        <label htmlFor="login-password">Password</label>
         <input
           id="login-password"
           type="password"
@@ -42,9 +42,9 @@ export function LoginScreen({ onShowRegister, registrationOpen = true }: { onSho
           </p>
         )}
         <button type="submit" disabled={submitting}>
-          Se connecter
+          Log in
         </button>
-        {registrationOpen ? <button type="button" className="auth-link" onClick={onShowRegister}>Créer un compte</button> : <p className="registration-closed">Les inscriptions sont fermées.</p>}
+        {registrationOpen ? <button type="button" className="auth-link" onClick={onShowRegister}>Create an account</button> : <p className="registration-closed">Registration is closed.</p>}
       </form>
     </div>
   );

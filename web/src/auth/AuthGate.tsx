@@ -14,15 +14,15 @@ export function AuthGate({ children }: { children(user: CurrentUser): ReactNode 
   const [registrationOpen, setRegistrationOpen] = useState(true);
   useEffect(() => { void api.getRegistrationStatus().then((value) => setRegistrationOpen(value.registrationOpen)).catch(() => {}); }, []);
 
-  if (state.phase === "loading") return <div className="auth-loading">Chargement…</div>;
+  if (state.phase === "loading") return <div className="auth-loading">Loading…</div>;
   if (state.phase === "error") {
     return (
       <div className="auth-screen">
         <div className="auth-card auth-error-screen">
-          <h1>Connexion impossible</h1>
+          <h1>Unable to connect</h1>
           <p role="alert">{state.message}</p>
           <button type="button" onClick={() => void refresh()}>
-            Réessayer
+            Retry
           </button>
         </div>
       </div>

@@ -10,6 +10,6 @@ vi.mock("./api/client", async () => {
 describe("App", () => {
   it("shows a loading state while auth is bootstrapping", () => {
     render(<App />);
-    expect(screen.getByText("Chargement…")).toBeInTheDocument();
+    expect(screen.getByText("Loading…")).toBeInTheDocument();
   });
 });

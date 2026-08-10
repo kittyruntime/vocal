@@ -16,7 +16,7 @@ export function SetupScreen() {
     try {
       await completeSetup(username, password);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Erreur inattendue");
+      setError(err instanceof ApiError ? err.message : "Unexpected error");
     } finally {
       setSubmitting(false);
     }
@@ -25,11 +25,11 @@ export function SetupScreen() {
   return (
     <div className="auth-screen">
       <form className="auth-card" onSubmit={handleSubmit}>
-        <h1>Bienvenue sur Vocal</h1>
-        <p>Crée le premier compte : il sera administrateur.</p>
-        <label htmlFor="setup-username">Nom d'utilisateur</label>
+        <h1>Welcome to Vocal</h1>
+        <p>Create the first account: it will be an administrator.</p>
+        <label htmlFor="setup-username">Username</label>
         <input id="setup-username" value={username} onChange={(e) => setUsername(e.target.value)} required />
-        <label htmlFor="setup-password">Mot de passe</label>
+        <label htmlFor="setup-password">Password</label>
         <input
           id="setup-password"
           type="password"
@@ -43,7 +43,7 @@ export function SetupScreen() {
           </p>
         )}
         <button type="submit" disabled={submitting}>
-          Créer le compte admin
+          Create admin account
         </button>
       </form>
     </div>

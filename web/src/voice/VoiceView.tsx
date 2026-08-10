@@ -65,16 +65,16 @@ function loadSettings(): VoiceSettings {
 
 const MEDIA_ERROR_MESSAGES: Record<MediaKind, Partial<Record<MediaDeviceFailure, string>> & { default: string }> = {
   microphone: {
-    [MediaDeviceFailure.PermissionDenied]: "Autorisation du microphone refusée. Vérifie les réglages de ton navigateur.",
-    [MediaDeviceFailure.NotFound]: "Aucun microphone détecté sur cet appareil.",
-    [MediaDeviceFailure.DeviceInUse]: "Le microphone est déjà utilisé par une autre application.",
-    default: "Impossible d’activer le microphone.",
+    [MediaDeviceFailure.PermissionDenied]: "Microphone permission denied. Check your browser settings.",
+    [MediaDeviceFailure.NotFound]: "No microphone detected on this device.",
+    [MediaDeviceFailure.DeviceInUse]: "The microphone is already in use by another application.",
+    default: "Could not enable the microphone.",
   },
   camera: {
-    [MediaDeviceFailure.PermissionDenied]: "Autorisation de la caméra refusée. Vérifie les réglages de ton navigateur.",
-    [MediaDeviceFailure.NotFound]: "Aucune caméra détectée sur cet appareil.",
-    [MediaDeviceFailure.DeviceInUse]: "La caméra est déjà utilisée par une autre application.",
-    default: "Impossible d’activer la caméra.",
+    [MediaDeviceFailure.PermissionDenied]: "Camera permission denied. Check your browser settings.",
+    [MediaDeviceFailure.NotFound]: "No camera detected on this device.",
+    [MediaDeviceFailure.DeviceInUse]: "The camera is already in use by another application.",
+    default: "Could not enable the camera.",
   },
   screen: {
     // getDisplayMedia surfaces a cancelled picker as the same NotAllowedError
@@ -82,8 +82,8 @@ const MEDIA_ERROR_MESSAGES: Record<MediaKind, Partial<Record<MediaDeviceFailure,
     // way to tell the two apart, and "cancelled" is by far the more common
     // real-world case for screen sharing (there is no separate persistent OS
     // prompt to actively deny).
-    [MediaDeviceFailure.PermissionDenied]: "Partage d’écran annulé.",
-    default: "Impossible de partager l’écran.",
+    [MediaDeviceFailure.PermissionDenied]: "Screen share cancelled.",
+    default: "Could not share the screen.",
   },
 };
 
@@ -102,13 +102,13 @@ const UNREACHABLE_CONNECTION_REASONS = new Set([
 function describeJoinError(error: unknown): string {
   if (error instanceof api.ApiError) {
     return error.message === "not a voice channel"
-      ? "Ce salon n’est pas un salon vocal"
-      : `Connexion vocale refusée : ${error.message}`;
+      ? "This channel is not a voice channel"
+      : `Voice connection refused: ${error.message}`;
   }
   if (error instanceof ConnectionError) {
     return UNREACHABLE_CONNECTION_REASONS.has(error.reason)
-      ? "Connexion réseau impossible. Vérifie ta connexion et réessaie."
-      : "Impossible de rejoindre le salon vocal";
+      ? "Network connection failed. Check your connection and try again."
+      : "Could not join the voice channel";
   }
   return describeMediaError(error, "microphone");
 }
@@ -206,7 +206,7 @@ export function VoiceView({
       lastVoiceActivityRef.current = 0;
     } catch {
       await gate.destroy();
-      showToast("La détection vocale n’est pas prise en charge par ce navigateur");
+      showToast("Voice detection is not supported by this browser");
     }
   }
 
@@ -378,7 +378,7 @@ export function VoiceView({
         setCallParticipants([]);
         clearMedia();
         if (lostAfterReconnecting) {
-          showToast("Connexion vocale perdue après plusieurs tentatives de reconnexion.");
+          showToast("Voice connection lost after several reconnection attempts.");
         }
       }
     });
@@ -416,7 +416,7 @@ export function VoiceView({
       await room.switchActiveDevice(kind, deviceId);
       saveSettings({ ...settings, devices: { ...settings.devices, [kind]: deviceId } });
     } catch {
-      showToast("Impossible de changer de périphérique");
+      showToast("Could not change device");
     }
   }
 
@@ -437,7 +437,7 @@ export function VoiceView({
       }
       setMicrophoneEnabled(!enabled);
     } catch {
-      showToast("Impossible d’activer le push-to-talk");
+      showToast("Could not enable push-to-talk");
     }
   }
 
@@ -516,7 +516,7 @@ export function VoiceView({
         element.setAttribute("playsinline", "");
         const label = document.createElement("span");
         label.className = "local-video-label";
-        label.textContent = `${currentUser.username} (vous)`;
+        label.textContent = `${currentUser.username} (you)`;
         localCameraRef.current?.append(element, label);
       } else if (!enabled && previousTrack) {
         for (const element of previousTrack.detach()) element.remove();
@@ -542,7 +542,7 @@ export function VoiceView({
         element.setAttribute("playsinline", "");
         const label = document.createElement("span");
         label.className = "local-video-label";
-        label.textContent = `${currentUser.username} · Écran`;
+        label.textContent = `${currentUser.username} · Screen`;
         localScreenRef.current?.append(element, label);
       } else if (!enabled && previousTrack) {
         for (const element of previousTrack.detach()) element.remove();
@@ -559,7 +559,7 @@ export function VoiceView({
     const key = `${kind}Quality` as const;
     saveSettings({ ...settings, [key]: quality });
     const active = kind === "audio" ? microphoneEnabled : kind === "camera" ? cameraEnabled : screenShareEnabled;
-    if (active) showToast(`La nouvelle qualité ${kind === "audio" ? "audio" : kind === "camera" ? "webcam" : "d’écran"} sera appliquée à la prochaine activation.`);
+    if (active) showToast(`The new ${kind === "audio" ? "audio" : kind === "camera" ? "webcam" : "screen share"} quality will apply the next time it's turned on.`);
   }
 
   const hasVideo = cameraEnabled || screenShareEnabled || remoteVideoCount > 0;
@@ -577,21 +577,21 @@ export function VoiceView({
   }, [channel.id, visible]);
 
   return (
-    <section className="voice-view" aria-label={`Salon vocal ${channel.name}`} hidden={!visible}>
+    <section className="voice-view" aria-label={`Voice channel ${channel.name}`} hidden={!visible}>
       <header className="chat-header"><span className="header-channel-icon"><Icon name="volume" size={21} /></span> {channel.name}</header>
       <div className="voice-stage">
         <div className={`voice-hero ${status === "connected" || status === "reconnecting" ? "is-connected" : ""}`}>
           <div className="voice-hero-icon"><Icon name="volume" size={28} /></div>
           <h1>{channel.name}</h1>
-          <p>{status === "connected" || status === "reconnecting" ? `${participantCount} participant${participantCount > 1 ? "s" : ""} · Connecté en tant que ${currentUser.username}` : "Rejoignez le salon pour parler, partager votre caméra ou votre écran."}</p>
+          <p>{status === "connected" || status === "reconnecting" ? `${participantCount} participant${participantCount > 1 ? "s" : ""} · Connected as ${currentUser.username}` : "Join the channel to talk, share your camera, or share your screen."}</p>
         </div>
         {status === "reconnecting" ? (
           <div className="voice-reconnect-banner" role="status">
-            <span className="connecting-dots" aria-hidden="true"><i /><i /><i /></span> Reconnexion en cours…
+            <span className="connecting-dots" aria-hidden="true"><i /><i /><i /></span> Reconnecting…
           </div>
         ) : null}
         {(status === "connected" || status === "reconnecting") && !hasVideo ? (
-          <div className="voice-participant-grid" aria-label="Participants à l’appel">
+          <div className="voice-participant-grid" aria-label="Call participants">
             {callParticipants.map((participant) => {
               const speaking = activeSpeakerIds.has(participant.identity) || (participant.local && localSpeaking);
               return (
@@ -599,43 +599,43 @@ export function VoiceView({
                   <div className="participant-avatar-wrap">
                     <span className="participant-avatar">{participant.name.slice(0, 1).toUpperCase()}</span>
                   </div>
-                  <strong>{participant.name}{participant.local ? " (vous)" : ""}</strong>
-                  <span>{speaking ? "Parle" : "En écoute"}</span>
+                  <strong>{participant.name}{participant.local ? " (you)" : ""}</strong>
+                  <span>{speaking ? "Speaking" : "Listening"}</span>
                 </article>
               );
             })}
           </div>
         ) : null}
-        <div className={`video-grid ${hasScreenShare ? "has-screen-share" : ""} ${!hasVideo ? "is-empty" : ""}`} aria-label="Vidéos du salon">
+        <div className={`video-grid ${hasScreenShare ? "has-screen-share" : ""} ${!hasVideo ? "is-empty" : ""}`} aria-label="Channel videos">
           <div ref={localScreenRef} className={`local-video local-screen ${localSpeaking ? "is-speaking" : ""}`} data-participant-id={currentUser.id} />
           <div ref={localCameraRef} className={`local-video ${localSpeaking ? "is-speaking" : ""}`} data-participant-id={currentUser.id} />
           <div ref={remoteVideoRef} className="remote-videos" />
         </div>
         {status === "idle" ? (
           <button type="button" className="voice-primary" onClick={() => void joinRoom()}>
-            Rejoindre
+            Join
           </button>
         ) : status === "connecting" ? (
-          <button type="button" className="voice-primary connecting" disabled>Connexion<span className="connecting-dots" aria-hidden="true"><i /><i /><i /></span></button>
+          <button type="button" className="voice-primary connecting" disabled>Connecting<span className="connecting-dots" aria-hidden="true"><i /><i /><i /></span></button>
         ) : (
           <>
-          <div className="voice-controls" aria-label="Contrôles du salon vocal">
-            <button type="button" title={microphoneEnabled ? "Couper le micro" : "Rétablir le micro"} aria-label={settings.pushToTalk ? (microphoneEnabled ? "Vous parlez…" : "Maintenez Espace") : (microphoneEnabled ? "Couper le micro" : "Rétablir le micro")} className={!microphoneEnabled ? "control-off" : ""} onClick={() => void toggleMicrophone()}>
+          <div className="voice-controls" aria-label="Voice channel controls">
+            <button type="button" title={microphoneEnabled ? "Mute microphone" : "Unmute microphone"} aria-label={settings.pushToTalk ? (microphoneEnabled ? "You're talking…" : "Hold Space") : (microphoneEnabled ? "Mute microphone" : "Unmute microphone")} className={!microphoneEnabled ? "control-off" : ""} onClick={() => void toggleMicrophone()}>
               <Icon name="microphone" size={19} />
             </button>
-            <button type="button" title={deafened ? "Rétablir le son" : "Assourdir"} aria-label={deafened ? "Rétablir le son" : "Assourdir"} className={deafened ? "control-off" : ""} aria-pressed={deafened} onClick={toggleDeafen}>
+            <button type="button" title={deafened ? "Undeafen" : "Deafen"} aria-label={deafened ? "Undeafen" : "Deafen"} className={deafened ? "control-off" : ""} aria-pressed={deafened} onClick={toggleDeafen}>
               <Icon name="headphones" size={19} />
             </button>
-            <button type="button" title={cameraEnabled ? "Arrêter la caméra" : "Activer la caméra"} aria-label={cameraEnabled ? "Arrêter la caméra" : "Activer la caméra"} className={!cameraEnabled ? "control-off" : ""} aria-pressed={cameraEnabled} onClick={() => void toggleCamera()}>
+            <button type="button" title={cameraEnabled ? "Stop camera" : "Turn on camera"} aria-label={cameraEnabled ? "Stop camera" : "Turn on camera"} className={!cameraEnabled ? "control-off" : ""} aria-pressed={cameraEnabled} onClick={() => void toggleCamera()}>
               <Icon name="camera" size={19} />
             </button>
-            <button type="button" title={screenShareEnabled ? "Arrêter le partage" : "Partager l’écran"} aria-label={screenShareEnabled ? "Arrêter le partage" : "Partager l’écran"} className={!screenShareEnabled ? "control-off" : ""} aria-pressed={screenShareEnabled} onClick={() => void toggleScreenShare()}>
+            <button type="button" title={screenShareEnabled ? "Stop sharing" : "Share screen"} aria-label={screenShareEnabled ? "Stop sharing" : "Share screen"} className={!screenShareEnabled ? "control-off" : ""} aria-pressed={screenShareEnabled} onClick={() => void toggleScreenShare()}>
               <Icon name="monitor" size={19} />
             </button>
-            <button type="button" title="Réglages" aria-label="Réglages" aria-haspopup="dialog" onClick={() => setSettingsOpen(true)}>
+            <button type="button" title="Settings" aria-label="Settings" aria-haspopup="dialog" onClick={() => setSettingsOpen(true)}>
               <Icon name="settings" size={19} />
             </button>
-            <button type="button" title="Quitter" aria-label="Quitter" className="voice-danger" onClick={() => void leaveRoom()}>
+            <button type="button" title="Leave" aria-label="Leave" className="voice-danger" onClick={() => void leaveRoom()}>
               <Icon name="phone" size={20} />
             </button>
           </div>
@@ -653,53 +653,53 @@ export function VoiceView({
           <section className="voice-settings-modal" role="dialog" aria-modal="true" aria-labelledby="voice-settings-title">
             <header>
               <div>
-                <span>PARAMÈTRES UTILISATEUR</span>
-                <h2 id="voice-settings-title">Voix & Vidéo</h2>
+                <span>USER SETTINGS</span>
+                <h2 id="voice-settings-title">Voice & Video</h2>
               </div>
-              <button type="button" className="modal-close" aria-label="Fermer les réglages" autoFocus onClick={() => setSettingsOpen(false)}>
+              <button type="button" className="modal-close" aria-label="Close settings" autoFocus onClick={() => setSettingsOpen(false)}>
                 <Icon name="close" size={20} />
               </button>
             </header>
             <div className="voice-settings-content">
               <div className="settings-section">
-                <h3>Périphériques</h3>
+                <h3>Devices</h3>
                 <div className="voice-settings">
                   <DeviceSelect label="Microphone" kind="audioinput" devices={devices} value={settings.devices.audioinput} onChange={selectDevice} />
-                  <DeviceSelect label="Sortie audio" kind="audiooutput" devices={devices} value={settings.devices.audiooutput} onChange={selectDevice} />
-                  <DeviceSelect label="Caméra" kind="videoinput" devices={devices} value={settings.devices.videoinput} onChange={selectDevice} />
+                  <DeviceSelect label="Audio output" kind="audiooutput" devices={devices} value={settings.devices.audiooutput} onChange={selectDevice} />
+                  <DeviceSelect label="Camera" kind="videoinput" devices={devices} value={settings.devices.videoinput} onChange={selectDevice} />
                 </div>
               </div>
               <div className="settings-section">
-                <h3>Qualité de diffusion</h3>
+                <h3>Streaming quality</h3>
                 <div className="voice-settings">
                   <QualitySelect label="Audio" value={settings.audioQuality} profiles={audioProfiles} onChange={(quality) => selectQuality("audio", quality)} />
                   <QualitySelect label="Webcam" value={settings.cameraQuality} profiles={cameraProfiles} onChange={(quality) => selectQuality("camera", quality)} />
-                  <QualitySelect<ScreenQuality> label="Partage d’écran" value={settings.screenQuality} profiles={screenProfiles} onChange={(quality) => selectQuality("screen", quality)} />
+                  <QualitySelect<ScreenQuality> label="Screen share" value={settings.screenQuality} profiles={screenProfiles} onChange={(quality) => selectQuality("screen", quality)} />
                 </div>
               </div>
               <div className="settings-section">
-                <h3>Mode d’entrée</h3>
-                <div className="input-mode-options" role="radiogroup" aria-label="Mode d’entrée audio">
+                <h3>Input mode</h3>
+                <div className="input-mode-options" role="radiogroup" aria-label="Audio input mode">
                   <button type="button" role="radio" aria-checked={!settings.pushToTalk} className={!settings.pushToTalk ? "active" : ""} onClick={() => settings.pushToTalk && void togglePushToTalk()}>
-                    <span>Détection vocale</span>
-                    <small>Le micro s’active automatiquement selon le seuil choisi.</small>
+                    <span>Voice detection</span>
+                    <small>The microphone activates automatically based on the chosen threshold.</small>
                   </button>
                   <button type="button" role="radio" aria-checked={settings.pushToTalk} className={settings.pushToTalk ? "active" : ""} onClick={() => !settings.pushToTalk && void togglePushToTalk()}>
                     <span>Push-to-talk</span>
-                    <small>Maintenez la barre Espace pour parler.</small>
+                    <small>Hold the Space bar to talk.</small>
                   </button>
                 </div>
               </div>
               <div className="settings-section voice-detection-section">
                 <div className="settings-section-heading">
-                  <div><h3>Sensibilité d’entrée</h3><p>Ajustez le niveau nécessaire pour détecter votre voix.</p></div>
+                  <div><h3>Input sensitivity</h3><p>Adjust the level needed to detect your voice.</p></div>
                   <strong>{Math.round(settings.vadThreshold * 100)} %</strong>
                 </div>
-                <div className="voice-meter" aria-label={`Niveau du microphone ${Math.round(audioLevel * 100)} %`}>
+                <div className="voice-meter" aria-label={`Microphone level ${Math.round(audioLevel * 100)} %`}>
                   <span style={{ width: `${Math.min(audioLevel * 100, 100)}%` }} />
                   <i style={{ left: `${settings.vadThreshold * 100}%` }} />
                 </div>
-                <input aria-label="Seuil vocal" type="range" min="0.02" max="0.6" step="0.01" value={settings.vadThreshold} onChange={(event) => saveSettings({ ...settings, vadThreshold: Number(event.target.value) })} />
+                <input aria-label="Voice threshold" type="range" min="0.02" max="0.6" step="0.01" value={settings.vadThreshold} onChange={(event) => saveSettings({ ...settings, vadThreshold: Number(event.target.value) })} />
               </div>
             </div>
           </section>
@@ -752,7 +752,7 @@ function DeviceSelect({
     <label>
       {label}
       <select value={value ?? ""} onChange={(event) => void onChange(kind, event.target.value)}>
-        <option value="">Par défaut</option>
+        <option value="">Default</option>
         {matching.map((device, index) => (
           <option key={device.deviceId} value={device.deviceId}>{device.label || `${label} ${index + 1}`}</option>
         ))}

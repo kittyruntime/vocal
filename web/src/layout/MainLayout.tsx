@@ -22,7 +22,7 @@ export function MainLayout({ currentUser }: { currentUser: CurrentUser }) {
     api
       .listChannels()
       .then((channels) => dispatch({ type: "channels/set", channels }))
-      .catch(() => showToast("Impossible de charger les channels"));
+      .catch(() => showToast("Could not load channels"));
   }, [showToast]);
 
   useEffect(() => {
@@ -108,10 +108,10 @@ export function MainLayout({ currentUser }: { currentUser: CurrentUser }) {
               }
             />
           ) : selectedChannel?.type !== "voice" ? (
-            <div className="no-channel">Aucun channel</div>
+            <div className="no-channel">No channel</div>
           ) : null}
           {voiceChannel ? (
-            <Suspense fallback={<div className="no-channel">Chargement du vocal…</div>}>
+            <Suspense fallback={<div className="no-channel">Loading voice…</div>}>
               <VoiceView
                 channel={voiceChannel}
                 currentUser={currentUser}
