@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import {
+  ConnectionError,
+  ConnectionErrorReason,
+  MediaDeviceFailure,
   Room,
   RoomEvent,
   Track,
@@ -18,7 +21,8 @@ import { Icon } from "../ui/Icon";
 import { audioProfiles, cameraProfiles, screenProfiles, type MediaQuality, type QualityProfile, type ScreenQuality } from "./quality";
 import { shouldOpenVoiceGate, VoiceGateProcessor } from "./VoiceGateProcessor";
 
-type VoiceStatus = "idle" | "connecting" | "connected";
+type VoiceStatus = "idle" | "connecting" | "connected" | "reconnecting";
+type MediaKind = "microphone" | "camera" | "screen";
 type DeviceSelections = Partial<Record<MediaDeviceKind, string>>;
 type CallParticipant = { identity: string; name: string; local: boolean };
 type VoiceSettings = {
@@ -57,6 +61,56 @@ function loadSettings(): VoiceSettings {
   } catch {
     return { devices: {}, vadThreshold: 0.15, pushToTalk: false, audioQuality: "standard", cameraQuality: "standard", screenQuality: "standard" };
   }
+}
+
+const MEDIA_ERROR_MESSAGES: Record<MediaKind, Partial<Record<MediaDeviceFailure, string>> & { default: string }> = {
+  microphone: {
+    [MediaDeviceFailure.PermissionDenied]: "Autorisation du microphone refusée. Vérifie les réglages de ton navigateur.",
+    [MediaDeviceFailure.NotFound]: "Aucun microphone détecté sur cet appareil.",
+    [MediaDeviceFailure.DeviceInUse]: "Le microphone est déjà utilisé par une autre application.",
+    default: "Impossible d’activer le microphone.",
+  },
+  camera: {
+    [MediaDeviceFailure.PermissionDenied]: "Autorisation de la caméra refusée. Vérifie les réglages de ton navigateur.",
+    [MediaDeviceFailure.NotFound]: "Aucune caméra détectée sur cet appareil.",
+    [MediaDeviceFailure.DeviceInUse]: "La caméra est déjà utilisée par une autre application.",
+    default: "Impossible d’activer la caméra.",
+  },
+  screen: {
+    // getDisplayMedia surfaces a cancelled picker as the same NotAllowedError
+    // browsers use for an outright permission refusal — there is no reliable
+    // way to tell the two apart, and "cancelled" is by far the more common
+    // real-world case for screen sharing (there is no separate persistent OS
+    // prompt to actively deny).
+    [MediaDeviceFailure.PermissionDenied]: "Partage d’écran annulé.",
+    default: "Impossible de partager l’écran.",
+  },
+};
+
+function describeMediaError(error: unknown, kind: MediaKind): string {
+  const failure = MediaDeviceFailure.getFailure(error);
+  const messages = MEDIA_ERROR_MESSAGES[kind];
+  return (failure && messages[failure]) || messages.default;
+}
+
+const UNREACHABLE_CONNECTION_REASONS = new Set([
+  ConnectionErrorReason.ServerUnreachable,
+  ConnectionErrorReason.WebSocket,
+  ConnectionErrorReason.Timeout,
+]);
+
+function describeJoinError(error: unknown): string {
+  if (error instanceof api.ApiError) {
+    return error.message === "not a voice channel"
+      ? "Ce salon n’est pas un salon vocal"
+      : `Connexion vocale refusée : ${error.message}`;
+  }
+  if (error instanceof ConnectionError) {
+    return UNREACHABLE_CONNECTION_REASONS.has(error.reason)
+      ? "Connexion réseau impossible. Vérifie ta connexion et réessaie."
+      : "Impossible de rejoindre le salon vocal";
+  }
+  return describeMediaError(error, "microphone");
 }
 
 export function VoiceView({
@@ -102,6 +156,7 @@ export function VoiceView({
   const voiceGateRef = useRef<VoiceGateProcessor | null>(null);
   const settingsRef = useRef(settings);
   const lastVoiceActivityRef = useRef(0);
+  const reconnectingRef = useRef(false);
 
   function saveSettings(next: typeof settings) {
     settingsRef.current = next;
@@ -230,6 +285,7 @@ export function VoiceView({
   async function joinRoom() {
     if (status !== "idle") return;
     setStatus("connecting");
+    reconnectingRef.current = false;
     const room = new Room({ adaptiveStream: true, dynacast: true });
     roomRef.current = room;
 
@@ -298,8 +354,18 @@ export function VoiceView({
     };
     room.on(RoomEvent.ParticipantConnected, refreshParticipants);
     room.on(RoomEvent.ParticipantDisconnected, refreshParticipants);
+    room.on(RoomEvent.Reconnecting, () => {
+      reconnectingRef.current = true;
+      if (roomRef.current === room) setStatus("reconnecting");
+    });
+    room.on(RoomEvent.Reconnected, () => {
+      reconnectingRef.current = false;
+      if (roomRef.current === room) setStatus("connected");
+    });
     room.on(RoomEvent.Disconnected, () => {
       if (roomRef.current === room) {
+        const lostAfterReconnecting = reconnectingRef.current;
+        reconnectingRef.current = false;
         roomRef.current = null;
         setStatus("idle");
         setMicrophoneEnabled(false);
@@ -311,6 +377,9 @@ export function VoiceView({
         setActiveSpeakerIds(new Set());
         setCallParticipants([]);
         clearMedia();
+        if (lostAfterReconnecting) {
+          showToast("Connexion vocale perdue après plusieurs tentatives de reconnexion.");
+        }
       }
     });
 
@@ -336,12 +405,7 @@ export function VoiceView({
       setStatus("idle");
       setMicrophoneEnabled(false);
       stopMeter();
-      const message = error instanceof api.ApiError
-        ? error.message === "not a voice channel"
-          ? "Ce salon n’est pas un salon vocal"
-          : `Connexion vocale refusée : ${error.message}`
-        : "Impossible de rejoindre le salon vocal";
-      showToast(message);
+      showToast(describeJoinError(error));
     }
   }
 
@@ -378,7 +442,7 @@ export function VoiceView({
   }
 
   useEffect(() => {
-    if (status !== "connected" || !settings.pushToTalk) return;
+    if ((status !== "connected" && status !== "reconnecting") || !settings.pushToTalk) return;
     const setPressed = (pressed: boolean) => {
       if (pttPressedRef.current === pressed) return;
       pttPressedRef.current = pressed;
@@ -387,7 +451,7 @@ export function VoiceView({
       const profile = audioProfiles[settings.audioQuality];
       void room.localParticipant.setMicrophoneEnabled(pressed, profile.capture, profile.publish).then(() => {
         setMicrophoneEnabled(pressed);
-      }).catch(() => showToast("Impossible de modifier le microphone"));
+      }).catch((error) => showToast(describeMediaError(error, "microphone")));
     };
     const isTyping = (target: EventTarget | null) => {
       const element = target as HTMLElement | null;
@@ -417,14 +481,14 @@ export function VoiceView({
 
   async function toggleMicrophone() {
     const room = roomRef.current;
-    if (!room || status !== "connected") return;
+    if (!room || (status !== "connected" && status !== "reconnecting")) return;
     const enabled = !microphoneEnabled;
     try {
       const profile = audioProfiles[settings.audioQuality];
       await room.localParticipant.setMicrophoneEnabled(enabled, profile.capture, profile.publish);
       setMicrophoneEnabled(enabled);
-    } catch {
-      showToast("Impossible de modifier le microphone");
+    } catch (error) {
+      showToast(describeMediaError(error, "microphone"));
     }
   }
 
@@ -439,7 +503,7 @@ export function VoiceView({
 
   async function toggleCamera() {
     const room = roomRef.current;
-    if (!room || status !== "connected") return;
+    if (!room || (status !== "connected" && status !== "reconnecting")) return;
     const enabled = !cameraEnabled;
     const previousTrack = room.localParticipant.getTrackPublication(Track.Source.Camera)?.track;
     try {
@@ -458,14 +522,14 @@ export function VoiceView({
         for (const element of previousTrack.detach()) element.remove();
       }
       setCameraEnabled(enabled);
-    } catch {
-      showToast("Impossible de modifier la caméra");
+    } catch (error) {
+      showToast(describeMediaError(error, "camera"));
     }
   }
 
   async function toggleScreenShare() {
     const room = roomRef.current;
-    if (!room || status !== "connected") return;
+    if (!room || (status !== "connected" && status !== "reconnecting")) return;
     const enabled = !screenShareEnabled;
     const previousTrack = room.localParticipant.getTrackPublication(Track.Source.ScreenShare)?.track;
     try {
@@ -484,8 +548,8 @@ export function VoiceView({
         for (const element of previousTrack.detach()) element.remove();
       }
       setScreenShareEnabled(enabled);
-    } catch {
-      showToast("Impossible de partager l’écran");
+    } catch (error) {
+      showToast(describeMediaError(error, "screen"));
     }
   }
 
@@ -516,12 +580,17 @@ export function VoiceView({
     <section className="voice-view" aria-label={`Salon vocal ${channel.name}`} hidden={!visible}>
       <header className="chat-header"><span className="header-channel-icon"><Icon name="volume" size={21} /></span> {channel.name}</header>
       <div className="voice-stage">
-        <div className={`voice-hero ${status === "connected" ? "is-connected" : ""}`}>
+        <div className={`voice-hero ${status === "connected" || status === "reconnecting" ? "is-connected" : ""}`}>
           <div className="voice-hero-icon"><Icon name="volume" size={28} /></div>
           <h1>{channel.name}</h1>
-          <p>{status === "connected" ? `${participantCount} participant${participantCount > 1 ? "s" : ""} · Connecté en tant que ${currentUser.username}` : "Rejoignez le salon pour parler, partager votre caméra ou votre écran."}</p>
+          <p>{status === "connected" || status === "reconnecting" ? `${participantCount} participant${participantCount > 1 ? "s" : ""} · Connecté en tant que ${currentUser.username}` : "Rejoignez le salon pour parler, partager votre caméra ou votre écran."}</p>
         </div>
-        {status === "connected" && !hasVideo ? (
+        {status === "reconnecting" ? (
+          <div className="voice-reconnect-banner" role="status">
+            <span className="connecting-dots" aria-hidden="true"><i /><i /><i /></span> Reconnexion en cours…
+          </div>
+        ) : null}
+        {(status === "connected" || status === "reconnecting") && !hasVideo ? (
           <div className="voice-participant-grid" aria-label="Participants à l’appel">
             {callParticipants.map((participant) => {
               const speaking = activeSpeakerIds.has(participant.identity) || (participant.local && localSpeaking);
