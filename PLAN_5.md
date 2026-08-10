@@ -31,6 +31,10 @@ Dernière mise à jour : 2026-08-10
 - [x] Correction des POST sans body (`voice-token` n'envoie plus un faux JSON vide).
 - [x] Polish visuel : typographie système stable, icônes SVG et hiérarchie affinée.
 - [x] Icônes standardisées avec Lucide (suppression des tracés SVG maison).
+- [x] Vue d'appel audio dédiée, compteur de participants et grille vidéo adaptative.
+- [x] Animations d'entrée, de connexion, de prise de parole et respect de `prefers-reduced-motion`.
+- [x] Profils persistants de qualité audio, webcam et partage d'écran appliqués à LiveKit.
+- [x] Mode partage « Jeu » en 1080p à 60 ips (8 Mb/s, priorité à la fluidité).
 
 ## À faire ensuite
 
@@ -42,8 +46,10 @@ Dernière mise à jour : 2026-08-10
 ## Point de reprise
 
 Le composant principal est `web/src/voice/VoiceView.tsx`. La refonte frontend,
-les périphériques, le vumètre, le push-to-talk et l'inscription publique sont
-implémentés. Le `400` Fastify sur `voice-token` est corrigé à la source. Le
-prochain point prioritaire est de redéployer sur Coolify puis de tester le média
-à deux navigateurs. Toute nouvelle tranche doit finir par les tests frontend et
-backend, les typechecks, le build, puis une mise à jour de ce fichier.
+les périphériques, le vumètre, le push-to-talk, les vues d'appel animées, les
+profils de qualité et l'inscription publique sont implémentés. Le `400` Fastify
+sur `voice-token` est corrigé à la source. Le prochain point prioritaire est de
+redéployer sur Coolify puis de tester le média à deux navigateurs, notamment le
+mode Jeu selon les limites du navigateur et de la connexion. Toute nouvelle
+tranche doit finir par les tests frontend et backend, les typechecks, le build,
+puis une mise à jour de ce fichier.
