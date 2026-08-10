@@ -178,14 +178,25 @@ export function registerAuthRoutes(app: FastifyInstance, pool: pg.Pool): void {
 
   app.patch("/api/me", { preHandler: app.requireAuth }, async (req, reply) => {
     const body = profileSchema.safeParse(req.body);
-    if (!body.success) return reply.code(400).send({ error: "invalid profile" });
+    if (!body.success) {
+      const field = body.error.issues[0]?.path[0];
+      const labels: Record<string, string> = {
+        username: "username",
+        email: "email address",
+        description: "description",
+        avatarUrl: "profile picture",
+      };
+      return reply.code(400).send({ error: `invalid ${labels[String(field)] ?? "profile"}` });
+    }
     try {
-      await pool.query(
+      const updated = await pool.query(
         `UPDATE users
          SET username = $1, email = $2, avatar_url = $3, description = $4
-         WHERE id = $5`,
+         WHERE id = $5
+         RETURNING username, email, avatar_url AS "avatarUrl", description`,
         [body.data.username, body.data.email, body.data.avatarUrl, body.data.description, req.user!.id],
       );
+      return { ...req.user!, ...updated.rows[0] };
     } catch (err: any) {
       if (err?.code === "23505") {
         const emailConflict = String(err.constraint ?? "").includes("email");
@@ -193,11 +204,5 @@ export function registerAuthRoutes(app: FastifyInstance, pool: pg.Pool): void {
       }
       throw err;
     }
-    const updated = await pool.query(
-      `SELECT username, email, avatar_url AS "avatarUrl", description
-       FROM users WHERE id = $1`,
-      [req.user!.id],
-    );
-    return { ...req.user!, ...updated.rows[0] };
   });
 }
