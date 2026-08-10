@@ -26,7 +26,7 @@ const loginSchema = z.object({
 
 const profileSchema = z.object({
   username: z.string().trim().min(2).max(32).regex(/^[a-zA-Z0-9_.-]+$/),
-  email: z.union([z.string().trim().email().max(254), z.literal("")]).transform((value) => value || null),
+  email: z.union([z.string().trim().email().max(254), z.literal(""), z.null()]).transform((value) => value || null),
   description: z.string().trim().max(190),
   avatarUrl: z.union([
     z.string().max(700_000).regex(/^data:image\/(?:png|jpeg|webp|gif);base64,[A-Za-z0-9+/]+=*$/),

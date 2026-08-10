@@ -123,6 +123,17 @@ describe("profile", () => {
     expect(me.json()).toMatchObject({ username: "theophile", email: "theo@example.com", description: "Building Vocal", avatarUrl });
   });
 
+  it("allows a profile without an email address", async () => {
+    const setup = await app.inject({ method: "POST", url: "/api/setup",
+      payload: { username: "theo", password: "correct horse battery" } });
+    const update = await app.inject({
+      method: "PATCH", url: "/api/me", headers: { cookie: sidCookie(setup) },
+      payload: { username: "theo", email: null, description: "No public email", avatarUrl: null },
+    });
+    expect(update.statusCode).toBe(200);
+    expect(update.json()).toMatchObject({ email: null, description: "No public email" });
+  });
+
   it("rejects duplicate usernames and invalid profile images", async () => {
     const setup = await app.inject({ method: "POST", url: "/api/setup",
       payload: { username: "theo", password: "correct horse battery" } });
