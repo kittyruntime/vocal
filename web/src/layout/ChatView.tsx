@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, type DragEvent, type FormEvent, type UIEvent } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ClipboardEvent, type DragEvent, type FormEvent, type UIEvent } from "react";
 import type { Channel, Message } from "../api/client";
 import * as api from "../api/client";
 import { useToast } from "../toast/ToastContext";
@@ -139,6 +139,17 @@ export function ChatView({
     requestAnimationFrame(() => composerInputRef.current?.focus());
   }
 
+  function handlePaste(event: ClipboardEvent<HTMLDivElement>) {
+    const pastedFiles = [...event.clipboardData.items]
+      .filter((item) => item.kind === "file")
+      .map((item) => item.getAsFile())
+      .filter((file): file is File => file !== null);
+    if (pastedFiles.length === 0) return;
+    event.preventDefault();
+    addFiles(pastedFiles);
+    requestAnimationFrame(() => composerInputRef.current?.focus());
+  }
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     const content = draft.trim();
@@ -157,7 +168,7 @@ export function ChatView({
   }
 
   return (
-    <div className={`chat-view ${dragActive ? "is-dragging-files" : ""}`} onDragEnter={handleDragEnter} onDragOver={(event) => {
+    <div className={`chat-view ${dragActive ? "is-dragging-files" : ""}`} onPaste={handlePaste} onDragEnter={handleDragEnter} onDragOver={(event) => {
       if (event.dataTransfer.types.includes("Files")) {
         event.preventDefault();
         event.dataTransfer.dropEffect = "copy";
