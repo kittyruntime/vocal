@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useReducer } from "react";
+import { lazy, Suspense, useCallback, useEffect, useReducer } from "react";
 import type { CurrentUser } from "../api/client";
 import * as api from "../api/client";
 import { appReducer, initialAppState } from "../store/appState";
@@ -9,6 +9,8 @@ import { Sidebar } from "./Sidebar";
 import { ChatView } from "./ChatView";
 import { UserBar } from "./UserBar";
 import { ConnectionBanner } from "./ConnectionBanner";
+
+const VoiceView = lazy(() => import("../voice/VoiceView").then((module) => ({ default: module.VoiceView })));
 
 export function MainLayout({ currentUser }: { currentUser: CurrentUser }) {
   const { signOut } = useAuth();
@@ -45,6 +47,15 @@ export function MainLayout({ currentUser }: { currentUser: CurrentUser }) {
           case "channel.deleted":
             dispatch({ type: "channel/removed", channelId: event.channelId });
             break;
+          case "voice.sync":
+            dispatch({ type: "voice/sync", channels: event.channels });
+            break;
+          case "voice.joined":
+            dispatch({ type: "voice/joined", channelId: event.channelId, userId: event.userId });
+            break;
+          case "voice.left":
+            dispatch({ type: "voice/left", channelId: event.channelId, userId: event.userId });
+            break;
         }
       },
       onStatusChange(status) {
@@ -69,6 +80,7 @@ export function MainLayout({ currentUser }: { currentUser: CurrentUser }) {
             channels={state.channels}
             selectedChannelId={state.selectedChannelId}
             onlineUserIds={state.onlineUserIds}
+            voiceOccupancy={state.voiceOccupancy}
             currentUser={currentUser}
             onSelectChannel={selectChannel}
             onChannelCreated={(channel) => dispatch({ type: "channel/added", channel })}
@@ -76,7 +88,7 @@ export function MainLayout({ currentUser }: { currentUser: CurrentUser }) {
           <UserBar currentUser={currentUser} onSignOut={signOut} />
         </aside>
         <div className="main-content">
-          {selectedChannel ? (
+          {selectedChannel?.type === "text" ? (
             <ChatView
               channel={selectedChannel}
               messages={state.messagesByChannel[selectedChannel.id] ?? []}
@@ -87,6 +99,10 @@ export function MainLayout({ currentUser }: { currentUser: CurrentUser }) {
                 dispatch({ type: "messages/prepended", channelId: selectedChannel.id, messages })
               }
             />
+          ) : selectedChannel?.type === "voice" ? (
+            <Suspense fallback={<div className="no-channel">Chargement du vocal…</div>}>
+              <VoiceView channel={selectedChannel} currentUser={currentUser} />
+            </Suspense>
           ) : (
             <div className="no-channel">Aucun channel</div>
           )}

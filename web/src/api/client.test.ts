@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { ApiError, getSetupStatus, login, getMe, listChannels, postMessage } from "./client";
+import { ApiError, getSetupStatus, login, getMe, getVoiceToken, listChannels, postMessage } from "./client";
 
 function mockFetchOnce(status: number, body: unknown) {
   vi.stubGlobal(
@@ -53,5 +53,13 @@ describe("api client", () => {
     });
     const msg = await postMessage("c1", "hi");
     expect(msg.content).toBe("hi");
+  });
+
+  it("requests a short-lived token for a voice channel", async () => {
+    mockFetchOnce(201, { token: "jwt", url: "ws://localhost:7880" });
+    await expect(getVoiceToken("c2")).resolves.toEqual({ token: "jwt", url: "ws://localhost:7880" });
+    const [url, init] = (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(url).toBe("/api/channels/c2/voice-token");
+    expect(init.method).toBe("POST");
   });
 });

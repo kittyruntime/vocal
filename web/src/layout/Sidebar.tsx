@@ -7,6 +7,7 @@ export function Sidebar({
   channels,
   selectedChannelId,
   onlineUserIds,
+  voiceOccupancy,
   currentUser,
   onSelectChannel,
   onChannelCreated,
@@ -14,6 +15,7 @@ export function Sidebar({
   channels: Channel[];
   selectedChannelId: string | null;
   onlineUserIds: string[];
+  voiceOccupancy: Record<string, string[]>;
   currentUser: CurrentUser;
   onSelectChannel(channelId: string): void;
   onChannelCreated(channel: Channel): void;
@@ -27,12 +29,16 @@ export function Sidebar({
       <ChannelGroup
         title="Salons textuels"
         channels={textChannels}
+        voiceOccupancy={voiceOccupancy}
+        currentUserId={currentUser.id}
         selectedChannelId={selectedChannelId}
         onSelectChannel={onSelectChannel}
       />
       <ChannelGroup
         title="Salons vocaux"
         channels={voiceChannels}
+        voiceOccupancy={voiceOccupancy}
+        currentUserId={currentUser.id}
         selectedChannelId={selectedChannelId}
         onSelectChannel={onSelectChannel}
       />
@@ -50,11 +56,15 @@ export function Sidebar({
 function ChannelGroup({
   title,
   channels,
+  voiceOccupancy,
+  currentUserId,
   selectedChannelId,
   onSelectChannel,
 }: {
   title: string;
   channels: Channel[];
+  voiceOccupancy: Record<string, string[]>;
+  currentUserId: string;
   selectedChannelId: string | null;
   onSelectChannel(channelId: string): void;
 }) {
@@ -63,8 +73,9 @@ function ChannelGroup({
     <section>
       <h2>{title}</h2>
       <ul>
-        {channels.map((channel) => (
-          <li key={channel.id}>
+        {channels.map((channel) => {
+          const occupants = voiceOccupancy[channel.id] ?? [];
+          return <li key={channel.id}>
             <button
               type="button"
               className={channel.id === selectedChannelId ? "channel-link active" : "channel-link"}
@@ -72,8 +83,15 @@ function ChannelGroup({
             >
               {channel.type === "voice" ? "🔊" : "#"} {channel.name}
             </button>
-          </li>
-        ))}
+            {channel.type === "voice" && occupants.length > 0 && (
+              <ul className="voice-occupants" aria-label={`Participants dans ${channel.name}`}>
+                {occupants.map((userId) => (
+                  <li key={userId}>{userId === currentUserId ? "Vous" : userId}</li>
+                ))}
+              </ul>
+            )}
+          </li>;
+        })}
       </ul>
     </section>
   );
