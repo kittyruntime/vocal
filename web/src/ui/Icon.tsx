@@ -18,6 +18,7 @@ import {
   Settings,
   Volume2,
   Upload,
+  Users,
   X,
   type LucideIcon,
 } from "lucide-react";
@@ -42,6 +43,7 @@ type IconName =
   | "settings"
   | "volume"
   | "upload"
+  | "users"
   | "close";
 
 const icons: Record<IconName, LucideIcon> = {
@@ -64,6 +66,7 @@ const icons: Record<IconName, LucideIcon> = {
   settings: Settings,
   volume: Volume2,
   upload: Upload,
+  users: Users,
   close: X,
 };
 
