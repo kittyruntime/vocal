@@ -85,6 +85,16 @@ summary:focus-visible {
   cursor: pointer;
 }
 
+.auth-card .auth-link {
+  padding: 4px;
+  background: transparent;
+  color: #00a8fc;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.auth-card .auth-link:hover { text-decoration: underline; }
+
 .auth-error,
 .auth-error-screen,
 .error-boundary-screen { color: #fa777c; text-align: center; }

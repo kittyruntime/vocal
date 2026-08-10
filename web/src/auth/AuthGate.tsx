@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { useAuth } from "./AuthContext";
 import type { CurrentUser } from "../api/client";
 import { SetupScreen } from "./SetupScreen";
@@ -7,6 +7,9 @@ import { RegisterScreen } from "./RegisterScreen";
 
 export function AuthGate({ children }: { children(user: CurrentUser): ReactNode }) {
   const { state, refresh } = useAuth();
+  const params = new URLSearchParams(window.location.search);
+  const invite = params.get("invite") ?? undefined;
+  const [showRegister, setShowRegister] = useState(Boolean(invite));
 
   if (state.phase === "loading") return <div className="auth-loading">Chargement…</div>;
   if (state.phase === "error") {
@@ -24,9 +27,9 @@ export function AuthGate({ children }: { children(user: CurrentUser): ReactNode 
   }
   if (state.phase === "needs-setup") return <SetupScreen />;
   if (state.phase === "signed-out") {
-    const params = new URLSearchParams(window.location.search);
-    const invite = params.get("invite");
-    return invite ? <RegisterScreen inviteToken={invite} /> : <LoginScreen />;
+    return showRegister
+      ? <RegisterScreen inviteToken={invite} onShowLogin={() => setShowRegister(false)} />
+      : <LoginScreen onShowRegister={() => setShowRegister(true)} />;
   }
   return <>{children(state.user)}</>;
 }

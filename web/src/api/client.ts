@@ -32,10 +32,11 @@ export class ApiError extends Error {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const hasBody = init?.body !== undefined && init.body !== null;
   const res = await fetch(path, {
     ...init,
     credentials: "include",
-    headers: { "content-type": "application/json", ...init?.headers },
+    headers: { ...(hasBody ? { "content-type": "application/json" } : {}), ...init?.headers },
   });
   if (res.status === 204) return undefined as T;
   const body: unknown = await res.json().catch(() => ({}));
@@ -61,10 +62,10 @@ export function login(username: string, password: string): Promise<{ ok: true }>
   return request("/api/auth/login", { method: "POST", body: JSON.stringify({ username, password }) });
 }
 
-export function register(inviteToken: string, username: string, password: string): Promise<{ ok: true }> {
+export function register(username: string, password: string, inviteToken?: string): Promise<{ ok: true }> {
   return request("/api/auth/register", {
     method: "POST",
-    body: JSON.stringify({ inviteToken, username, password }),
+    body: JSON.stringify({ username, password, ...(inviteToken ? { inviteToken } : {}) }),
   });
 }
 

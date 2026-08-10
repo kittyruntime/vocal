@@ -65,6 +65,15 @@ describe("AuthGate", () => {
     expect(await screen.findByText("Connexion")).toBeInTheDocument();
   });
 
+  it("allows a signed-out visitor to open public registration", async () => {
+    vi.mocked(api.getSetupStatus).mockResolvedValue({ done: true });
+    vi.mocked(api.getMe).mockRejectedValue(new ApiError(401, "authentication required"));
+    renderGate();
+    await screen.findByText("Connexion");
+    await userEvent.setup().click(screen.getByRole("button", { name: "Créer un compte" }));
+    expect(await screen.findByText("Rejoindre Vocal")).toBeInTheDocument();
+  });
+
   it("shows an inline error when login fails", async () => {
     vi.mocked(api.getSetupStatus).mockResolvedValue({ done: true });
     vi.mocked(api.getMe).mockRejectedValue(new ApiError(401, "authentication required"));
@@ -128,5 +137,6 @@ describe("AuthGate", () => {
 
     expect(await screen.findByText("Contenu protégé pour theo")).toBeInTheDocument();
     expect(window.location.search).toBe("");
+    expect(api.register).toHaveBeenCalledWith("theo", "correct horse battery", "abc123");
   });
 });
