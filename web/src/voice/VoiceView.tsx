@@ -57,7 +57,15 @@ function loadSettings(): VoiceSettings {
   }
 }
 
-export function VoiceView({ channel, currentUser }: { channel: Channel; currentUser: CurrentUser }) {
+export function VoiceView({
+  channel,
+  currentUser,
+  visible = true,
+}: {
+  channel: Channel;
+  currentUser: CurrentUser;
+  visible?: boolean;
+}) {
   const { showToast } = useToast();
   const [status, setStatus] = useState<VoiceStatus>("idle");
   const [microphoneEnabled, setMicrophoneEnabled] = useState(false);
@@ -70,6 +78,7 @@ export function VoiceView({ channel, currentUser }: { channel: Channel; currentU
   const [participantCount, setParticipantCount] = useState(1);
   const [remoteVideoCount, setRemoteVideoCount] = useState(0);
   const [remoteScreenCount, setRemoteScreenCount] = useState(0);
+  const [activeSpeakerLabels, setActiveSpeakerLabels] = useState<string[]>([]);
   const roomRef = useRef<Room | null>(null);
   const audioRef = useRef<HTMLDivElement>(null);
   const remoteVideoRef = useRef<HTMLDivElement>(null);
@@ -144,6 +153,7 @@ export function VoiceView({ channel, currentUser }: { channel: Channel; currentU
     setParticipantCount(1);
     setRemoteVideoCount(0);
     setRemoteScreenCount(0);
+    setActiveSpeakerLabels([]);
     activeSpeakersRef.current.clear();
     stopMeter();
   }
@@ -211,6 +221,7 @@ export function VoiceView({ channel, currentUser }: { channel: Channel; currentU
     });
     room.on(RoomEvent.ActiveSpeakersChanged, (speakers: Participant[]) => {
       updateSpeakingTiles(new Set(speakers.map((participant) => participant.identity)));
+      setActiveSpeakerLabels(speakers.map((participant) => participant.name || participant.identity));
     });
     const refreshParticipantCount = () => setParticipantCount(room.remoteParticipants.size + 1);
     room.on(RoomEvent.ParticipantConnected, refreshParticipantCount);
@@ -225,6 +236,7 @@ export function VoiceView({ channel, currentUser }: { channel: Channel; currentU
         setParticipantCount(1);
         setRemoteVideoCount(0);
         setRemoteScreenCount(0);
+        setActiveSpeakerLabels([]);
         clearMedia();
       }
     });
@@ -400,9 +412,13 @@ export function VoiceView({ channel, currentUser }: { channel: Channel; currentU
 
   const hasVideo = cameraEnabled || screenShareEnabled || remoteVideoCount > 0;
   const hasScreenShare = screenShareEnabled || remoteScreenCount > 0;
+  const localSpeaking = microphoneEnabled && audioLevel >= settings.vadThreshold;
+  const speakingLabels = localSpeaking && !activeSpeakerLabels.includes(currentUser.username)
+    ? [currentUser.username, ...activeSpeakerLabels]
+    : activeSpeakerLabels;
 
   return (
-    <section className="voice-view" aria-label={`Salon vocal ${channel.name}`}>
+    <section className="voice-view" aria-label={`Salon vocal ${channel.name}`} hidden={!visible}>
       <header className="chat-header"><span className="header-channel-icon"><Icon name="volume" size={21} /></span> {channel.name}</header>
       <div className="voice-stage">
         <div className={`voice-hero ${status === "connected" ? "is-connected" : ""}`}>
@@ -410,6 +426,14 @@ export function VoiceView({ channel, currentUser }: { channel: Channel; currentU
           <h1>{channel.name}</h1>
           <p>{status === "connected" ? `${participantCount} participant${participantCount > 1 ? "s" : ""} · Connecté en tant que ${currentUser.username}` : "Rejoignez le salon pour parler, partager votre caméra ou votre écran."}</p>
         </div>
+        {status === "connected" ? (
+          <div className={`speaking-indicator ${speakingLabels.length > 0 ? "is-active" : ""}`} role="status">
+            <i aria-hidden="true" />
+            {speakingLabels.length > 0
+              ? `${speakingLabels.slice(0, 2).join(" et ")}${speakingLabels.length > 2 ? ` +${speakingLabels.length - 2}` : ""} ${speakingLabels.length > 1 ? "parlent" : "parle"}`
+              : "Personne ne parle"}
+          </div>
+        ) : null}
         {status === "connected" && !hasVideo ? (
           <div className="call-audio-view">
             <div className="call-avatar-wrap">

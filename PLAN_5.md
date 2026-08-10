@@ -35,6 +35,8 @@ Dernière mise à jour : 2026-08-10
 - [x] Animations d'entrée, de connexion, de prise de parole et respect de `prefers-reduced-motion`.
 - [x] Profils persistants de qualité audio, webcam et partage d'écran appliqués à LiveKit.
 - [x] Mode partage « Jeu » en 1080p à 60 ips (8 Mb/s, priorité à la fluidité).
+- [x] Session vocale persistante pendant la navigation dans les salons textuels.
+- [x] Indicateur nominatif du locuteur actif en vue audio, vidéo et partage.
 
 ## À faire ensuite
 
