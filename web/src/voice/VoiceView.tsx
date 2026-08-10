@@ -16,6 +16,7 @@ import * as api from "../api/client";
 import { useToast } from "../toast/ToastContext";
 import { Icon } from "../ui/Icon";
 import { audioProfiles, cameraProfiles, screenProfiles, type MediaQuality, type QualityProfile, type ScreenQuality } from "./quality";
+import { shouldOpenVoiceGate, VoiceGateProcessor } from "./VoiceGateProcessor";
 
 type VoiceStatus = "idle" | "connecting" | "connected";
 type DeviceSelections = Partial<Record<MediaDeviceKind, string>>;
@@ -98,8 +99,12 @@ export function VoiceView({
   const meterFrameRef = useRef<number | null>(null);
   const pttPressedRef = useRef(false);
   const lastVisibleChannelRef = useRef<string | null>(null);
+  const voiceGateRef = useRef<VoiceGateProcessor | null>(null);
+  const settingsRef = useRef(settings);
+  const lastVoiceActivityRef = useRef(0);
 
   function saveSettings(next: typeof settings) {
+    settingsRef.current = next;
     setSettings(next);
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(next));
   }
@@ -110,6 +115,9 @@ export function VoiceView({
     const cleanup = meterCleanupRef.current;
     meterCleanupRef.current = null;
     if (cleanup) void cleanup();
+    const gate = voiceGateRef.current;
+    voiceGateRef.current = null;
+    if (gate) void gate.destroy();
     setAudioLevel(0);
   }
 
@@ -119,12 +127,31 @@ export function VoiceView({
       const analyser = createAudioAnalyser(track, { cloneTrack: true, smoothingTimeConstant: 0.7 });
       meterCleanupRef.current = analyser.cleanup;
       const update = () => {
-        setAudioLevel(analyser.calculateVolume());
+        const level = analyser.calculateVolume();
+        setAudioLevel(level);
+        const gate = voiceGateRef.current;
+        if (gate && !settingsRef.current.pushToTalk) {
+          const now = performance.now();
+          if (level >= settingsRef.current.vadThreshold) lastVoiceActivityRef.current = now;
+          gate.setOpen(shouldOpenVoiceGate(level, settingsRef.current.vadThreshold, now, lastVoiceActivityRef.current));
+        }
         meterFrameRef.current = requestAnimationFrame(update);
       };
       update();
     } catch {
       // The audio call remains usable on browsers without Web Audio support.
+    }
+  }
+
+  async function installVoiceGate(track: LocalAudioTrack) {
+    const gate = new VoiceGateProcessor();
+    try {
+      await track.setProcessor(gate);
+      voiceGateRef.current = gate;
+      lastVoiceActivityRef.current = 0;
+    } catch {
+      await gate.destroy();
+      showToast("La détection vocale n’est pas prise en charge par ce navigateur");
     }
   }
 
@@ -188,12 +215,16 @@ export function VoiceView({
   }, [settingsOpen]);
 
   useEffect(() => {
-    setSettings((value) => ({
-      ...value,
-      audioQuality: channel.defaultAudioQuality ?? "standard",
-      cameraQuality: channel.defaultCameraQuality ?? "standard",
-      screenQuality: channel.defaultScreenQuality ?? "standard",
-    }));
+    setSettings((value) => {
+      const next = {
+        ...value,
+        audioQuality: channel.defaultAudioQuality ?? "standard",
+        cameraQuality: channel.defaultCameraQuality ?? "standard",
+        screenQuality: channel.defaultScreenQuality ?? "standard",
+      };
+      settingsRef.current = next;
+      return next;
+    });
   }, [channel.id]);
 
   async function joinRoom() {
@@ -292,7 +323,10 @@ export function VoiceView({
       const audioProfile = audioProfiles[settings.audioQuality];
       const microphone = await room.localParticipant.setMicrophoneEnabled(!settings.pushToTalk, audioProfile.capture, audioProfile.publish);
       setMicrophoneEnabled(!settings.pushToTalk);
-      if (microphone?.audioTrack) startMeter(microphone.audioTrack);
+      if (microphone?.audioTrack) {
+        startMeter(microphone.audioTrack);
+        if (!settings.pushToTalk) await installVoiceGate(microphone.audioTrack);
+      }
       setDevices(await Room.getLocalDevices(undefined, false));
       refreshParticipants();
       setStatus("connected");
@@ -330,7 +364,13 @@ export function VoiceView({
     pttPressedRef.current = false;
     try {
       const profile = audioProfiles[settings.audioQuality];
-      await room.localParticipant.setMicrophoneEnabled(!enabled, profile.capture, profile.publish);
+      const publication = await room.localParticipant.setMicrophoneEnabled(!enabled, profile.capture, profile.publish);
+      if (enabled) {
+        voiceGateRef.current = null;
+        if (publication?.audioTrack?.getProcessor()) await publication.audioTrack.stopProcessor();
+      } else if (publication?.audioTrack) {
+        await installVoiceGate(publication.audioTrack);
+      }
       setMicrophoneEnabled(!enabled);
     } catch {
       showToast("Impossible d’activer le push-to-talk");
