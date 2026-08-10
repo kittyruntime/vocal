@@ -13,6 +13,7 @@ export function Sidebar({
   onlineUserIds,
   voiceOccupancy,
   voiceSpeakingUserIds,
+  unreadChannelIds,
   currentUser,
   onSelectChannel,
   onChannelCreated,
@@ -24,6 +25,7 @@ export function Sidebar({
   onlineUserIds: string[];
   voiceOccupancy: Record<string, VoiceParticipant[]>;
   voiceSpeakingUserIds?: string[];
+  unreadChannelIds?: string[];
   currentUser: CurrentUser;
   onSelectChannel(channelId: string): void;
   onChannelCreated(channel: Channel): void;
@@ -52,6 +54,7 @@ export function Sidebar({
         voiceOccupancy={voiceOccupancy}
         currentUserId={currentUser.id}
         selectedChannelId={selectedChannelId}
+        unreadChannelIds={unreadChannelIds}
         onSelectChannel={onSelectChannel}
         onEditChannel={canManageChannels ? setEditingChannelId : undefined}
       />
@@ -62,6 +65,7 @@ export function Sidebar({
         voiceSpeakingUserIds={voiceSpeakingUserIds}
         currentUserId={currentUser.id}
         selectedChannelId={selectedChannelId}
+        unreadChannelIds={unreadChannelIds}
         onSelectChannel={onSelectChannel}
         onEditChannel={canManageChannels ? setEditingChannelId : undefined}
       />
@@ -95,6 +99,7 @@ function ChannelGroup({
   voiceSpeakingUserIds,
   currentUserId,
   selectedChannelId,
+  unreadChannelIds,
   onSelectChannel,
   onEditChannel,
 }: {
@@ -104,6 +109,7 @@ function ChannelGroup({
   voiceSpeakingUserIds?: string[];
   currentUserId: string;
   selectedChannelId: string | null;
+  unreadChannelIds?: string[];
   onSelectChannel(channelId: string): void;
   onEditChannel?(channelId: string): void;
 }) {
@@ -114,15 +120,18 @@ function ChannelGroup({
       <ul>
         {channels.map((channel) => {
           const occupants = voiceOccupancy[channel.id] ?? [];
+          const unread = channel.type === "text" && (unreadChannelIds?.includes(channel.id) ?? false);
           return <li key={channel.id}>
             <div className="channel-row">
               <button
                 type="button"
-                className={channel.id === selectedChannelId ? "channel-link active" : "channel-link"}
+                className={`${channel.id === selectedChannelId ? "channel-link active" : "channel-link"} ${unread ? "has-unread" : ""}`}
+                aria-label={unread ? `${channel.name}, unread messages` : channel.name}
                 onClick={() => onSelectChannel(channel.id)}
               >
                 <span className="channel-icon" aria-hidden="true"><Icon name={channel.type === "voice" ? "volume" : "hash"} /></span>
                 <span className="channel-name">{channel.name}</span>
+                {unread ? <span className="channel-unread-dot" aria-hidden="true" /> : null}
               </button>
               {onEditChannel ? (
                 <button

@@ -101,4 +101,20 @@ describe("appReducer", () => {
     const state = appReducer(initialAppState, { type: "connection/status", status: "open" });
     expect(state.connectionStatus).toBe("open");
   });
+
+  it("marks background messages unread and clears them when the channel opens", () => {
+    const base: AppState = { ...initialAppState, currentUser: { id: "u1", username: "theo", capabilities: [] }, selectedChannelId: "c1" };
+    const incoming = { ...msg("m2", "c2", "hello"), userId: "u2" };
+    const unread = appReducer(base, { type: "message/received", message: incoming });
+    expect(unread.unreadChannelIds).toEqual(["c2"]);
+    const opened = appReducer(unread, { type: "channel/selected", channelId: "c2" });
+    expect(opened.unreadChannelIds).toEqual([]);
+  });
+
+  it("does not mark the open channel or the current user's messages unread", () => {
+    const base: AppState = { ...initialAppState, currentUser: { id: "u1", username: "theo", capabilities: [] }, selectedChannelId: "c1" };
+    const visible = appReducer(base, { type: "message/received", message: { ...msg("m2", "c1", "visible"), userId: "u2" } });
+    const own = { ...msg("m3", "c2", "own"), userId: "u1" };
+    expect(appReducer(visible, { type: "message/received", message: own }).unreadChannelIds).toEqual([]);
+  });
 });

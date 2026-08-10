@@ -182,6 +182,9 @@ summary:focus-visible {
 .channel-link.active { background: #404249; color: #fff; }
 .channel-icon { width: 20px; flex: 0 0 20px; display: grid; place-items: center; color: #80848e; }
 .channel-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+.channel-link.has-unread { position: relative; color: #f2f3f5; font-weight: 600; }
+.channel-unread-dot { width: 8px; height: 8px; flex: 0 0 8px; margin-left: auto; border-radius: 50%; background: #f2f3f5; box-shadow: 0 0 0 3px rgb(242 243 245 / 8%); }
+.channel-link.has-unread::before { position: absolute; left: -8px; width: 4px; height: 8px; border-radius: 0 4px 4px 0; background: #f2f3f5; content: ""; }
 
 .channel-row { display: flex; align-items: center; gap: 2px; }
 .channel-row .channel-link { flex: 1; min-width: 0; }

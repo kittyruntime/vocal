@@ -19,7 +19,7 @@ const channels: Channel[] = [
   { id: "c2", name: "salle", type: "voice", requiredCapability: null, position: 1, createdAt: "now" },
 ];
 
-function renderSidebar(user: CurrentUser, onSelect = vi.fn(), onCreated = vi.fn()) {
+function renderSidebar(user: CurrentUser, onSelect = vi.fn(), onCreated = vi.fn(), unreadChannelIds: string[] = []) {
   render(
     <ToastProvider>
       <Sidebar
@@ -27,6 +27,7 @@ function renderSidebar(user: CurrentUser, onSelect = vi.fn(), onCreated = vi.fn(
         selectedChannelId="c1"
         onlineUserIds={["u1"]}
         voiceOccupancy={{ c2: [{ userId: "u1", username: "theo" }, { userId: "u2", username: "alice" }] }}
+        unreadChannelIds={unreadChannelIds}
         currentUser={user}
         onSelectChannel={onSelect}
         onChannelCreated={onCreated}
@@ -53,6 +54,13 @@ describe("Sidebar", () => {
     renderSidebar(admin, onSelect);
     await userEvent.setup().click(screen.getByText("général", { exact: false }));
     expect(onSelect).toHaveBeenCalledWith("c1");
+  });
+
+  it("shows an accessible unread marker on text channels", () => {
+    renderSidebar(admin, vi.fn(), vi.fn(), ["c1"]);
+    const channel = screen.getByRole("button", { name: "général, unread messages" });
+    expect(channel).toHaveClass("has-unread");
+    expect(channel.querySelector(".channel-unread-dot")).toBeInTheDocument();
   });
 
   it("shows the create-channel form only to admins", () => {
