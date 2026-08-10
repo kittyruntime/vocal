@@ -213,7 +213,8 @@ describe("VoiceView", () => {
     act(() => roomHandlers.get("activeSpeakersChanged")?.([{ identity: "u1", name: "theo" }]));
 
     expect(participantName.closest(".voice-participant")).toHaveClass("is-speaking");
-    expect(screen.getByText("Speaking")).toBeInTheDocument();
+    expect(screen.queryByText("Speaking")).not.toBeInTheDocument();
+    expect(screen.queryByText("Listening")).not.toBeInTheDocument();
   });
 
   it("keeps the voice session connected while the view is hidden", async () => {
