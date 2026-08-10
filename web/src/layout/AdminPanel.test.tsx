@@ -17,7 +17,7 @@ function renderPanel(users: AdminUser[] = [alice]) {
   vi.mocked(api.listAdminUsers).mockResolvedValue(users);
   vi.mocked(api.getAdminSettings).mockResolvedValue({ registrationOpen: true });
   return render(
-    <AdminPanel channels={[]} currentUser={admin} onChannelUpdated={vi.fn()} onChannelDeleted={vi.fn()} onClose={vi.fn()} />,
+    <AdminPanel currentUser={admin} onClose={vi.fn()} />,
   );
 }
 
