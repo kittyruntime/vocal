@@ -763,10 +763,10 @@ export function VoiceView({
               <Icon name="headphones" size={19} />
             </button>
             <button type="button" title={cameraEnabled ? "Stop camera" : "Turn on camera"} aria-label={cameraEnabled ? "Stop camera" : "Turn on camera"} className={!cameraEnabled ? "control-off" : ""} aria-pressed={cameraEnabled} onClick={() => void toggleCamera()}>
-              <Icon name="camera" size={19} />
+              <Icon name={cameraEnabled ? "cameraOff" : "camera"} size={19} />
             </button>
             <button type="button" title={screenShareEnabled ? "Stop sharing" : "Share screen"} aria-label={screenShareEnabled ? "Stop sharing" : "Share screen"} className={!screenShareEnabled ? "control-off" : ""} aria-pressed={screenShareEnabled} onClick={() => void toggleScreenShare()}>
-              <Icon name="monitor" size={19} />
+              <Icon name={screenShareEnabled ? "monitorOff" : "monitor"} size={19} />
             </button>
             <button type="button" title="Settings" aria-label="Settings" aria-haspopup="dialog" onClick={() => setSettingsOpen(true)}>
               <Icon name="settings" size={19} />

@@ -436,6 +436,8 @@ summary:focus-visible {
 .voice-controls button:hover { background: #4e5058; }
 .voice-controls button:active { transform: translateY(1px) scale(.98); }
 .voice-controls button.control-off { background: #f2f3f5; color: #1e1f22; }
+.voice-controls button[aria-label="Stop camera"], .voice-controls button[aria-label="Stop sharing"] { background: #4e5058; color: #f23f42; }
+.voice-controls button[aria-label="Stop camera"]:hover, .voice-controls button[aria-label="Stop sharing"]:hover { background: #da373c; color: #fff; }
 .voice-controls .voice-danger { width: 52px; flex-basis: 52px; border-radius: 22px; background: #da373c; color: #fff; }
 .voice-controls .voice-danger:hover { background: #a1282c; }
 
