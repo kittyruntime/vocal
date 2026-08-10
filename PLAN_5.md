@@ -37,6 +37,7 @@ Dernière mise à jour : 2026-08-10
 - [x] Mode partage « Jeu » en 1080p à 60 ips (8 Mb/s, priorité à la fluidité).
 - [x] Session vocale persistante pendant la navigation dans les salons textuels.
 - [x] Indicateur nominatif du locuteur actif en vue audio, vidéo et partage.
+- [x] Paramètres voix/vidéo déplacés dans une modale inspirée de Discord.
 
 ## À faire ensuite
 

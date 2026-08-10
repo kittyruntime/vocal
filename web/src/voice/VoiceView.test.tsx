@@ -110,8 +110,9 @@ describe("VoiceView", () => {
     renderView();
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: "Rejoindre" }));
-    await user.click(await screen.findByText("Réglages audio et vidéo"));
-    await user.selectOptions(screen.getByLabelText("Qualité du partage"), "game");
+    await user.click(await screen.findByRole("button", { name: "Réglages" }));
+    await screen.findByRole("dialog", { name: "Voix & Vidéo" });
+    await user.selectOptions(screen.getByLabelText("Partage d’écran"), "game");
     await user.click(screen.getByRole("button", { name: "Partager l’écran" }));
 
     expect(setScreenShareEnabled).toHaveBeenLastCalledWith(
@@ -119,6 +120,17 @@ describe("VoiceView", () => {
       expect.objectContaining({ resolution: expect.objectContaining({ width: 1920, height: 1080, frameRate: 60 }) }),
       expect.objectContaining({ screenShareEncoding: expect.objectContaining({ maxFramerate: 60 }) }),
     );
+  });
+
+  it("opens voice settings in a modal and closes it with Escape", async () => {
+    renderView();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Rejoindre" }));
+    await user.click(await screen.findByRole("button", { name: "Réglages" }));
+    expect(screen.getByRole("dialog", { name: "Voix & Vidéo" })).toBeVisible();
+
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog", { name: "Voix & Vidéo" })).not.toBeInTheDocument();
   });
 
   it("keeps the voice session connected while the view is hidden", async () => {

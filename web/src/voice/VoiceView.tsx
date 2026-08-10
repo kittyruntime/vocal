@@ -79,6 +79,7 @@ export function VoiceView({
   const [remoteVideoCount, setRemoteVideoCount] = useState(0);
   const [remoteScreenCount, setRemoteScreenCount] = useState(0);
   const [activeSpeakerLabels, setActiveSpeakerLabels] = useState<string[]>([]);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const roomRef = useRef<Room | null>(null);
   const audioRef = useRef<HTMLDivElement>(null);
   const remoteVideoRef = useRef<HTMLDivElement>(null);
@@ -167,6 +168,15 @@ export function VoiceView({
       stopMeter();
     };
   }, [channel.id]);
+
+  useEffect(() => {
+    if (!settingsOpen) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setSettingsOpen(false);
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [settingsOpen]);
 
   async function joinRoom() {
     if (status !== "idle") return;
@@ -457,51 +467,6 @@ export function VoiceView({
           <button type="button" className="voice-primary connecting" disabled>Connexion<span className="connecting-dots" aria-hidden="true"><i /><i /><i /></span></button>
         ) : (
           <>
-          <details className="voice-settings-panel">
-            <summary><Icon name="settings" size={16} /> Réglages audio et vidéo</summary>
-            <div className="voice-meter" aria-label={`Niveau du microphone ${Math.round(audioLevel * 100)} %`}>
-              <span style={{ width: `${Math.min(audioLevel * 100, 100)}%` }} />
-              <i style={{ left: `${settings.vadThreshold * 100}%` }} />
-            </div>
-            <div className="voice-settings">
-            <DeviceSelect
-              label="Microphone"
-              kind="audioinput"
-              devices={devices}
-              value={settings.devices.audioinput}
-              onChange={selectDevice}
-            />
-            <QualitySelect label="Qualité audio" value={settings.audioQuality} profiles={audioProfiles} onChange={(quality) => selectQuality("audio", quality)} />
-            <QualitySelect label="Qualité webcam" value={settings.cameraQuality} profiles={cameraProfiles} onChange={(quality) => selectQuality("camera", quality)} />
-            <QualitySelect<ScreenQuality> label="Qualité du partage" value={settings.screenQuality} profiles={screenProfiles} onChange={(quality) => selectQuality("screen", quality)} />
-            <DeviceSelect
-              label="Caméra"
-              kind="videoinput"
-              devices={devices}
-              value={settings.devices.videoinput}
-              onChange={selectDevice}
-            />
-            <DeviceSelect
-              label="Sortie audio"
-              kind="audiooutput"
-              devices={devices}
-              value={settings.devices.audiooutput}
-              onChange={selectDevice}
-            />
-            <label>
-              Seuil vocal
-              <input
-                aria-label="Seuil vocal"
-                type="range"
-                min="0.02"
-                max="0.6"
-                step="0.01"
-                value={settings.vadThreshold}
-                onChange={(event) => saveSettings({ ...settings, vadThreshold: Number(event.target.value) })}
-              />
-            </label>
-            </div>
-          </details>
           <div className="voice-controls" aria-label="Contrôles du salon vocal">
             <button type="button" className={!microphoneEnabled ? "control-off" : ""} onClick={() => void toggleMicrophone()}>
               <Icon name="microphone" size={16} />
@@ -523,6 +488,10 @@ export function VoiceView({
               <Icon name="monitor" size={16} />
               {screenShareEnabled ? "Arrêter le partage" : "Partager l’écran"}
             </button>
+            <button type="button" aria-haspopup="dialog" onClick={() => setSettingsOpen(true)}>
+              <Icon name="settings" size={16} />
+              Réglages
+            </button>
             <button type="button" className="voice-danger" onClick={() => void leaveRoom()}>
               <Icon name="phone" size={16} />
               Quitter
@@ -531,6 +500,56 @@ export function VoiceView({
           </>
         )}
       </div>
+      {settingsOpen ? (
+        <div
+          className="voice-modal-backdrop"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setSettingsOpen(false);
+          }}
+        >
+          <section className="voice-settings-modal" role="dialog" aria-modal="true" aria-labelledby="voice-settings-title">
+            <header>
+              <div>
+                <span>PARAMÈTRES UTILISATEUR</span>
+                <h2 id="voice-settings-title">Voix & Vidéo</h2>
+              </div>
+              <button type="button" className="modal-close" aria-label="Fermer les réglages" autoFocus onClick={() => setSettingsOpen(false)}>
+                <Icon name="close" size={20} />
+              </button>
+            </header>
+            <div className="voice-settings-content">
+              <div className="settings-section">
+                <h3>Périphériques</h3>
+                <div className="voice-settings">
+                  <DeviceSelect label="Microphone" kind="audioinput" devices={devices} value={settings.devices.audioinput} onChange={selectDevice} />
+                  <DeviceSelect label="Sortie audio" kind="audiooutput" devices={devices} value={settings.devices.audiooutput} onChange={selectDevice} />
+                  <DeviceSelect label="Caméra" kind="videoinput" devices={devices} value={settings.devices.videoinput} onChange={selectDevice} />
+                </div>
+              </div>
+              <div className="settings-section">
+                <h3>Qualité de diffusion</h3>
+                <div className="voice-settings">
+                  <QualitySelect label="Audio" value={settings.audioQuality} profiles={audioProfiles} onChange={(quality) => selectQuality("audio", quality)} />
+                  <QualitySelect label="Webcam" value={settings.cameraQuality} profiles={cameraProfiles} onChange={(quality) => selectQuality("camera", quality)} />
+                  <QualitySelect<ScreenQuality> label="Partage d’écran" value={settings.screenQuality} profiles={screenProfiles} onChange={(quality) => selectQuality("screen", quality)} />
+                </div>
+              </div>
+              <div className="settings-section voice-detection-section">
+                <div className="settings-section-heading">
+                  <div><h3>Sensibilité d’entrée</h3><p>Ajustez le niveau nécessaire pour détecter votre voix.</p></div>
+                  <strong>{Math.round(settings.vadThreshold * 100)} %</strong>
+                </div>
+                <div className="voice-meter" aria-label={`Niveau du microphone ${Math.round(audioLevel * 100)} %`}>
+                  <span style={{ width: `${Math.min(audioLevel * 100, 100)}%` }} />
+                  <i style={{ left: `${settings.vadThreshold * 100}%` }} />
+                </div>
+                <input aria-label="Seuil vocal" type="range" min="0.02" max="0.6" step="0.01" value={settings.vadThreshold} onChange={(event) => saveSettings({ ...settings, vadThreshold: Number(event.target.value) })} />
+              </div>
+            </div>
+          </section>
+        </div>
+      ) : null}
       <div ref={audioRef} className="remote-audio" aria-hidden="true" />
     </section>
   );
