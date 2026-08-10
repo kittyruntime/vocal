@@ -1,5 +1,6 @@
 import {
   Camera,
+  File,
   ChevronDown,
   Hash,
   Headphones,
@@ -20,6 +21,7 @@ import {
 
 type IconName =
   | "camera"
+  | "file"
   | "chevron"
   | "hash"
   | "headphones"
@@ -38,6 +40,7 @@ type IconName =
 
 const icons: Record<IconName, LucideIcon> = {
   camera: Camera,
+  file: File,
   chevron: ChevronDown,
   hash: Hash,
   headphones: Headphones,

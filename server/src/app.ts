@@ -2,6 +2,7 @@ import Fastify, { type FastifyError, type FastifyInstance } from "fastify";
 import cookie from "@fastify/cookie";
 import rateLimit from "@fastify/rate-limit";
 import websocket from "@fastify/websocket";
+import multipart from "@fastify/multipart";
 import type pg from "pg";
 import { registerAuthGuard } from "./auth/guard.js";
 import { registerAuthRoutes } from "./routes/auth.js";
@@ -24,6 +25,9 @@ export async function buildApp(
   await app.register(cookie);
   await app.register(rateLimit, { global: false });
   await app.register(websocket);
+  await app.register(multipart, {
+    limits: { fileSize: 50 * 1024 * 1024, files: 10, fields: 5 },
+  });
   const hub = createHub();
   const key = loadMasterKey();
   const liveKitConfig = loadLiveKitConfig();

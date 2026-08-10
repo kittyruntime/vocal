@@ -26,11 +26,13 @@ export function ChatView({
   const { showToast } = useToast();
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
+  const [files, setFiles] = useState<File[]>([]);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
 
   const messagesRef = useRef<HTMLDivElement>(null);
   const composerInputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   // Tells the scroll-restoration effect (below) why `messages` just changed, so it knows
   // whether to jump to the bottom, preserve the reading position, or leave things alone.
   const pendingScrollActionRef = useRef<"load" | "prepend" | null>(null);
@@ -110,11 +112,12 @@ export function ChatView({
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     const content = draft.trim();
-    if (!content || sending) return;
+    if ((!content && files.length === 0) || sending) return;
     setSending(true);
     try {
-      await api.postMessage(channel.id, content);
+      await (files.length > 0 ? api.postMessage(channel.id, content, files) : api.postMessage(channel.id, content));
       setDraft("");
+      setFiles([]);
     } catch {
       showToast("The message could not be sent");
     } finally {
@@ -154,13 +157,33 @@ export function ChatView({
                 <time dateTime={message.createdAt}>{formatMessageTime(message.createdAt)}</time>
               </div>
               <div className="chat-content">{message.content}</div>
+              {(message.attachments?.length ?? 0) > 0 ? <div className="message-attachments">
+                {message.attachments!.map((attachment) => attachment.mimeType.startsWith("image/") ? (
+                  <a key={attachment.id} className="message-image" href={attachment.url} target="_blank" rel="noreferrer">
+                    <img src={attachment.url} alt={attachment.filename} loading="lazy" />
+                  </a>
+                ) : (
+                  <a key={attachment.id} className="message-file" href={attachment.url} download={attachment.filename}>
+                    <span><Icon name="file" size={22} /></span>
+                    <span><strong>{attachment.filename}</strong><small>{formatFileSize(attachment.size)}</small></span>
+                  </a>
+                ))}
+              </div> : null}
             </div>
           </article>
         ))}
       </div>
+      {files.length > 0 ? <div className="composer-attachments" aria-label="Files to send">
+        {files.map((file, index) => <PendingFile key={`${file.name}-${file.lastModified}-${index}`} file={file} onRemove={() => setFiles((values) => values.filter((_, valueIndex) => valueIndex !== index))} />)}
+      </div> : null}
       <form className="chat-composer" onSubmit={handleSubmit}>
         <div className="composer-field">
-          <span aria-hidden="true"><Icon name="plus" size={20} /></span>
+          <button type="button" className="composer-attach-button" aria-label="Attach files" onClick={() => fileInputRef.current?.click()}><Icon name="plus" size={20} /></button>
+          <input ref={fileInputRef} className="sr-only" type="file" multiple onChange={(event) => {
+            const selected = [...(event.target.files ?? [])];
+            setFiles((values) => [...values, ...selected].slice(0, 10));
+            event.target.value = "";
+          }} />
           <input
             ref={composerInputRef}
             aria-label={`Message in ${channel.name}`}
@@ -169,12 +192,33 @@ export function ChatView({
             onChange={(e) => setDraft(e.target.value)}
           />
         </div>
-        <button type="submit" aria-label="Send" disabled={sending || draft.trim().length === 0}>
+        <button type="submit" aria-label="Send" disabled={sending || (draft.trim().length === 0 && files.length === 0)}>
           <Icon name="send" size={18} /><span className="sr-only">Send</span>
         </button>
       </form>
     </div>
   );
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function PendingFile({ file, onRemove }: { file: File; onRemove(): void }) {
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  useEffect(() => {
+    if (!file.type.startsWith("image/") || typeof URL.createObjectURL !== "function") return;
+    const url = URL.createObjectURL(file);
+    setPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [file]);
+  return <div>
+    {previewUrl ? <img src={previewUrl} alt="" /> : <Icon name="file" size={18} />}
+    <span title={file.name}>{file.name}</span>
+    <button type="button" aria-label={`Remove ${file.name}`} onClick={onRemove}><Icon name="close" size={14} /></button>
+  </div>;
 }
 
 function formatMessageTime(value: string): string {

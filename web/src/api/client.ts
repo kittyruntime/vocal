@@ -23,7 +23,7 @@ export type Channel = {
   defaultScreenQuality?: "low" | "standard" | "high" | "game";
 };
 export type AdminUser = CurrentUser & { createdAt: string; bannedAt: string | null; voiceMuted: boolean };
-export type ServerSettings = { registrationOpen: boolean };
+export type ServerSettings = { registrationOpen: boolean; maxImageSizeMb: number; maxFileSizeMb: number };
 
 export type Message = {
   id: string;
@@ -33,7 +33,9 @@ export type Message = {
   avatarUrl?: string | null;
   content: string;
   createdAt: string;
+  attachments?: MessageAttachment[];
 };
+export type MessageAttachment = { id: string; filename: string; mimeType: string; size: number; url: string };
 
 export type VoiceToken = { token: string; url: string };
 
@@ -48,10 +50,11 @@ export class ApiError extends Error {
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const hasBody = init?.body !== undefined && init.body !== null;
+  const isFormData = typeof FormData !== "undefined" && init?.body instanceof FormData;
   const res = await fetch(path, {
     ...init,
     credentials: "include",
-    headers: { ...(hasBody ? { "content-type": "application/json" } : {}), ...init?.headers },
+    headers: { ...(hasBody && !isFormData ? { "content-type": "application/json" } : {}), ...init?.headers },
   });
   if (res.status === 204) return undefined as T;
   const body: unknown = await res.json().catch(() => ({}));
@@ -68,7 +71,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 export function getSetupStatus(): Promise<{ done: boolean }> {
   return request("/api/setup");
 }
-export function getRegistrationStatus(): Promise<ServerSettings> { return request("/api/registration-status"); }
+export function getRegistrationStatus(): Promise<Pick<ServerSettings, "registrationOpen">> { return request("/api/registration-status"); }
 
 export function setup(username: string, password: string): Promise<{ ok: true }> {
   return request("/api/setup", { method: "POST", body: JSON.stringify({ username, password }) });
@@ -142,8 +145,12 @@ export function listMessages(channelId: string, opts?: { before?: string; limit?
   return request(`/api/channels/${channelId}/messages${qs ? `?${qs}` : ""}`);
 }
 
-export function postMessage(channelId: string, content: string): Promise<Message> {
-  return request(`/api/channels/${channelId}/messages`, { method: "POST", body: JSON.stringify({ content }) });
+export function postMessage(channelId: string, content: string, files: File[] = []): Promise<Message> {
+  if (files.length === 0) return request(`/api/channels/${channelId}/messages`, { method: "POST", body: JSON.stringify({ content }) });
+  const body = new FormData();
+  body.set("content", content);
+  for (const file of files) body.append("files", file, file.name);
+  return request(`/api/channels/${channelId}/messages`, { method: "POST", body });
 }
 
 export function getVoiceToken(channelId: string): Promise<VoiceToken> {

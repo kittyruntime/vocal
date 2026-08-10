@@ -16,7 +16,7 @@ export function AdminPanel({ currentUser, onClose }: {
   onClose(): void;
 }) {
   const [users, setUsers] = useState<AdminUser[]>([]);
-  const [settings, setSettings] = useState<ServerSettings>({ registrationOpen: true });
+  const [settings, setSettings] = useState<ServerSettings>({ registrationOpen: true, maxImageSizeMb: 5, maxFileSizeMb: 10 });
   const [error, setError] = useState("");
   const canManageServer = currentUser.capabilities.includes("manage_server");
   const canModerate = currentUser.capabilities.includes("moderate");
@@ -60,8 +60,13 @@ export function AdminPanel({ currentUser, onClose }: {
 
   async function toggleRegistration() {
     try {
-      setSettings(await api.updateAdminSettings({ registrationOpen: !settings.registrationOpen }));
+      setSettings(await api.updateAdminSettings({ ...settings, registrationOpen: !settings.registrationOpen }));
     } catch { setError("Could not change registration settings."); }
+  }
+
+  async function saveUploadLimits(next: ServerSettings) {
+    try { setSettings(await api.updateAdminSettings(next)); }
+    catch { setError("Could not change attachment limits."); }
   }
 
   async function toggleVoiceMute(user: AdminUser) {
@@ -82,6 +87,14 @@ export function AdminPanel({ currentUser, onClose }: {
           {canManageServer ? <div className="settings-section admin-setting-row">
             <div><h3>Public registration</h3><p>Invitations remain usable even when registration is closed.</p></div>
             <button type="button" className={`setting-switch ${settings.registrationOpen ? "active" : ""}`} aria-pressed={settings.registrationOpen} onClick={() => void toggleRegistration()}>{settings.registrationOpen ? "Open" : "Closed"}</button>
+          </div> : null}
+          {canManageServer ? <div className="settings-section">
+            <h3>Attachment limits</h3>
+            <p className="admin-setting-description">Maximum size accepted for each uploaded item. The hard server limit is 50 MB.</p>
+            <div className="attachment-limit-grid">
+              <label>Images (MB)<input type="number" min="1" max="50" value={settings.maxImageSizeMb} onChange={(event) => setSettings({ ...settings, maxImageSizeMb: Number(event.target.value) })} onBlur={() => void saveUploadLimits(settings)} /></label>
+              <label>Other files (MB)<input type="number" min="1" max="50" value={settings.maxFileSizeMb} onChange={(event) => setSettings({ ...settings, maxFileSizeMb: Number(event.target.value) })} onBlur={() => void saveUploadLimits(settings)} /></label>
+            </div>
           </div> : null}
           <div className="settings-section">
             <h3>Members and capabilities</h3>

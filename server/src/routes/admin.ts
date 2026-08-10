@@ -9,6 +9,20 @@ import type { VoiceAdminService } from "../voice/admin.js";
 
 const capabilitiesSchema = z.object({ capabilities: z.array(z.enum(CAPABILITIES)) });
 const idSchema = z.object({ id: z.uuid() });
+const settingsSchema = z.object({
+  registrationOpen: z.boolean().optional(),
+  maxImageSizeMb: z.number().int().min(1).max(50).optional(),
+  maxFileSizeMb: z.number().int().min(1).max(50).optional(),
+});
+
+type SettingsRow = { registration_open: boolean; max_image_size_mb: number; max_file_size_mb: number };
+function toSettings(row: SettingsRow | undefined) {
+  return {
+    registrationOpen: row?.registration_open ?? true,
+    maxImageSizeMb: row?.max_image_size_mb ?? 5,
+    maxFileSizeMb: row?.max_file_size_mb ?? 10,
+  };
+}
 
 type AdminUserRow = { id: string; username: string; created_at: Date; banned_at: Date | null; voice_muted: boolean; capabilities: Capability[] };
 
@@ -41,15 +55,22 @@ export function registerAdminRoutes(
   });
 
   app.get("/api/admin/settings", { preHandler: [app.requireAuth, requireCapability("manage_server")] }, async () => {
-    const result = await pool.query<{ registration_open: boolean }>("SELECT registration_open FROM server_settings WHERE singleton = true");
-    return { registrationOpen: result.rows[0]?.registration_open ?? true };
+    const result = await pool.query<SettingsRow>("SELECT registration_open, max_image_size_mb, max_file_size_mb FROM server_settings WHERE singleton = true");
+    return toSettings(result.rows[0]);
   });
 
   app.patch("/api/admin/settings", { preHandler: [app.requireAuth, requireCapability("manage_server")] }, async (req, reply) => {
-    const body = z.object({ registrationOpen: z.boolean() }).safeParse(req.body);
+    const body = settingsSchema.safeParse(req.body);
     if (!body.success) return reply.code(400).send({ error: "invalid payload" });
-    await pool.query("UPDATE server_settings SET registration_open = $1 WHERE singleton = true", [body.data.registrationOpen]);
-    return { registrationOpen: body.data.registrationOpen };
+    const result = await pool.query<SettingsRow>(
+      `UPDATE server_settings SET
+         registration_open = COALESCE($1, registration_open),
+         max_image_size_mb = COALESCE($2, max_image_size_mb),
+         max_file_size_mb = COALESCE($3, max_file_size_mb)
+       WHERE singleton = true RETURNING registration_open, max_image_size_mb, max_file_size_mb`,
+      [body.data.registrationOpen, body.data.maxImageSizeMb, body.data.maxFileSizeMb],
+    );
+    return toSettings(result.rows[0]);
   });
 
   app.get("/api/admin/users", { preHandler: [app.requireAuth, requireAnyCapability("manage_server", "moderate")] }, async () => {
