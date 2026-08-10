@@ -24,6 +24,16 @@ const loginSchema = z.object({
   password: z.string().min(1).max(256),
 });
 
+const profileSchema = z.object({
+  username: z.string().trim().min(2).max(32).regex(/^[a-zA-Z0-9_.-]+$/),
+  email: z.union([z.string().trim().email().max(254), z.literal("")]).transform((value) => value || null),
+  description: z.string().trim().max(190),
+  avatarUrl: z.union([
+    z.string().max(700_000).regex(/^data:image\/(?:png|jpeg|webp|gif);base64,[A-Za-z0-9+/]+=*$/),
+    z.null(),
+  ]),
+});
+
 function setSidCookie(reply: any, token: string, expiresAt: Date): void {
   reply.setCookie("sid", token, {
     path: "/",
@@ -165,4 +175,29 @@ export function registerAuthRoutes(app: FastifyInstance, pool: pg.Pool): void {
   });
 
   app.get("/api/me", { preHandler: app.requireAuth }, async (req) => req.user);
+
+  app.patch("/api/me", { preHandler: app.requireAuth }, async (req, reply) => {
+    const body = profileSchema.safeParse(req.body);
+    if (!body.success) return reply.code(400).send({ error: "invalid profile" });
+    try {
+      await pool.query(
+        `UPDATE users
+         SET username = $1, email = $2, avatar_url = $3, description = $4
+         WHERE id = $5`,
+        [body.data.username, body.data.email, body.data.avatarUrl, body.data.description, req.user!.id],
+      );
+    } catch (err: any) {
+      if (err?.code === "23505") {
+        const emailConflict = String(err.constraint ?? "").includes("email");
+        return reply.code(409).send({ error: emailConflict ? "email already used" : "username taken" });
+      }
+      throw err;
+    }
+    const updated = await pool.query(
+      `SELECT username, email, avatar_url AS "avatarUrl", description
+       FROM users WHERE id = $1`,
+      [req.user!.id],
+    );
+    return { ...req.user!, ...updated.rows[0] };
+  });
 }

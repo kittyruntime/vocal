@@ -1,7 +1,15 @@
 export const CAPABILITIES = ["manage_channels", "manage_server", "moderate", "publish_voice"] as const;
 export type Capability = (typeof CAPABILITIES)[number];
 
-export type CurrentUser = { id: string; username: string; capabilities: Capability[] };
+export type CurrentUser = {
+  id: string;
+  username: string;
+  email?: string | null;
+  avatarUrl?: string | null;
+  description?: string;
+  capabilities: Capability[];
+};
+export type ProfileUpdate = Pick<Required<CurrentUser>, "username" | "email" | "avatarUrl" | "description">;
 
 export type Channel = {
   id: string;
@@ -22,6 +30,7 @@ export type Message = {
   channelId: string;
   userId: string;
   username: string;
+  avatarUrl?: string | null;
   content: string;
   createdAt: string;
 };
@@ -82,6 +91,10 @@ export function logout(): Promise<{ ok: true }> {
 
 export function getMe(): Promise<CurrentUser> {
   return request("/api/me");
+}
+
+export function updateProfile(profile: ProfileUpdate): Promise<CurrentUser> {
+  return request("/api/me", { method: "PATCH", body: JSON.stringify(profile) });
 }
 
 export function listChannels(): Promise<Channel[]> {

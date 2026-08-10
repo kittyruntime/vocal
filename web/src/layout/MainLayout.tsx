@@ -11,15 +11,17 @@ import { UserBar } from "./UserBar";
 import { ConnectionBanner } from "./ConnectionBanner";
 import { playAppSound } from "../audio/sounds";
 import { Icon } from "../ui/Icon";
+import { ProfileModal } from "./ProfileModal";
 
 const VoiceView = lazy(() => import("../voice/VoiceView").then((module) => ({ default: module.VoiceView })));
 
 export function MainLayout({ currentUser }: { currentUser: CurrentUser }) {
-  const { signOut } = useAuth();
+  const { signOut, refresh } = useAuth();
   const { showToast } = useToast();
   const [state, dispatch] = useReducer(appReducer, { ...initialAppState, currentUser });
   const [retainedVoiceChannel, setRetainedVoiceChannel] = useState<Channel | null>(null);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
   const joinedVoiceChannelIdRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -122,7 +124,7 @@ export function MainLayout({ currentUser }: { currentUser: CurrentUser }) {
             onChannelUpdated={(channel) => dispatch({ type: "channel/updated", channel })}
             onChannelDeleted={(channelId) => dispatch({ type: "channel/removed", channelId })}
           />
-          <UserBar currentUser={currentUser} onSignOut={signOut} />
+          <UserBar currentUser={currentUser} onOpenProfile={() => setProfileOpen(true)} onSignOut={signOut} />
         </aside>
         <div className="main-content">
           {selectedChannel?.type === "text" ? (
@@ -168,6 +170,7 @@ export function MainLayout({ currentUser }: { currentUser: CurrentUser }) {
             </Suspense>
           ) : null}
         </div>
+        {profileOpen ? <ProfileModal currentUser={currentUser} onClose={() => setProfileOpen(false)} onSaved={refresh} /> : null}
       </div>
     </div>
   );

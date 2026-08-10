@@ -7,7 +7,7 @@ const MAX_LIMIT = 100;
 
 type Row = {
   id: string; channel_id: string; user_id: string;
-  username: string; content_encrypted: string; created_at: Date;
+  username: string; avatar_url: string | null; content_encrypted: string; created_at: Date;
 };
 
 function toPayload(row: Row, key: Buffer): MessagePayload {
@@ -16,6 +16,7 @@ function toPayload(row: Row, key: Buffer): MessagePayload {
     channelId: row.channel_id,
     userId: row.user_id,
     username: row.username,
+    avatarUrl: row.avatar_url,
     content: decryptMessage(row.content_encrypted, key),
     createdAt: row.created_at.toISOString(),
   };
@@ -32,7 +33,7 @@ export async function createMessage(
        VALUES ($1, $2, $3)
        RETURNING id, channel_id, user_id, content_encrypted, created_at
      )
-     SELECT inserted.*, u.username FROM inserted
+     SELECT inserted.*, u.username, u.avatar_url FROM inserted
      JOIN users u ON u.id = inserted.user_id`,
     [input.channelId, input.userId, encrypted],
   );
@@ -52,7 +53,7 @@ export async function listMessages(
   }
   params.push(limit);
   const res = await pool.query<Row>(
-    `SELECT m.id, m.channel_id, m.user_id, u.username, m.content_encrypted, m.created_at
+    `SELECT m.id, m.channel_id, m.user_id, u.username, u.avatar_url, m.content_encrypted, m.created_at
      FROM messages m JOIN users u ON u.id = m.user_id
      WHERE ${where}
      ORDER BY m.created_at DESC

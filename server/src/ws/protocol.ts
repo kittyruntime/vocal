@@ -3,6 +3,7 @@ export type MessagePayload = {
   channelId: string;
   userId: string;
   username: string;
+  avatarUrl: string | null;
   content: string;
   createdAt: string;
 };

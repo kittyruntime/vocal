@@ -105,6 +105,41 @@ describe("login / logout", () => {
   });
 });
 
+describe("profile", () => {
+  it("updates the authenticated user's public profile", async () => {
+    const setup = await app.inject({ method: "POST", url: "/api/setup",
+      payload: { username: "theo", password: "correct horse battery" } });
+    const cookie = sidCookie(setup);
+    const avatarUrl = `data:image/png;base64,${Buffer.from("avatar").toString("base64")}`;
+
+    const update = await app.inject({
+      method: "PATCH", url: "/api/me", headers: { cookie },
+      payload: { username: "theophile", email: "theo@example.com", description: "Building Vocal", avatarUrl },
+    });
+
+    expect(update.statusCode).toBe(200);
+    expect(update.json()).toMatchObject({ username: "theophile", email: "theo@example.com", description: "Building Vocal", avatarUrl });
+    const me = await app.inject({ method: "GET", url: "/api/me", headers: { cookie } });
+    expect(me.json()).toMatchObject({ username: "theophile", email: "theo@example.com", description: "Building Vocal", avatarUrl });
+  });
+
+  it("rejects duplicate usernames and invalid profile images", async () => {
+    const setup = await app.inject({ method: "POST", url: "/api/setup",
+      payload: { username: "theo", password: "correct horse battery" } });
+    await app.inject({ method: "POST", url: "/api/auth/register",
+      payload: { username: "alice", password: "alicepass123" } });
+    const cookie = sidCookie(setup);
+    const duplicate = await app.inject({ method: "PATCH", url: "/api/me", headers: { cookie },
+      payload: { username: "alice", email: "", description: "", avatarUrl: null } });
+    expect(duplicate.statusCode).toBe(409);
+    expect(duplicate.json()).toEqual({ error: "username taken" });
+
+    const invalidImage = await app.inject({ method: "PATCH", url: "/api/me", headers: { cookie },
+      payload: { username: "theo", email: "", description: "", avatarUrl: "https://example.com/avatar.png" } });
+    expect(invalidImage.statusCode).toBe(400);
+  });
+});
+
 describe("register", () => {
   it("allows public registration without an invite and logs the member in", async () => {
     await app.inject({ method: "POST", url: "/api/setup",
