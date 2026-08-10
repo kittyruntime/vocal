@@ -1,4 +1,5 @@
 import type { CurrentUser } from "../api/client";
+import { Icon } from "../ui/Icon";
 
 const ROLE_LABEL: Record<CurrentUser["role"], string> = {
   admin: "Admin",
@@ -15,7 +16,7 @@ export function UserBar({ currentUser, onSignOut }: { currentUser: CurrentUser; 
         <span className="user-role">{ROLE_LABEL[currentUser.role]}</span>
       </div>
       <button type="button" className="user-action" aria-label="Déconnexion" title="Se déconnecter" onClick={() => void onSignOut()}>
-        ↪
+        <Icon name="logout" />
       </button>
     </div>
   );

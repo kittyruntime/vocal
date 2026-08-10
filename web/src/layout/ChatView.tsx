@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type FormEvent, type UIEv
 import type { Channel, Message } from "../api/client";
 import * as api from "../api/client";
 import { useToast } from "../toast/ToastContext";
+import { Icon } from "../ui/Icon";
 
 const PAGE_SIZE = 50;
 
@@ -120,7 +121,7 @@ export function ChatView({
 
   return (
     <div className="chat-view">
-      <header className="chat-header"><span className="header-channel-icon">#</span> {channel.name}</header>
+      <header className="chat-header"><span className="header-channel-icon"><Icon name="hash" size={22} /></span> {channel.name}</header>
       <div
         className="chat-messages"
         role="log"
@@ -130,7 +131,7 @@ export function ChatView({
       >
         {messages.length === 0 && (
           <div className="chat-empty">
-            <div className="chat-empty-icon">#</div>
+            <div className="chat-empty-icon"><Icon name="hash" size={38} /></div>
             <h1>Bienvenue dans #{channel.name}</h1>
             <p>C’est le début de ce salon.</p>
           </div>
@@ -150,7 +151,7 @@ export function ChatView({
       </div>
       <form className="chat-composer" onSubmit={handleSubmit}>
         <div className="composer-field">
-          <span aria-hidden="true">＋</span>
+          <span aria-hidden="true"><Icon name="plus" size={20} /></span>
           <input
             aria-label={`Message dans ${channel.name}`}
             placeholder={`Envoyer un message dans #${channel.name}`}
@@ -160,7 +161,7 @@ export function ChatView({
           />
         </div>
         <button type="submit" aria-label="Envoyer" disabled={sending || draft.trim().length === 0}>
-          ➤<span className="sr-only">Envoyer</span>
+          <Icon name="send" size={18} /><span className="sr-only">Envoyer</span>
         </button>
       </form>
     </div>

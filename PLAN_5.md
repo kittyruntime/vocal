@@ -29,6 +29,7 @@ Dernière mise à jour : 2026-08-10
 - [x] Push-to-talk à la barre Espace, ignoré pendant la saisie.
 - [x] Inscription publique sans invitation, avec session immédiate.
 - [x] Correction des POST sans body (`voice-token` n'envoie plus un faux JSON vide).
+- [x] Polish visuel : typographie système stable, icônes SVG et hiérarchie affinée.
 
 ## À faire ensuite
 
