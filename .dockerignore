@@ -1,0 +1,9 @@
+.git
+.claude
+.superpowers
+docs/superpowers
+node_modules
+**/node_modules
+**/dist
+.env
+*.log

@@ -1,5 +1,12 @@
 {
   "name": "vocal",
   "private": true,
-  "type": "module"
+  "type": "module",
+  "packageManager": "pnpm@10.30.0",
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "argon2",
+      "esbuild"
+    ]
+  }
 }
