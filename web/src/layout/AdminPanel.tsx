@@ -18,12 +18,14 @@ export function AdminPanel({ currentUser, onClose }: {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [settings, setSettings] = useState<ServerSettings>({ registrationOpen: true });
   const [error, setError] = useState("");
+  const canManageServer = currentUser.capabilities.includes("manage_server");
+  const canModerate = currentUser.capabilities.includes("moderate");
 
   useEffect(() => {
-    void Promise.all([api.listAdminUsers(), api.getAdminSettings()])
-      .then(([nextUsers, nextSettings]) => { setUsers(nextUsers); setSettings(nextSettings); })
+    void Promise.all([api.listAdminUsers(), canManageServer ? api.getAdminSettings() : Promise.resolve(null)])
+      .then(([nextUsers, nextSettings]) => { setUsers(nextUsers); if (nextSettings) setSettings(nextSettings); })
       .catch(() => setError("Could not load server settings."));
-  }, []);
+  }, [canManageServer]);
 
   async function toggleCapability(user: AdminUser, capability: Capability) {
     const capabilities = user.capabilities.includes(capability)
@@ -62,25 +64,34 @@ export function AdminPanel({ currentUser, onClose }: {
     } catch { setError("Could not change registration settings."); }
   }
 
+  async function toggleVoiceMute(user: AdminUser) {
+    try {
+      const updated = await api.setUserVoiceMuted(user.id, !user.voiceMuted);
+      setUsers((value) => value.map((entry) => entry.id === user.id ? updated : entry));
+    } catch (reason) {
+      setError(reason instanceof api.ApiError && reason.message === "cannot voice-mute yourself" ? "You cannot force-mute yourself." : "Could not change this user's voice mute.");
+    }
+  }
+
   return (
     <div className="voice-modal-backdrop admin-backdrop" role="presentation">
       <section className="voice-settings-modal admin-modal" role="dialog" aria-modal="true" aria-labelledby="admin-title">
         <header><div><span>ADMINISTRATION</span><h2 id="admin-title">Server settings</h2></div><button type="button" className="modal-close" aria-label="Close administration" onClick={onClose}><Icon name="close" size={20} /></button></header>
         <div className="voice-settings-content">
           {error ? <p className="admin-error" role="alert">{error}</p> : null}
-          <div className="settings-section admin-setting-row">
+          {canManageServer ? <div className="settings-section admin-setting-row">
             <div><h3>Public registration</h3><p>Invitations remain usable even when registration is closed.</p></div>
             <button type="button" className={`setting-switch ${settings.registrationOpen ? "active" : ""}`} aria-pressed={settings.registrationOpen} onClick={() => void toggleRegistration()}>{settings.registrationOpen ? "Open" : "Closed"}</button>
-          </div>
+          </div> : null}
           <div className="settings-section">
             <h3>Members and capabilities</h3>
             <div className="admin-user-list">
               {users.map((user) => (
                 <div className={`admin-user ${user.bannedAt ? "is-banned" : ""}`} key={user.id}>
                   <span className="member-avatar">{user.username[0].toUpperCase()}</span>
-                  <strong>{user.username}{user.id === currentUser.id ? " (you)" : ""}{user.bannedAt ? <span className="ban-badge">Banned</span> : null}</strong>
+                  <strong>{user.username}{user.id === currentUser.id ? " (you)" : ""}{user.bannedAt ? <span className="ban-badge">Banned</span> : null}{user.voiceMuted ? <span className="mute-badge">Voice muted</span> : null}</strong>
                   <div className="admin-user-capabilities">
-                    {CAPABILITIES.map((capability) => (
+                    {canManageServer ? CAPABILITIES.map((capability) => (
                       <label key={capability}>
                         <input
                           type="checkbox"
@@ -89,12 +100,11 @@ export function AdminPanel({ currentUser, onClose }: {
                         />
                         {CAPABILITY_LABEL[capability]}
                       </label>
-                    ))}
+                    )) : <span className="admin-capability-summary">{user.capabilities.map((capability) => CAPABILITY_LABEL[capability]).join(" · ") || "No capabilities"}</span>}
                   </div>
                   {user.id === currentUser.id ? null : (
                     <div className="admin-user-actions">
-                      <button type="button" className="danger-link" onClick={() => void kick(user.username, user.id)}>Kick</button>
-                      <button type="button" className={user.bannedAt ? "" : "danger-link"} onClick={() => void toggleBan(user)}>{user.bannedAt ? "Unban" : "Ban"}</button>
+                      {canModerate ? <><button type="button" className={user.voiceMuted ? "" : "danger-link"} onClick={() => void toggleVoiceMute(user)}>{user.voiceMuted ? "Allow voice" : "Force mute"}</button><button type="button" className="danger-link" onClick={() => void kick(user.username, user.id)}>Kick</button><button type="button" className={user.bannedAt ? "" : "danger-link"} onClick={() => void toggleBan(user)}>{user.bannedAt ? "Unban" : "Ban"}</button></> : null}
                     </div>
                   )}
                 </div>

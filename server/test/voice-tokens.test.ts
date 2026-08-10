@@ -108,4 +108,14 @@ describe("POST /api/channels/:id/voice-token", () => {
     const claims = await verifier.verify(res.json().token);
     expect(claims.video?.canPublish).toBe(false);
   });
+
+  it("mints a listen-only token for a force-muted user", async () => {
+    const channel = await app.inject({ method: "POST", url: "/api/channels", headers: { cookie: adminCookie }, payload: { name: "salle", type: "voice" } });
+    const me = await app.inject({ method: "GET", url: "/api/me", headers: { cookie: adminCookie } });
+    await pool.query("UPDATE users SET voice_muted = true WHERE id = $1", [me.json().id]);
+
+    const response = await app.inject({ method: "POST", url: `/api/channels/${channel.json().id}/voice-token`, headers: { cookie: adminCookie } });
+    const claims = await new TokenVerifier("devkey", "secret").verify(response.json().token);
+    expect(claims.video?.canPublish).toBe(false);
+  });
 });

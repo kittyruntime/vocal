@@ -15,9 +15,10 @@ import { loadLiveKitConfig } from "./voice/tokens.js";
 import { registerVoiceTokenRoute, registerVoiceWebhookRoute } from "./routes/voice.js";
 import { registerAdminRoutes } from "./routes/admin.js";
 import { createVoicePresence, type VoicePresence } from "./voice/presence.js";
+import { createVoiceAdminService, type VoiceAdminService } from "./voice/admin.js";
 
 export async function buildApp(
-  opts: { pool: pg.Pool },
+  opts: { pool: pg.Pool; voiceAdmin?: VoiceAdminService },
 ): Promise<{ app: FastifyInstance; hub: WsHub; voicePresence: VoicePresence }> {
   const app = Fastify({ logger: false });
   await app.register(cookie);
@@ -27,6 +28,7 @@ export async function buildApp(
   const key = loadMasterKey();
   const liveKitConfig = loadLiveKitConfig();
   const voicePresence = createVoicePresence();
+  const voiceAdmin = opts.voiceAdmin ?? createVoiceAdminService(liveKitConfig);
   app.setErrorHandler((err: FastifyError, _req, reply) => {
     if (typeof err.statusCode === "number") {
       reply.code(err.statusCode).send({ error: err.message });
@@ -41,7 +43,7 @@ export async function buildApp(
   registerAuthGuard(app, opts.pool);
   app.get("/api/health", async () => ({ status: "ok" }));
   registerAuthRoutes(app, opts.pool);
-  registerAdminRoutes(app, opts.pool, hub);
+  registerAdminRoutes(app, opts.pool, hub, voicePresence, voiceAdmin);
   registerInviteRoutes(app, opts.pool);
   registerChannelRoutes(app, opts.pool, hub);
   registerMessageRoutes(app, opts.pool, key, hub);

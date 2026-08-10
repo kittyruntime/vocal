@@ -67,8 +67,8 @@ Dernière mise à jour : 2026-08-10 (nuit)
 - [x] Appliquer réellement le seuil VAD à la transmission avec porte audio et délai anti-coupure.
 - [x] Reconnexion et messages d'erreur média détaillés.
 - [x] Expulsion et bannissement de comptes (modération de base).
-- [ ] Mute forcé par un modérateur, non contournable (API serveur LiveKit `RoomServiceClient`).
-- [ ] Retirer aussi un utilisateur expulsé/banni d’un salon vocal LiveKit auquel iel est déjà connecté·e (aujourd’hui, kick/ban coupe la session WebSocket mais pas une connexion WebRTC déjà établie — limite connue, à traiter avec le mute forcé puisque les deux ont besoin du `RoomServiceClient`).
+- [x] Mute forcé persistant par un détenteur de `moderate`, appliqué immédiatement avec `RoomServiceClient.updateParticipant` et aux futurs jetons LiveKit en écoute seule.
+- [x] Retirer aussi un utilisateur expulsé/banni de chaque salon LiveKit occupé via `RoomServiceClient.removeParticipant` avant de révoquer ses sessions.
 - [ ] Tests E2E Playwright.
 - [ ] Vérification réelle à deux navigateurs via le déploiement Coolify.
 - [ ] TURN/TLS et durcissement production.
@@ -114,12 +114,18 @@ un bouton de navigation. La parole active remonte de `VoiceView` vers la
 sidebar. Le changement direct entre deux salons vocaux réinitialise désormais
 l’ancien appel avant de rejoindre automatiquement le nouveau.
 
-**Prochaine étape exacte :** reprendre le backlog de modération avancée —
-mute forcé par un détenteur de `moderate`, non contournable (API serveur
-LiveKit `RoomServiceClient`), et retirer un utilisateur expulsé/banni d'une
-connexion WebRTC déjà établie (même limite de `RoomServiceClient`). Puis
-redéployer sur Coolify pour le test réel à deux navigateurs (mode Jeu inclus)
-et vérifier en conditions réelles le bandeau de reconnexion et les messages
-d'erreur média. Enfin, TURN/TLS et durcissement production. Toute nouvelle
-tranche doit finir par les tests frontend et backend, les typechecks, le
-build, puis une mise à jour de ce fichier.
+**Modération LiveKit (fait) :** la migration `007_voice_moderation.sql` ajoute
+le mute vocal persistant. L’API `PATCH /api/admin/users/:id/voice-mute`, réservée
+à `moderate`, révoque immédiatement la publication dans chaque room occupée ;
+les futurs jetons restent en écoute seule tant que le mute est actif. Les
+actions kick/ban retirent désormais le participant de LiveKit avant de fermer
+ses sessions applicatives. Le client expose Force mute/Allow voice et l’état
+Voice muted dans le panneau de modération, également accessible aux
+modérateurs sans `manage_server`.
+
+**Prochaine étape exacte :** ajouter les tests E2E Playwright, puis redéployer
+sur Coolify pour le test réel à deux navigateurs (mode Jeu, mute forcé et
+kick/ban LiveKit inclus) et vérifier en conditions réelles le bandeau de
+reconnexion et les messages d’erreur média. Enfin, TURN/TLS et durcissement
+production. Toute nouvelle tranche doit finir par les tests frontend et
+backend, les typechecks, le build, puis une mise à jour de ce fichier.

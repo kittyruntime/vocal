@@ -3,30 +3,38 @@ import type pg from "pg";
 import { z } from "zod";
 import type { WsHub } from "../ws/hub.js";
 import { CAPABILITIES, type Capability } from "../capabilities.js";
-import { requireCapability } from "../auth/guard.js";
+import { requireAnyCapability, requireCapability } from "../auth/guard.js";
+import type { VoicePresence } from "../voice/presence.js";
+import type { VoiceAdminService } from "../voice/admin.js";
 
 const capabilitiesSchema = z.object({ capabilities: z.array(z.enum(CAPABILITIES)) });
 const idSchema = z.object({ id: z.uuid() });
 
-type AdminUserRow = { id: string; username: string; created_at: Date; banned_at: Date | null; capabilities: Capability[] };
+type AdminUserRow = { id: string; username: string; created_at: Date; banned_at: Date | null; voice_muted: boolean; capabilities: Capability[] };
 
 async function fetchAdminUser(pool: pg.Pool, userId: string): Promise<AdminUserRow | null> {
   const result = await pool.query<AdminUserRow>(
-    `SELECT u.id, u.username, u.created_at, u.banned_at,
+    `SELECT u.id, u.username, u.created_at, u.banned_at, u.voice_muted,
        COALESCE(array_agg(uc.capability) FILTER (WHERE uc.capability IS NOT NULL), '{}') AS capabilities
      FROM users u LEFT JOIN user_capabilities uc ON uc.user_id = u.id
      WHERE u.id = $1
-     GROUP BY u.id, u.username, u.created_at, u.banned_at`,
+     GROUP BY u.id, u.username, u.created_at, u.banned_at, u.voice_muted`,
     [userId],
   );
   return result.rows[0] ?? null;
 }
 
 function toAdminUser(row: AdminUserRow) {
-  return { id: row.id, username: row.username, capabilities: row.capabilities, createdAt: row.created_at, bannedAt: row.banned_at };
+  return { id: row.id, username: row.username, capabilities: row.capabilities, createdAt: row.created_at, bannedAt: row.banned_at, voiceMuted: row.voice_muted };
 }
 
-export function registerAdminRoutes(app: FastifyInstance, pool: pg.Pool, hub: WsHub): void {
+export function registerAdminRoutes(
+  app: FastifyInstance,
+  pool: pg.Pool,
+  hub: WsHub,
+  voicePresence: VoicePresence,
+  voiceAdmin: VoiceAdminService,
+): void {
   app.get("/api/registration-status", async () => {
     const result = await pool.query<{ registration_open: boolean }>("SELECT registration_open FROM server_settings WHERE singleton = true");
     return { registrationOpen: result.rows[0]?.registration_open ?? true };
@@ -44,12 +52,12 @@ export function registerAdminRoutes(app: FastifyInstance, pool: pg.Pool, hub: Ws
     return { registrationOpen: body.data.registrationOpen };
   });
 
-  app.get("/api/admin/users", { preHandler: [app.requireAuth, requireCapability("manage_server")] }, async () => {
+  app.get("/api/admin/users", { preHandler: [app.requireAuth, requireAnyCapability("manage_server", "moderate")] }, async () => {
     const result = await pool.query<AdminUserRow>(
-      `SELECT u.id, u.username, u.created_at, u.banned_at,
+      `SELECT u.id, u.username, u.created_at, u.banned_at, u.voice_muted,
          COALESCE(array_agg(uc.capability) FILTER (WHERE uc.capability IS NOT NULL), '{}') AS capabilities
        FROM users u LEFT JOIN user_capabilities uc ON uc.user_id = u.id
-       GROUP BY u.id, u.username, u.created_at, u.banned_at
+       GROUP BY u.id, u.username, u.created_at, u.banned_at, u.voice_muted
        ORDER BY u.username`,
     );
     return result.rows.map(toAdminUser);
@@ -94,9 +102,32 @@ export function registerAdminRoutes(app: FastifyInstance, pool: pg.Pool, hub: Ws
   // WebSocket connections. Does not touch capabilities or ban state — a
   // kicked user can simply log back in, unlike a ban.
   async function kickUser(userId: string): Promise<void> {
+    const rooms = Object.entries(voicePresence.allOccupancy())
+      .filter(([, participants]) => participants.some((participant) => participant.userId === userId))
+      .map(([room]) => room);
+    await Promise.all(rooms.map((room) => voiceAdmin.removeParticipant(room, userId)));
     await pool.query("DELETE FROM sessions WHERE user_id = $1", [userId]);
     hub.disconnect(userId, 4001, "kicked");
   }
+
+  app.patch("/api/admin/users/:id/voice-mute", { preHandler: [app.requireAuth, requireCapability("moderate")] }, async (req, reply) => {
+    const params = idSchema.safeParse(req.params);
+    const body = z.object({ muted: z.boolean() }).safeParse(req.body);
+    if (!params.success || !body.success) return reply.code(400).send({ error: "invalid payload" });
+    if (params.data.id === req.user!.id) return reply.code(409).send({ error: "cannot voice-mute yourself" });
+    const result = await pool.query<{ capabilities: Capability[] }>(
+      `UPDATE users SET voice_muted = $1 WHERE id = $2 RETURNING
+       ARRAY(SELECT capability FROM user_capabilities WHERE user_id = $2) AS capabilities`,
+      [body.data.muted, params.data.id],
+    );
+    if (!result.rowCount) return reply.code(404).send({ error: "user not found" });
+    const canPublish = !body.data.muted && result.rows[0].capabilities.includes("publish_voice");
+    const rooms = Object.entries(voicePresence.allOccupancy())
+      .filter(([, participants]) => participants.some((participant) => participant.userId === params.data.id))
+      .map(([room]) => room);
+    await Promise.all(rooms.map((room) => voiceAdmin.setParticipantPublishing(room, params.data.id, canPublish)));
+    return toAdminUser((await fetchAdminUser(pool, params.data.id))!);
+  });
 
   app.post("/api/admin/users/:id/kick", { preHandler: [app.requireAuth, requireCapability("moderate")] }, async (req, reply) => {
     const params = idSchema.safeParse(req.params);
