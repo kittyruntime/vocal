@@ -1,8 +1,9 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import type pg from "pg";
 import { getSessionUser } from "./sessions.js";
+import type { Capability } from "../capabilities.js";
 
-export type SessionUser = { id: string; username: string; role: "admin" | "moderator" | "member" };
+export type SessionUser = { id: string; username: string; capabilities: Capability[] };
 
 declare module "fastify" {
   interface FastifyRequest { user?: SessionUser }
@@ -21,4 +22,12 @@ export function registerAuthGuard(app: FastifyInstance, pool: pg.Pool): void {
     }
     req.user = user;
   });
+}
+
+export function requireCapability(capability: Capability) {
+  return async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+    if (!req.user?.capabilities.includes(capability)) {
+      await reply.code(403).send({ error: "forbidden" });
+    }
+  };
 }

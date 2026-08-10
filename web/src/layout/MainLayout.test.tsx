@@ -5,7 +5,6 @@ import { AuthProvider } from "../auth/AuthContext";
 import { MainLayout } from "./MainLayout";
 import * as api from "../api/client";
 import type { Channel, CurrentUser } from "../api/client";
-
 vi.mock("../api/client", async () => {
   const actual = await vi.importActual<typeof import("../api/client")>("../api/client");
   return {
@@ -43,8 +42,8 @@ class FakeWebSocket {
   }
 }
 
-const admin: CurrentUser = { id: "u1", username: "theo", role: "admin" };
-const generalChannel: Channel = { id: "c1", name: "général", type: "text", minRole: "member", position: 0, createdAt: "now" };
+const admin: CurrentUser = { id: "u1", username: "theo", capabilities: ["manage_channels", "manage_server", "moderate", "publish_voice"] };
+const generalChannel: Channel = { id: "c1", name: "général", type: "text", requiredCapability: null, position: 0, createdAt: "now" };
 
 beforeEach(() => {
   FakeWebSocket.reset();
@@ -97,4 +96,5 @@ describe("MainLayout", () => {
     });
     expect(await screen.findByText("salut")).toBeInTheDocument();
   });
+
 });

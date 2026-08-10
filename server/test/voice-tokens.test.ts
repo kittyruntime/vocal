@@ -72,10 +72,10 @@ describe("POST /api/channels/:id/voice-token", () => {
     expect(res.statusCode).toBe(400);
   });
 
-  it("forbids a member from joining a moderator-only voice channel", async () => {
+  it("forbids a member from joining a moderate-only voice channel", async () => {
     const ch = await app.inject({ method: "POST", url: "/api/channels",
       headers: { cookie: adminCookie },
-      payload: { name: "staff-voice", type: "voice", minRole: "moderator" } });
+      payload: { name: "staff-voice", type: "voice", requiredCapability: "moderate" } });
     const channelId = ch.json().id;
 
     const inv = await app.inject({ method: "POST", url: "/api/invites", headers: { cookie: adminCookie } });
@@ -86,5 +86,26 @@ describe("POST /api/channels/:id/voice-token", () => {
     const res = await app.inject({ method: "POST", url: `/api/channels/${channelId}/voice-token`,
       headers: { cookie: memberCookie } });
     expect(res.statusCode).toBe(403);
+  });
+
+  it("mints a listen-only token (canPublish: false) for a user without publish_voice", async () => {
+    const ch = await app.inject({ method: "POST", url: "/api/channels",
+      headers: { cookie: adminCookie }, payload: { name: "salle", type: "voice" } });
+    const channelId = ch.json().id;
+
+    const reg = await app.inject({ method: "POST", url: "/api/auth/register",
+      payload: { username: "alice", password: "alicepass123" } });
+    const aliceId = (await app.inject({ method: "GET", url: "/api/me",
+      headers: { cookie: `sid=${reg.cookies.find((c) => c.name === "sid")!.value}` } })).json().id;
+    await app.inject({ method: "PATCH", url: `/api/admin/users/${aliceId}`,
+      headers: { cookie: adminCookie }, payload: { capabilities: [] } });
+    const aliceCookie = `sid=${reg.cookies.find((c) => c.name === "sid")!.value}`;
+
+    const res = await app.inject({ method: "POST", url: `/api/channels/${channelId}/voice-token`,
+      headers: { cookie: aliceCookie } });
+    expect(res.statusCode).toBe(201);
+    const verifier = new TokenVerifier("devkey", "secret");
+    const claims = await verifier.verify(res.json().token);
+    expect(claims.video?.canPublish).toBe(false);
   });
 });

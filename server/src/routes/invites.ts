@@ -1,21 +1,16 @@
 import { randomBytes } from "node:crypto";
-import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import type { FastifyInstance } from "fastify";
 import type pg from "pg";
 import { z } from "zod";
 import { hashToken } from "../auth/sessions.js";
+import { requireCapability } from "../auth/guard.js";
 
 const inviteIdSchema = z.object({ id: z.uuid() });
 
 const INVITE_DAYS = 7;
 
-async function requireAdmin(req: FastifyRequest, reply: FastifyReply): Promise<void> {
-  if (req.user?.role !== "admin") {
-    await reply.code(403).send({ error: "admin only" });
-  }
-}
-
 export function registerInviteRoutes(app: FastifyInstance, pool: pg.Pool): void {
-  const guards = { preHandler: [app.requireAuth, requireAdmin] };
+  const guards = { preHandler: [app.requireAuth, requireCapability("manage_server")] };
 
   app.post("/api/invites", guards, async (req, reply) => {
     const token = randomBytes(32).toString("base64url");

@@ -38,7 +38,7 @@ describe("channels", () => {
     const text = await app.inject({ method: "POST", url: "/api/channels",
       headers: { cookie: adminCookie }, payload: { name: "général", type: "text" } });
     expect(text.statusCode).toBe(201);
-    expect(text.json()).toMatchObject({ name: "général", type: "text", minRole: "member" });
+    expect(text.json()).toMatchObject({ name: "général", type: "text", requiredCapability: null });
 
     const voice = await app.inject({ method: "POST", url: "/api/channels",
       headers: { cookie: adminCookie }, payload: { name: "vocal", type: "voice" } });
@@ -59,11 +59,11 @@ describe("channels", () => {
     expect(res.statusCode).toBe(403);
   });
 
-  it("GET /api/channels hides channels above the user's role", async () => {
+  it("GET /api/channels hides channels the user lacks the required capability for", async () => {
     await app.inject({ method: "POST", url: "/api/channels", headers: { cookie: adminCookie },
-      payload: { name: "public", type: "text", minRole: "member" } });
+      payload: { name: "public", type: "text" } });
     await app.inject({ method: "POST", url: "/api/channels", headers: { cookie: adminCookie },
-      payload: { name: "staff", type: "text", minRole: "moderator" } });
+      payload: { name: "staff", type: "text", requiredCapability: "moderate" } });
     const memberCookie = await makeMember("alice");
     const list = await app.inject({ method: "GET", url: "/api/channels",
       headers: { cookie: memberCookie } });
@@ -72,9 +72,9 @@ describe("channels", () => {
     expect(names).not.toContain("staff");
   });
 
-  it("admin sees all channels", async () => {
+  it("a holder of the required capability sees the gated channel", async () => {
     await app.inject({ method: "POST", url: "/api/channels", headers: { cookie: adminCookie },
-      payload: { name: "staff", type: "text", minRole: "moderator" } });
+      payload: { name: "staff", type: "text", requiredCapability: "moderate" } });
     const list = await app.inject({ method: "GET", url: "/api/channels",
       headers: { cookie: adminCookie } });
     expect(list.json().map((c: { name: string }) => c.name)).toContain("staff");
@@ -94,9 +94,9 @@ describe("channels", () => {
 
   it("updates channel permissions and voice quality defaults", async () => {
     const created = await app.inject({ method: "POST", url: "/api/channels", headers: { cookie: adminCookie }, payload: { name: "vocal", type: "voice" } });
-    const updated = await app.inject({ method: "PATCH", url: `/api/channels/${created.json().id}`, headers: { cookie: adminCookie }, payload: { name: "gaming", minRole: "moderator", defaultAudioQuality: "high", defaultCameraQuality: "high", defaultScreenQuality: "game" } });
+    const updated = await app.inject({ method: "PATCH", url: `/api/channels/${created.json().id}`, headers: { cookie: adminCookie }, payload: { name: "gaming", requiredCapability: "moderate", defaultAudioQuality: "high", defaultCameraQuality: "high", defaultScreenQuality: "game" } });
     expect(updated.statusCode).toBe(200);
-    expect(updated.json()).toMatchObject({ name: "gaming", minRole: "moderator", defaultAudioQuality: "high", defaultCameraQuality: "high", defaultScreenQuality: "game" });
+    expect(updated.json()).toMatchObject({ name: "gaming", requiredCapability: "moderate", defaultAudioQuality: "high", defaultCameraQuality: "high", defaultScreenQuality: "game" });
   });
 
   it("rejects a malformed channel id on delete", async () => {

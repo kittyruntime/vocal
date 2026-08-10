@@ -1,6 +1,6 @@
 # Plan 5 — Client voix, caméra et partage d'écran
 
-Dernière mise à jour : 2026-08-10 (soir)
+Dernière mise à jour : 2026-08-10 (nuit)
 
 ## Terminé
 
@@ -8,6 +8,7 @@ Dernière mise à jour : 2026-08-10 (soir)
 - [x] Plein écran par tuile vidéo (partage d'écran, caméra locale et distante) via la Fullscreen API native, bouton visible au survol, icône synchronisée sur l'état réel (y compris sortie via Échap ou l'UI du navigateur).
 - [x] Réglages d'un salon (nom, accès, qualité média par défaut, suppression) déplacés du panneau admin global vers une icône réglages par salon dans la sidebar (`ChannelSettingsModal.tsx`), visible aux admins uniquement. Le panneau admin ne garde que les réglages serveur (inscriptions, membres/rôles).
 - [x] Interface entièrement traduite en anglais (composants + tests + `lang="en"`). Les noms de salons restent du contenu utilisateur, non traduits.
+- [x] Remplacement complet du système de rôles (admin/moderator/member, hiérarchique) par des capabilities indépendantes et cumulables : `manage_channels`, `manage_server`, `moderate`, `publish_voice`. Aucune hiérarchie implicite — détenir une capability n'en implique jamais une autre. L'accès à un salon est gouverné par `channels.required_capability` (nullable = ouvert à tout utilisateur authentifié), à la place de `min_role`. Le premier compte (`/api/setup`) reçoit les 4 capabilities ; une inscription normale reçoit uniquement `publish_voice` (préserve le comportement actuel : tout le monde peut publier en vocal par défaut). Nouveauté réelle permise par ce modèle : `publish_voice` gouverne désormais si le jeton LiveKit émis autorise `canPublish` — un admin peut donc retirer ce droit à un utilisateur précis (mode écoute seule) sans toucher au reste de ses droits. Kick/ban sont gouvernés par `moderate` (plus par admin uniquement) ; gestion des salons par `manage_channels` ; réglages serveur, invitations et attribution des capabilities par `manage_server`, avec protection contre le retrait de `manage_server` au dernier détenteur (équivalent du garde-fou « dernier admin »). Migration `006_capabilities.sql` : nouvelle table `user_capabilities`, colonnes `users.role` et `channels.min_role` supprimées, mapping des données existantes préservant l'accès effectif (admin → toutes, moderator → moderate+publish_voice, member → publish_voice). Panneau admin : sélecteur de rôle remplacé par des cases à cocher par capability ; réglages de salon : sélecteur d'accès par capability requise (ou « Everyone »).
 - [x] SDK `livekit-client` chargé à la demande.
 - [x] Récupération d'un jeton vocal court auprès du backend.
 - [x] Présence vocale synchronisée par WebSocket et affichée dans la sidebar.
@@ -95,11 +96,21 @@ niveau de l'API navigateur `getDisplayMedia`). Tout vit dans
 `web/src/voice/VoiceView.tsx` (`describeJoinError`, `describeMediaError`,
 `MEDIA_ERROR_MESSAGES`) — pas de nouveau fichier.
 
-**Prochaine étape exacte :** redéployer sur Coolify et effectuer le test réel
-à deux navigateurs, notamment le mode Jeu selon les limites du navigateur et
-de la connexion, et vérifier que le nouveau bandeau de reconnexion / les
-messages d'erreur se comportent correctement en conditions réelles (couper le
-réseau pendant un appel, refuser la permission micro, annuler le partage
-d'écran). Ensuite seulement, TURN/TLS et durcissement production. Toute
-nouvelle tranche doit finir par les tests frontend et backend, les
-typechecks, le build, puis une mise à jour de ce fichier.
+**Passe UX/UI (fait) :** traduction complète en anglais, réglages de salon
+déplacés sur une icône par salon, plein écran par tuile vidéo, transitions
+adoucies, et remplacement complet du système de rôles par des capabilities
+indépendantes (`manage_channels`, `manage_server`, `moderate`,
+`publish_voice` — voir la section Terminé pour le détail). Le modèle de
+permissions vit désormais dans `server/src/capabilities.ts` côté serveur et
+`web/src/api/client.ts` côté client ; il n'y a plus de notion de rôle nulle
+part dans le code.
+
+**Prochaine étape exacte :** reprendre le backlog de modération avancée —
+mute forcé par un détenteur de `moderate`, non contournable (API serveur
+LiveKit `RoomServiceClient`), et retirer un utilisateur expulsé/banni d'une
+connexion WebRTC déjà établie (même limite de `RoomServiceClient`). Puis
+redéployer sur Coolify pour le test réel à deux navigateurs (mode Jeu inclus)
+et vérifier en conditions réelles le bandeau de reconnexion et les messages
+d'erreur média. Enfin, TURN/TLS et durcissement production. Toute nouvelle
+tranche doit finir par les tests frontend et backend, les typechecks, le
+build, puis une mise à jour de ce fichier.

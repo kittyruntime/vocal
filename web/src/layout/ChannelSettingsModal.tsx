@@ -1,7 +1,14 @@
 import { useState } from "react";
-import type { Channel, Role } from "../api/client";
+import type { Capability, Channel } from "../api/client";
 import * as api from "../api/client";
 import { Icon } from "../ui/Icon";
+
+const CAPABILITY_LABEL: Record<Capability, string> = {
+  manage_channels: "Can manage channels",
+  manage_server: "Can manage the server",
+  moderate: "Can moderate",
+  publish_voice: "Can publish in voice",
+};
 
 export function ChannelSettingsModal({ channel, onUpdated, onDeleted, onClose }: {
   channel: Channel;
@@ -64,10 +71,15 @@ export function ChannelSettingsModal({ channel, onUpdated, onDeleted, onClose }:
           <div className="settings-section">
             <div className="admin-channel-head">
               <input aria-label={`Name of ${channel.name}`} value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} />
-              <select aria-label={`Access to ${channel.name}`} value={draft.minRole} onChange={(event) => setDraft({ ...draft, minRole: event.target.value as Role })}>
-                <option value="member">All members</option>
-                <option value="moderator">Moderators</option>
-                <option value="admin">Administrators</option>
+              <select
+                aria-label={`Access to ${channel.name}`}
+                value={draft.requiredCapability ?? ""}
+                onChange={(event) => setDraft({ ...draft, requiredCapability: (event.target.value || null) as Capability | null })}
+              >
+                <option value="">Everyone</option>
+                {(Object.keys(CAPABILITY_LABEL) as Capability[]).map((capability) => (
+                  <option key={capability} value={capability}>{CAPABILITY_LABEL[capability]}</option>
+                ))}
               </select>
             </div>
           </div>

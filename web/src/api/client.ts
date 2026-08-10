@@ -1,12 +1,13 @@
-export type Role = "admin" | "moderator" | "member";
+export const CAPABILITIES = ["manage_channels", "manage_server", "moderate", "publish_voice"] as const;
+export type Capability = (typeof CAPABILITIES)[number];
 
-export type CurrentUser = { id: string; username: string; role: Role };
+export type CurrentUser = { id: string; username: string; capabilities: Capability[] };
 
 export type Channel = {
   id: string;
   name: string;
   type: "text" | "voice";
-  minRole: Role;
+  requiredCapability: Capability | null;
   position: number;
   createdAt: string;
   defaultAudioQuality?: "low" | "standard" | "high";
@@ -87,11 +88,11 @@ export function listChannels(): Promise<Channel[]> {
   return request("/api/channels");
 }
 
-export function createChannel(input: { name: string; type: "text" | "voice"; minRole?: Role }): Promise<Channel> {
+export function createChannel(input: { name: string; type: "text" | "voice"; requiredCapability?: Capability | null }): Promise<Channel> {
   return request("/api/channels", { method: "POST", body: JSON.stringify(input) });
 }
 
-export function updateChannel(channelId: string, input: Partial<Pick<Channel, "name" | "minRole" | "defaultAudioQuality" | "defaultCameraQuality" | "defaultScreenQuality">>): Promise<Channel> {
+export function updateChannel(channelId: string, input: Partial<Pick<Channel, "name" | "requiredCapability" | "defaultAudioQuality" | "defaultCameraQuality" | "defaultScreenQuality">>): Promise<Channel> {
   return request(`/api/channels/${channelId}`, { method: "PATCH", body: JSON.stringify(input) });
 }
 
@@ -104,8 +105,8 @@ export function updateAdminSettings(settings: ServerSettings): Promise<ServerSet
   return request("/api/admin/settings", { method: "PATCH", body: JSON.stringify(settings) });
 }
 export function listAdminUsers(): Promise<AdminUser[]> { return request("/api/admin/users"); }
-export function updateUserRole(userId: string, role: Role): Promise<AdminUser> {
-  return request(`/api/admin/users/${userId}`, { method: "PATCH", body: JSON.stringify({ role }) });
+export function updateUserCapabilities(userId: string, capabilities: Capability[]): Promise<AdminUser> {
+  return request(`/api/admin/users/${userId}`, { method: "PATCH", body: JSON.stringify({ capabilities }) });
 }
 export function kickUser(userId: string): Promise<{ ok: true }> {
   return request(`/api/admin/users/${userId}/kick`, { method: "POST" });

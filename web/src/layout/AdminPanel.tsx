@@ -1,7 +1,15 @@
 import { useEffect, useState } from "react";
-import type { AdminUser, CurrentUser, Role, ServerSettings } from "../api/client";
+import type { AdminUser, Capability, CurrentUser, ServerSettings } from "../api/client";
+import { CAPABILITIES } from "../api/client";
 import * as api from "../api/client";
 import { Icon } from "../ui/Icon";
+
+const CAPABILITY_LABEL: Record<Capability, string> = {
+  manage_channels: "Manage channels",
+  manage_server: "Manage server",
+  moderate: "Moderate",
+  publish_voice: "Publish in voice",
+};
 
 export function AdminPanel({ currentUser, onClose }: {
   currentUser: CurrentUser;
@@ -17,12 +25,15 @@ export function AdminPanel({ currentUser, onClose }: {
       .catch(() => setError("Could not load server settings."));
   }, []);
 
-  async function changeRole(userId: string, role: Role) {
+  async function toggleCapability(user: AdminUser, capability: Capability) {
+    const capabilities = user.capabilities.includes(capability)
+      ? user.capabilities.filter((value) => value !== capability)
+      : [...user.capabilities, capability];
     try {
-      const updated = await api.updateUserRole(userId, role);
-      setUsers((value) => value.map((user) => user.id === userId ? updated : user));
+      const updated = await api.updateUserCapabilities(user.id, capabilities);
+      setUsers((value) => value.map((entry) => entry.id === user.id ? updated : entry));
     } catch (reason) {
-      setError(reason instanceof api.ApiError && reason.message === "cannot demote the last admin" ? "The server must keep at least one administrator." : "Could not change this role.");
+      setError(reason instanceof api.ApiError && reason.message === "cannot remove manage_server from the last holder" ? "The server must keep at least one member who can manage the server." : "Could not change this user's capabilities.");
     }
   }
 
@@ -61,7 +72,35 @@ export function AdminPanel({ currentUser, onClose }: {
             <div><h3>Public registration</h3><p>Invitations remain usable even when registration is closed.</p></div>
             <button type="button" className={`setting-switch ${settings.registrationOpen ? "active" : ""}`} aria-pressed={settings.registrationOpen} onClick={() => void toggleRegistration()}>{settings.registrationOpen ? "Open" : "Closed"}</button>
           </div>
-          <div className="settings-section"><h3>Members and roles</h3><div className="admin-user-list">{users.map((user) => <div className={`admin-user ${user.bannedAt ? "is-banned" : ""}`} key={user.id}><span className="member-avatar">{user.username[0].toUpperCase()}</span><strong>{user.username}{user.id === currentUser.id ? " (you)" : ""}{user.bannedAt ? <span className="ban-badge">Banned</span> : null}</strong><select aria-label={`Role for ${user.username}`} value={user.role} onChange={(event) => void changeRole(user.id, event.target.value as Role)}><option value="member">Member</option><option value="moderator">Moderator</option><option value="admin">Administrator</option></select>{user.id === currentUser.id ? null : <div className="admin-user-actions"><button type="button" className="danger-link" onClick={() => void kick(user.username, user.id)}>Kick</button><button type="button" className={user.bannedAt ? "" : "danger-link"} onClick={() => void toggleBan(user)}>{user.bannedAt ? "Unban" : "Ban"}</button></div>}</div>)}</div></div>
+          <div className="settings-section">
+            <h3>Members and capabilities</h3>
+            <div className="admin-user-list">
+              {users.map((user) => (
+                <div className={`admin-user ${user.bannedAt ? "is-banned" : ""}`} key={user.id}>
+                  <span className="member-avatar">{user.username[0].toUpperCase()}</span>
+                  <strong>{user.username}{user.id === currentUser.id ? " (you)" : ""}{user.bannedAt ? <span className="ban-badge">Banned</span> : null}</strong>
+                  <div className="admin-user-capabilities">
+                    {CAPABILITIES.map((capability) => (
+                      <label key={capability}>
+                        <input
+                          type="checkbox"
+                          checked={user.capabilities.includes(capability)}
+                          onChange={() => void toggleCapability(user, capability)}
+                        />
+                        {CAPABILITY_LABEL[capability]}
+                      </label>
+                    ))}
+                  </div>
+                  {user.id === currentUser.id ? null : (
+                    <div className="admin-user-actions">
+                      <button type="button" className="danger-link" onClick={() => void kick(user.username, user.id)}>Kick</button>
+                      <button type="button" className={user.bannedAt ? "" : "danger-link"} onClick={() => void toggleBan(user)}>{user.bannedAt ? "Unban" : "Ban"}</button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
           <p className="admin-hint">Channel name, access, and quality settings have moved to the <Icon name="settings" size={13} /> icon next to each channel in the sidebar.</p>
         </div>
       </section>

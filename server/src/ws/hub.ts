@@ -1,4 +1,4 @@
-import { hasAtLeastRole, type Role } from "../roles.js";
+import type { Capability } from "../capabilities.js";
 import type { ServerEvent } from "./protocol.js";
 
 export interface WsLike {
@@ -7,18 +7,18 @@ export interface WsLike {
 }
 
 export interface WsHub {
-  add(userId: string, role: Role, socket: WsLike): void;
+  add(userId: string, capabilities: Capability[], socket: WsLike): void;
   remove(userId: string, socket: WsLike): void;
-  updateRole(userId: string, role: Role): void;
+  updateCapabilities(userId: string, capabilities: Capability[]): void;
   broadcast(event: ServerEvent): void;
-  broadcastToRole(minRole: Role, event: ServerEvent): void;
+  broadcastToCapability(requiredCapability: Capability | null, event: ServerEvent): void;
   onlineUserIds(): string[];
   disconnect(userId: string, code: number, reason: string): void;
 }
 
 export function createHub(): WsHub {
-  // userId -> { role, sockets } (a user may have several tabs/devices)
-  const byUser = new Map<string, { role: Role; sockets: Set<WsLike> }>();
+  // userId -> { capabilities, sockets } (a user may have several tabs/devices)
+  const byUser = new Map<string, { capabilities: Capability[]; sockets: Set<WsLike> }>();
 
   function send(socket: WsLike, event: ServerEvent): void {
     socket.send(JSON.stringify(event));
@@ -36,14 +36,14 @@ export function createHub(): WsHub {
   }
 
   return {
-    add(userId, role, socket) {
+    add(userId, capabilities, socket) {
       let entry = byUser.get(userId);
       const wasOffline = !entry || entry.sockets.size === 0;
       if (!entry) {
-        entry = { role, sockets: new Set() };
+        entry = { capabilities, sockets: new Set() };
         byUser.set(userId, entry);
       } else {
-        entry.role = role;
+        entry.capabilities = capabilities;
       }
       entry.sockets.add(socket);
       if (wasOffline) {
@@ -59,18 +59,18 @@ export function createHub(): WsHub {
         this.broadcast({ type: "presence.offline", userId });
       }
     },
-    updateRole(userId, role) {
+    updateCapabilities(userId, capabilities) {
       const entry = byUser.get(userId);
-      if (entry) entry.role = role;
+      if (entry) entry.capabilities = capabilities;
     },
     broadcast(event) {
       for (const { sockets } of byUser.values()) {
         for (const socket of sockets) send(socket, event);
       }
     },
-    broadcastToRole(minRole, event) {
-      for (const { role, sockets } of byUser.values()) {
-        if (!hasAtLeastRole(role, minRole)) continue;
+    broadcastToCapability(requiredCapability, event) {
+      for (const { capabilities, sockets } of byUser.values()) {
+        if (requiredCapability !== null && !capabilities.includes(requiredCapability)) continue;
         for (const socket of sockets) send(socket, event);
       }
     },

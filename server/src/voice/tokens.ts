@@ -14,7 +14,7 @@ export function loadLiveKitConfig(): LiveKitConfig {
 
 export async function mintVoiceToken(
   config: LiveKitConfig,
-  input: { channelId: string; userId: string; username: string },
+  input: { channelId: string; userId: string; username: string; canPublish: boolean },
 ): Promise<{ token: string; url: string }> {
   const at = new AccessToken(config.apiKey, config.apiSecret, {
     identity: input.userId,
@@ -24,7 +24,7 @@ export async function mintVoiceToken(
   at.addGrant({
     roomJoin: true,
     room: input.channelId,
-    canPublish: true,
+    canPublish: input.canPublish,
     canSubscribe: true,
   });
   const token = await at.toJwt();

@@ -10,8 +10,8 @@ vi.mock("../api/client", async () => {
   return { ...actual, listAdminUsers: vi.fn(), getAdminSettings: vi.fn(), kickUser: vi.fn(), banUser: vi.fn(), unbanUser: vi.fn() };
 });
 
-const admin: CurrentUser = { id: "u1", username: "theo", role: "admin" };
-const alice: AdminUser = { id: "u2", username: "alice", role: "member", createdAt: "now", bannedAt: null };
+const admin: CurrentUser = { id: "u1", username: "theo", capabilities: ["manage_channels", "manage_server", "moderate", "publish_voice"] };
+const alice: AdminUser = { id: "u2", username: "alice", capabilities: [], createdAt: "now", bannedAt: null };
 
 function renderPanel(users: AdminUser[] = [alice]) {
   vi.mocked(api.listAdminUsers).mockResolvedValue(users);
@@ -74,7 +74,7 @@ describe("AdminPanel moderation", () => {
   });
 
   it("hides moderation actions for the current admin's own row", async () => {
-    renderPanel([{ id: admin.id, username: admin.username, role: "admin", createdAt: "now", bannedAt: null }, alice]);
+    renderPanel([{ id: admin.id, username: admin.username, capabilities: ["manage_channels", "manage_server", "moderate", "publish_voice"], createdAt: "now", bannedAt: null }, alice]);
     await screen.findByText("alice");
     const rows = screen.getAllByText(/theo|alice/).map((el) => el.closest(".admin-user"));
     const theoRow = rows.find((row) => row?.textContent?.includes("theo"));

@@ -4,6 +4,7 @@ import type { FastifyInstance } from "fastify";
 import { makeTestDb } from "./helpers/db.js";
 import { buildApp } from "../src/app.js";
 import { hashToken } from "../src/auth/sessions.js";
+import { CAPABILITIES } from "../src/capabilities.js";
 
 let pool: pg.Pool;
 let app: FastifyInstance;
@@ -33,7 +34,8 @@ describe("setup", () => {
     const me = await app.inject({
       method: "GET", url: "/api/me", headers: { cookie: sidCookie(res) },
     });
-    expect(me.json()).toMatchObject({ username: "theo", role: "admin" });
+    expect(me.json().username).toBe("theo");
+    expect(me.json().capabilities.sort()).toEqual([...CAPABILITIES].sort());
   });
 
   it("refuses setup when a user already exists", async () => {
@@ -114,7 +116,7 @@ describe("register", () => {
     expect(res.statusCode).toBe(201);
     const me = await app.inject({ method: "GET", url: "/api/me",
       headers: { cookie: sidCookie(res) } });
-    expect(me.json()).toMatchObject({ username: "alice", role: "member" });
+    expect(me.json()).toMatchObject({ username: "alice", capabilities: ["publish_voice"] });
   });
 
   it("returns 409 with 'username taken' when the username already exists", async () => {
