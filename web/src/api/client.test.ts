@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { ApiError, getSetupStatus, login, getMe, getVoiceToken, listChannels, postMessage } from "./client";
+import { ApiError, getSetupStatus, login, getMe, getVoiceToken, listChannels, postMessage, register } from "./client";
 
 function mockFetchOnce(status: number, body: unknown) {
   vi.stubGlobal(
@@ -34,6 +34,13 @@ describe("api client", () => {
     await expect(login("theo", "wrong")).rejects.toMatchObject({ status: 401, message: "invalid credentials" });
   });
 
+  it("registers without an invite token", async () => {
+    mockFetchOnce(201, { ok: true });
+    await register("alice", "alicepass123");
+    const [, init] = (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(JSON.parse(init.body)).toEqual({ username: "alice", password: "alicepass123" });
+  });
+
   it("getMe rejects with an ApiError instance when unauthenticated", async () => {
     mockFetchOnce(401, { error: "authentication required" });
     await expect(getMe()).rejects.toBeInstanceOf(ApiError);
@@ -61,5 +68,6 @@ describe("api client", () => {
     const [url, init] = (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls[0];
     expect(url).toBe("/api/channels/c2/voice-token");
     expect(init.method).toBe("POST");
+    expect(init.headers).not.toHaveProperty("content-type");
   });
 });

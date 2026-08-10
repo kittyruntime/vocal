@@ -2,7 +2,7 @@ import { useState, type FormEvent } from "react";
 import { useAuth } from "./AuthContext";
 import { ApiError } from "../api/client";
 
-export function LoginScreen() {
+export function LoginScreen({ onShowRegister }: { onShowRegister(): void }) {
   const { signIn } = useAuth();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -43,6 +43,9 @@ export function LoginScreen() {
         )}
         <button type="submit" disabled={submitting}>
           Se connecter
+        </button>
+        <button type="button" className="auth-link" onClick={onShowRegister}>
+          Créer un compte
         </button>
       </form>
     </div>

@@ -104,6 +104,19 @@ describe("login / logout", () => {
 });
 
 describe("register", () => {
+  it("allows public registration without an invite and logs the member in", async () => {
+    await app.inject({ method: "POST", url: "/api/setup",
+      payload: { username: "theo", password: "correct horse battery" } });
+
+    const res = await app.inject({ method: "POST", url: "/api/auth/register",
+      payload: { username: "alice", password: "alicepass123" } });
+
+    expect(res.statusCode).toBe(201);
+    const me = await app.inject({ method: "GET", url: "/api/me",
+      headers: { cookie: sidCookie(res) } });
+    expect(me.json()).toMatchObject({ username: "alice", role: "member" });
+  });
+
   it("returns 409 with 'username taken' when the username already exists", async () => {
     const setup = await app.inject({ method: "POST", url: "/api/setup",
       payload: { username: "theo", password: "correct horse battery" } });

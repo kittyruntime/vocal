@@ -84,31 +84,37 @@ export function registerAuthRoutes(app: FastifyInstance, pool: pg.Pool): void {
   app.post("/api/auth/register", {
     config: { rateLimit: { max: 10, timeWindow: "1 minute" } },
   }, async (req, reply) => {
-    const schema = credentialsSchema.extend({ inviteToken: z.string().min(1) });
+    const schema = credentialsSchema.extend({ inviteToken: z.string().min(1).optional() });
     const body = schema.safeParse(req.body);
     if (!body.success) return reply.code(400).send({ error: "invalid payload" });
     const client = await pool.connect();
     try {
       await client.query("BEGIN");
-      const invite = await client.query(
-        `SELECT id FROM invites
-         WHERE token_hash = $1 AND used_by IS NULL AND expires_at > now()
-         FOR UPDATE`,
-        [hashToken(body.data.inviteToken)],
-      );
-      if (!invite.rowCount) {
-        await client.query("ROLLBACK");
-        return reply.code(403).send({ error: "invalid or expired invite" });
+      let inviteId: string | undefined;
+      if (body.data.inviteToken) {
+        const invite = await client.query<{ id: string }>(
+          `SELECT id FROM invites
+           WHERE token_hash = $1 AND used_by IS NULL AND expires_at > now()
+           FOR UPDATE`,
+          [hashToken(body.data.inviteToken)],
+        );
+        if (!invite.rowCount) {
+          await client.query("ROLLBACK");
+          return reply.code(403).send({ error: "invalid or expired invite" });
+        }
+        inviteId = invite.rows[0].id;
       }
       const hash = await hashPassword(body.data.password);
       const user = await client.query(
         "INSERT INTO users (username, password_hash) VALUES ($1, $2) RETURNING id",
         [body.data.username, hash],
       );
-      await client.query(
-        "UPDATE invites SET used_by = $1, used_at = now() WHERE id = $2",
-        [user.rows[0].id, invite.rows[0].id],
-      );
+      if (inviteId) {
+        await client.query(
+          "UPDATE invites SET used_by = $1, used_at = now() WHERE id = $2",
+          [user.rows[0].id, inviteId],
+        );
+      }
       await client.query("COMMIT");
       const session = await createSession(pool, user.rows[0].id);
       setSidCookie(reply, session.token, session.expiresAt);

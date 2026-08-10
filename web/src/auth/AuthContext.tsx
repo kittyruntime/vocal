@@ -15,7 +15,7 @@ type AuthContextValue = {
   refresh(): Promise<void>;
   completeSetup(username: string, password: string): Promise<void>;
   signIn(username: string, password: string): Promise<void>;
-  signUp(inviteToken: string, username: string, password: string): Promise<void>;
+  signUp(username: string, password: string, inviteToken?: string): Promise<void>;
   signOut(): Promise<void>;
 };
 
@@ -65,10 +65,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const signUp = useCallback(
-    async (inviteToken: string, username: string, password: string) => {
-      await api.register(inviteToken, username, password);
-      // The invite token is single-use; strip it from the URL so it doesn't linger in the
-      // address bar, browser history, or outbound Referer headers after account creation.
+    async (username: string, password: string, inviteToken?: string) => {
+      await api.register(username, password, inviteToken);
+      // Strip a legacy invite token from the URL after account creation.
       window.history.replaceState({}, "", window.location.pathname);
       await refresh();
     },

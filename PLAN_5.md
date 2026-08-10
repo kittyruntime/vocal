@@ -27,6 +27,8 @@ Dernière mise à jour : 2026-08-10
 - [x] Sélection des microphones, caméras et sorties audio.
 - [x] Vumètre local avec seuil visuel persistant.
 - [x] Push-to-talk à la barre Espace, ignoré pendant la saisie.
+- [x] Inscription publique sans invitation, avec session immédiate.
+- [x] Correction des POST sans body (`voice-token` n'envoie plus un faux JSON vide).
 
 ## À faire ensuite
 
@@ -38,8 +40,8 @@ Dernière mise à jour : 2026-08-10
 ## Point de reprise
 
 Le composant principal est `web/src/voice/VoiceView.tsx`. La refonte frontend,
-les périphériques, le vumètre et le push-to-talk sont implémentés. Le prochain
-point prioritaire est de diagnostiquer sur Coolify toute réponse `400` de
-`voice-token` grâce au message API désormais affiché, puis de tester le média à
-deux navigateurs. Toute nouvelle tranche doit finir par les tests frontend et
+les périphériques, le vumètre, le push-to-talk et l'inscription publique sont
+implémentés. Le `400` Fastify sur `voice-token` est corrigé à la source. Le
+prochain point prioritaire est de redéployer sur Coolify puis de tester le média
+à deux navigateurs. Toute nouvelle tranche doit finir par les tests frontend et
 backend, les typechecks, le build, puis une mise à jour de ce fichier.

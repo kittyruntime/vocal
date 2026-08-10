@@ -2,7 +2,7 @@ import { useState, type FormEvent } from "react";
 import { useAuth } from "./AuthContext";
 import { ApiError } from "../api/client";
 
-export function RegisterScreen({ inviteToken }: { inviteToken: string }) {
+export function RegisterScreen({ inviteToken, onShowLogin }: { inviteToken?: string; onShowLogin(): void }) {
   const { signUp } = useAuth();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -14,7 +14,7 @@ export function RegisterScreen({ inviteToken }: { inviteToken: string }) {
     setError(null);
     setSubmitting(true);
     try {
-      await signUp(inviteToken, username, password);
+      await signUp(username, password, inviteToken);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Erreur inattendue");
     } finally {
@@ -43,6 +43,9 @@ export function RegisterScreen({ inviteToken }: { inviteToken: string }) {
         )}
         <button type="submit" disabled={submitting}>
           Créer mon compte
+        </button>
+        <button type="button" className="auth-link" onClick={onShowLogin}>
+          J’ai déjà un compte
         </button>
       </form>
     </div>
