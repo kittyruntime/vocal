@@ -11,6 +11,7 @@ import {
   Send,
   Settings,
   Volume2,
+  X,
   type LucideIcon,
 } from "lucide-react";
 
@@ -26,7 +27,8 @@ type IconName =
   | "plus"
   | "send"
   | "settings"
-  | "volume";
+  | "volume"
+  | "close";
 
 const icons: Record<IconName, LucideIcon> = {
   camera: Camera,
@@ -41,6 +43,7 @@ const icons: Record<IconName, LucideIcon> = {
   send: Send,
   settings: Settings,
   volume: Volume2,
+  close: X,
 };
 
 export function Icon({ name, size = 18 }: { name: IconName; size?: number }) {
