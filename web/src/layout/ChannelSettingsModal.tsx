@@ -57,7 +57,7 @@ export function ChannelSettingsModal({ channel, onUpdated, onDeleted, onClose }:
 
   return (
     <div
-      className="voice-modal-backdrop"
+      className="voice-modal-backdrop channel-settings-backdrop"
       role="presentation"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onClose();

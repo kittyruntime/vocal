@@ -18,6 +18,7 @@ export function AdminPanel({ currentUser, onClose }: {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [settings, setSettings] = useState<ServerSettings>({ registrationOpen: true, maxImageSizeMb: 5, maxFileSizeMb: 10, maxMessageLength: 4000 });
   const [error, setError] = useState("");
+  const [activeTab, setActiveTab] = useState<"members" | "general">("members");
   const canManageServer = currentUser.capabilities.includes("manage_server");
   const canModerate = currentUser.capabilities.includes("moderate");
 
@@ -26,6 +27,12 @@ export function AdminPanel({ currentUser, onClose }: {
       .then(([nextUsers, nextSettings]) => { setUsers(nextUsers); if (nextSettings) setSettings(nextSettings); })
       .catch(() => setError("Could not load server settings."));
   }, [canManageServer]);
+
+  useEffect(() => {
+    const close = (event: KeyboardEvent) => { if (event.key === "Escape") onClose(); };
+    window.addEventListener("keydown", close);
+    return () => window.removeEventListener("keydown", close);
+  }, [onClose]);
 
   async function toggleCapability(user: AdminUser, capability: Capability) {
     const capabilities = user.capabilities.includes(capability)
@@ -79,31 +86,36 @@ export function AdminPanel({ currentUser, onClose }: {
   }
 
   return (
-    <div className="voice-modal-backdrop admin-backdrop" role="presentation">
+    <div className="voice-modal-backdrop admin-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
       <section className="voice-settings-modal admin-modal" role="dialog" aria-modal="true" aria-labelledby="admin-title">
         <header><div><span>ADMINISTRATION</span><h2 id="admin-title">Server settings</h2></div><button type="button" className="modal-close" aria-label="Close administration" onClick={onClose}><Icon name="close" size={20} /></button></header>
-        <div className="voice-settings-content">
+        <nav className="settings-tabs" aria-label="Server settings sections">
+          <button type="button" className={activeTab === "members" ? "active" : ""} aria-pressed={activeTab === "members"} onClick={() => setActiveTab("members")}><Icon name="users" size={17} /> Members</button>
+          {canManageServer ? <button type="button" className={activeTab === "general" ? "active" : ""} aria-pressed={activeTab === "general"} onClick={() => setActiveTab("general")}><Icon name="settings" size={17} /> General</button> : null}
+        </nav>
+        <div className="voice-settings-content admin-settings-content">
           {error ? <p className="admin-error" role="alert">{error}</p> : null}
-          {canManageServer ? <div className="settings-section admin-setting-row">
+          {activeTab === "general" && canManageServer ? <><div className="settings-section admin-setting-row">
             <div><h3>Public registration</h3><p>Invitations remain usable even when registration is closed.</p></div>
             <button type="button" className={`setting-switch ${settings.registrationOpen ? "active" : ""}`} aria-pressed={settings.registrationOpen} onClick={() => void toggleRegistration()}>{settings.registrationOpen ? "Open" : "Closed"}</button>
-          </div> : null}
-          {canManageServer ? <div className="settings-section">
+          </div>
+          <div className="settings-section">
             <h3>Attachment limits</h3>
             <p className="admin-setting-description">Maximum size accepted for each uploaded item. The hard server limit is 50 MB.</p>
             <div className="attachment-limit-grid">
               <label>Images (MB)<input type="number" min="1" max="50" value={settings.maxImageSizeMb} onChange={(event) => setSettings({ ...settings, maxImageSizeMb: Number(event.target.value) })} onBlur={() => void saveUploadLimits(settings)} /></label>
               <label>Other files (MB)<input type="number" min="1" max="50" value={settings.maxFileSizeMb} onChange={(event) => setSettings({ ...settings, maxFileSizeMb: Number(event.target.value) })} onBlur={() => void saveUploadLimits(settings)} /></label>
             </div>
-          </div> : null}
-          {canManageServer ? <div className="settings-section">
+          </div>
+          <div className="settings-section">
             <h3>Message length</h3>
             <p className="admin-setting-description">Maximum number of characters allowed in a single message.</p>
             <div className="attachment-limit-grid single-setting">
               <label>Characters per message<input type="number" min="100" max="10000" step="100" value={settings.maxMessageLength} onChange={(event) => setSettings({ ...settings, maxMessageLength: Number(event.target.value) })} onBlur={() => void saveUploadLimits(settings)} /></label>
             </div>
-          </div> : null}
-          <div className="settings-section">
+          </div>
+          <p className="admin-hint">Channel-specific access and voice quality remain under the <Icon name="settings" size={13} /> icon beside each channel.</p></> : null}
+          {activeTab === "members" ? <div className="settings-section">
             <h3>Members and capabilities</h3>
             <div className="admin-user-list">
               {users.map((user) => (
@@ -130,8 +142,7 @@ export function AdminPanel({ currentUser, onClose }: {
                 </div>
               ))}
             </div>
-          </div>
-          <p className="admin-hint">Channel name, access, and quality settings have moved to the <Icon name="settings" size={13} /> icon next to each channel in the sidebar.</p>
+          </div> : null}
         </div>
       </section>
     </div>
