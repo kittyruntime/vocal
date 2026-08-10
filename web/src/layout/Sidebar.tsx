@@ -3,6 +3,7 @@ import type { Channel, CurrentUser } from "../api/client";
 import * as api from "../api/client";
 import { useToast } from "../toast/ToastContext";
 import type { VoiceParticipant } from "../ws/protocol";
+import { Icon } from "../ui/Icon";
 
 export function Sidebar({
   channels,
@@ -76,7 +77,7 @@ function ChannelGroup({
   if (channels.length === 0) return null;
   return (
     <section className="channel-group">
-      <h2><span>⌄</span> {title}</h2>
+      <h2><Icon name="chevron" size={13} /> {title}</h2>
       <ul>
         {channels.map((channel) => {
           const occupants = voiceOccupancy[channel.id] ?? [];
@@ -86,7 +87,7 @@ function ChannelGroup({
               className={channel.id === selectedChannelId ? "channel-link active" : "channel-link"}
               onClick={() => onSelectChannel(channel.id)}
             >
-              <span className="channel-icon" aria-hidden="true">{channel.type === "voice" ? "◖))" : "#"}</span>
+              <span className="channel-icon" aria-hidden="true"><Icon name={channel.type === "voice" ? "volume" : "hash"} /></span>
               <span className="channel-name">{channel.name}</span>
             </button>
             {channel.type === "voice" && occupants.length > 0 && (
@@ -135,7 +136,7 @@ function CreateChannelForm({
 
   return (
     <details className="create-channel">
-      <summary>＋ Créer un salon</summary>
+      <summary><Icon name="plus" size={15} /> Créer un salon</summary>
       <form onSubmit={handleSubmit}>
       <input
         aria-label="Nom du nouveau channel"

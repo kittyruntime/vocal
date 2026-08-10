@@ -14,6 +14,7 @@ import {
 import type { Channel, CurrentUser } from "../api/client";
 import * as api from "../api/client";
 import { useToast } from "../toast/ToastContext";
+import { Icon } from "../ui/Icon";
 
 type VoiceStatus = "idle" | "connecting" | "connected";
 type DeviceSelections = Partial<Record<MediaDeviceKind, string>>;
@@ -344,10 +345,10 @@ export function VoiceView({ channel, currentUser }: { channel: Channel; currentU
 
   return (
     <section className="voice-view" aria-label={`Salon vocal ${channel.name}`}>
-      <header className="chat-header"><span className="header-channel-icon">◖))</span> {channel.name}</header>
+      <header className="chat-header"><span className="header-channel-icon"><Icon name="volume" size={21} /></span> {channel.name}</header>
       <div className="voice-stage">
         <div className="voice-hero">
-          <div className="voice-hero-icon">◖))</div>
+          <div className="voice-hero-icon"><Icon name="volume" size={28} /></div>
           <h1>{channel.name}</h1>
           <p>{status === "connected" ? `Connecté en tant que ${currentUser.username}` : "Rejoignez le salon pour parler, partager votre caméra ou votre écran."}</p>
         </div>
@@ -365,7 +366,7 @@ export function VoiceView({ channel, currentUser }: { channel: Channel; currentU
         ) : (
           <>
           <details className="voice-settings-panel">
-            <summary>⚙ Réglages audio et vidéo</summary>
+            <summary><Icon name="settings" size={16} /> Réglages audio et vidéo</summary>
             <div className="voice-meter" aria-label={`Niveau du microphone ${Math.round(audioLevel * 100)} %`}>
               <span style={{ width: `${Math.min(audioLevel * 100, 100)}%` }} />
               <i style={{ left: `${settings.vadThreshold * 100}%` }} />
@@ -408,21 +409,27 @@ export function VoiceView({ channel, currentUser }: { channel: Channel; currentU
           </details>
           <div className="voice-controls" aria-label="Contrôles du salon vocal">
             <button type="button" className={!microphoneEnabled ? "control-off" : ""} onClick={() => void toggleMicrophone()}>
+              <Icon name="microphone" size={16} />
               {settings.pushToTalk ? (microphoneEnabled ? "Vous parlez…" : "Maintenez Espace") : (microphoneEnabled ? "Couper le micro" : "Rétablir le micro")}
             </button>
             <button type="button" aria-pressed={settings.pushToTalk} onClick={() => void togglePushToTalk()}>
+              <Icon name="microphone" size={16} />
               {settings.pushToTalk ? "Désactiver PTT" : "Activer PTT"}
             </button>
             <button type="button" className={deafened ? "control-off" : ""} aria-pressed={deafened} onClick={toggleDeafen}>
+              <Icon name="headphones" size={16} />
               {deafened ? "Rétablir le son" : "Assourdir"}
             </button>
             <button type="button" className={!cameraEnabled ? "control-off" : ""} aria-pressed={cameraEnabled} onClick={() => void toggleCamera()}>
+              <Icon name="camera" size={16} />
               {cameraEnabled ? "Arrêter la caméra" : "Activer la caméra"}
             </button>
             <button type="button" className={!screenShareEnabled ? "control-off" : ""} aria-pressed={screenShareEnabled} onClick={() => void toggleScreenShare()}>
+              <Icon name="monitor" size={16} />
               {screenShareEnabled ? "Arrêter le partage" : "Partager l’écran"}
             </button>
             <button type="button" className="voice-danger" onClick={() => void leaveRoom()}>
+              <Icon name="phone" size={16} />
               Quitter
             </button>
           </div>
