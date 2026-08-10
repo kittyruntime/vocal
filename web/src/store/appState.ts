@@ -7,6 +7,7 @@ export type AppState = {
   selectedChannelId: string | null;
   messagesByChannel: Record<string, Message[]>;
   onlineUserIds: string[];
+  voiceOccupancy: Record<string, string[]>;
   connectionStatus: ConnectionStatus;
 };
 
@@ -16,6 +17,7 @@ export const initialAppState: AppState = {
   selectedChannelId: null,
   messagesByChannel: {},
   onlineUserIds: [],
+  voiceOccupancy: {},
   connectionStatus: "connecting",
 };
 
@@ -30,6 +32,9 @@ export type AppAction =
   | { type: "presence/sync"; userIds: string[] }
   | { type: "presence/online"; userId: string }
   | { type: "presence/offline"; userId: string }
+  | { type: "voice/sync"; channels: Record<string, string[]> }
+  | { type: "voice/joined"; channelId: string; userId: string }
+  | { type: "voice/left"; channelId: string; userId: string }
   | { type: "connection/status"; status: ConnectionStatus };
 
 export function appReducer(state: AppState, action: AppAction): AppState {
@@ -81,6 +86,28 @@ export function appReducer(state: AppState, action: AppAction): AppState {
         : { ...state, onlineUserIds: [...state.onlineUserIds, action.userId] };
     case "presence/offline":
       return { ...state, onlineUserIds: state.onlineUserIds.filter((id) => id !== action.userId) };
+    case "voice/sync":
+      return { ...state, voiceOccupancy: action.channels };
+    case "voice/joined": {
+      const occupants = state.voiceOccupancy[action.channelId] ?? [];
+      if (occupants.includes(action.userId)) return state;
+      return {
+        ...state,
+        voiceOccupancy: {
+          ...state.voiceOccupancy,
+          [action.channelId]: [...occupants, action.userId],
+        },
+      };
+    }
+    case "voice/left": {
+      const occupants = (state.voiceOccupancy[action.channelId] ?? []).filter(
+        (id) => id !== action.userId,
+      );
+      const voiceOccupancy = { ...state.voiceOccupancy };
+      if (occupants.length === 0) delete voiceOccupancy[action.channelId];
+      else voiceOccupancy[action.channelId] = occupants;
+      return { ...state, voiceOccupancy };
+    }
     case "connection/status":
       return { ...state, connectionStatus: action.status };
     default:

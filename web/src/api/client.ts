@@ -20,6 +20,8 @@ export type Message = {
   createdAt: string;
 };
 
+export type VoiceToken = { token: string; url: string };
+
 export class ApiError extends Error {
   status: number;
   constructor(status: number, message: string) {
@@ -92,4 +94,8 @@ export function listMessages(channelId: string, opts?: { before?: string; limit?
 
 export function postMessage(channelId: string, content: string): Promise<Message> {
   return request(`/api/channels/${channelId}/messages`, { method: "POST", body: JSON.stringify({ content }) });
+}
+
+export function getVoiceToken(channelId: string): Promise<VoiceToken> {
+  return request(`/api/channels/${channelId}/voice-token`, { method: "POST" });
 }

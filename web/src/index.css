@@ -151,6 +151,16 @@ input, select { font: inherit; }
   color: #ffffff;
 }
 
+.voice-occupants {
+  margin: 2px 0 4px 30px;
+  color: #949ba4;
+  font-size: 0.8rem;
+}
+
+.voice-occupants li {
+  padding: 2px 0;
+}
+
 .sidebar-presence {
   padding: 8px;
   font-size: 0.75rem;
@@ -243,6 +253,59 @@ input, select { font: inherit; }
   align-items: center;
   justify-content: center;
   color: #949ba4;
+}
+
+.voice-view {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.voice-stage {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  text-align: center;
+}
+
+.voice-stage h1,
+.voice-stage p {
+  margin: 0;
+}
+
+.voice-stage p {
+  color: #949ba4;
+}
+
+.voice-primary,
+.voice-controls button {
+  border: 0;
+  border-radius: 4px;
+  padding: 9px 14px;
+  background: #5865f2;
+  color: white;
+  cursor: pointer;
+}
+
+.voice-primary:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+.voice-controls {
+  display: flex;
+  gap: 8px;
+}
+
+.voice-controls .voice-danger {
+  background: #da373c;
+}
+
+.remote-audio {
+  display: none;
 }
 
 .toast-viewport {

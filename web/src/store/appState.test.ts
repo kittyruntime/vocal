@@ -68,6 +68,22 @@ describe("appReducer", () => {
     expect(state.onlineUserIds).toEqual(["u2"]);
   });
 
+  it("voice/sync replaces voice occupancy", () => {
+    const state = appReducer(initialAppState, {
+      type: "voice/sync",
+      channels: { c2: ["u1", "u2"] },
+    });
+    expect(state.voiceOccupancy).toEqual({ c2: ["u1", "u2"] });
+  });
+
+  it("voice join and leave events are idempotent and remove empty rooms", () => {
+    const joined = appReducer(initialAppState, { type: "voice/joined", channelId: "c2", userId: "u1" });
+    const duplicate = appReducer(joined, { type: "voice/joined", channelId: "c2", userId: "u1" });
+    expect(duplicate.voiceOccupancy).toEqual({ c2: ["u1"] });
+    const left = appReducer(duplicate, { type: "voice/left", channelId: "c2", userId: "u1" });
+    expect(left.voiceOccupancy).toEqual({});
+  });
+
   it("connection/status updates the status", () => {
     const state = appReducer(initialAppState, { type: "connection/status", status: "open" });
     expect(state.connectionStatus).toBe("open");
