@@ -8,7 +8,7 @@ import { channelRequiredCapability } from "../channels/lookup.js";
 import type { Capability } from "../capabilities.js";
 
 const idSchema = z.object({ id: z.uuid() });
-const postSchema = z.object({ content: z.string().max(4000) });
+const postSchema = z.object({ content: z.string().max(10000) });
 const querySchema = z.object({
   before: z.string().datetime().optional(),
   limit: z.coerce.number().int().min(1).max(100).optional(),
@@ -53,11 +53,15 @@ export function registerMessageRoutes(
     if (!parsedContent.success || (content.trim().length === 0 && attachments.length === 0)) {
       return reply.code(400).send({ error: "message cannot be empty" });
     }
-    const settings = await pool.query<{ max_image_size_mb: number; max_file_size_mb: number }>(
-      "SELECT max_image_size_mb, max_file_size_mb FROM server_settings WHERE singleton = true",
+    const settings = await pool.query<{ max_image_size_mb: number; max_file_size_mb: number; max_message_length: number }>(
+      "SELECT max_image_size_mb, max_file_size_mb, max_message_length FROM server_settings WHERE singleton = true",
     );
     const maxImageBytes = (settings.rows[0]?.max_image_size_mb ?? 5) * 1024 * 1024;
     const maxFileBytes = (settings.rows[0]?.max_file_size_mb ?? 10) * 1024 * 1024;
+    const maxMessageLength = settings.rows[0]?.max_message_length ?? 4000;
+    if (parsedContent.data.content.length > maxMessageLength) {
+      return reply.code(413).send({ error: `message exceeds the ${maxMessageLength} character limit` });
+    }
     for (const attachment of attachments) {
       const isImage = attachment.mimeType.startsWith("image/");
       if (attachment.content.length > (isImage ? maxImageBytes : maxFileBytes)) {

@@ -165,6 +165,17 @@ describe("ChatView", () => {
     await waitFor(() => expect(api.postMessage).toHaveBeenCalledWith("c1", "", [file]));
   });
 
+  it("enforces the configured character limit in the composer", async () => {
+    vi.mocked(api.listMessages).mockResolvedValue([]);
+    render(
+      <ToastProvider><ChatView channel={channel} maxMessageLength={100} messages={[]} onMessagesLoaded={vi.fn()} onMessagesPrepended={vi.fn()} /></ToastProvider>,
+    );
+    const input = screen.getByLabelText("Message in général");
+    await userEvent.setup().type(input, "x".repeat(101));
+    expect(input).toHaveValue("x".repeat(100));
+    expect(screen.getByLabelText("100 of 100 characters")).toBeInTheDocument();
+  });
+
   it("loads older messages when scrolled to the top", async () => {
     vi.mocked(api.listMessages)
       .mockResolvedValueOnce([])

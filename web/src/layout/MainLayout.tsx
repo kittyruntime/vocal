@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useReducer, useRef, useState } from "react";
-import type { Channel, CurrentUser } from "../api/client";
+import type { Channel, ChatSettings, CurrentUser } from "../api/client";
 import * as api from "../api/client";
 import { appReducer, initialAppState } from "../store/appState";
 import { createSocketClient } from "../ws/socketClient";
@@ -22,6 +22,7 @@ export function MainLayout({ currentUser }: { currentUser: CurrentUser }) {
   const [retainedVoiceChannel, setRetainedVoiceChannel] = useState<Channel | null>(null);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [chatSettings, setChatSettings] = useState<ChatSettings>({ maxImageSizeMb: 5, maxFileSizeMb: 10, maxMessageLength: 4000 });
   const joinedVoiceChannelIdRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -39,6 +40,8 @@ export function MainLayout({ currentUser }: { currentUser: CurrentUser }) {
       .then((channels) => dispatch({ type: "channels/set", channels }))
       .catch(() => showToast("Could not load channels"));
   }, [showToast]);
+
+  useEffect(() => { void api.getChatSettings().then(setChatSettings).catch(() => {}); }, []);
 
   useEffect(() => {
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
@@ -131,6 +134,7 @@ export function MainLayout({ currentUser }: { currentUser: CurrentUser }) {
           {selectedChannel?.type === "text" ? (
             <ChatView
               channel={selectedChannel}
+              maxMessageLength={chatSettings.maxMessageLength}
               messages={state.messagesByChannel[selectedChannel.id] ?? []}
               onMessagesLoaded={(messages) =>
                 dispatch({ type: "messages/loaded", channelId: selectedChannel.id, messages })

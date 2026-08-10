@@ -23,7 +23,8 @@ export type Channel = {
   defaultScreenQuality?: "low" | "standard" | "high" | "game";
 };
 export type AdminUser = CurrentUser & { createdAt: string; bannedAt: string | null; voiceMuted: boolean };
-export type ServerSettings = { registrationOpen: boolean; maxImageSizeMb: number; maxFileSizeMb: number };
+export type ChatSettings = { maxImageSizeMb: number; maxFileSizeMb: number; maxMessageLength: number };
+export type ServerSettings = ChatSettings & { registrationOpen: boolean };
 
 export type Message = {
   id: string;
@@ -117,6 +118,7 @@ export function deleteChannel(channelId: string): Promise<void> {
 }
 
 export function getAdminSettings(): Promise<ServerSettings> { return request("/api/admin/settings"); }
+export function getChatSettings(): Promise<ChatSettings> { return request("/api/chat-settings"); }
 export function updateAdminSettings(settings: ServerSettings): Promise<ServerSettings> {
   return request("/api/admin/settings", { method: "PATCH", body: JSON.stringify(settings) });
 }
