@@ -136,6 +136,33 @@ describe("POST /api/voice/webhook", () => {
     expect(res.statusCode).toBe(200);
   });
 
+  it("accepts the real LiveKit content-type (application/webhook+json)", async () => {
+    const ch = await app.inject({ method: "POST", url: "/api/channels",
+      headers: { cookie: adminCookie }, payload: { name: "salle", type: "voice" } });
+    const channelId = ch.json().id;
+
+    const ws = openWs(adminCookie);
+    await new Promise((r) => ws.once("open", r));
+    await nextMessage(ws); // presence.sync
+    await nextMessage(ws); // voice.sync (empty)
+
+    const eventP = nextMessage(ws);
+    const body = JSON.stringify({
+      event: "participant_joined",
+      room: { name: channelId },
+      participant: { identity: "some-user-id" },
+    });
+    const res = await app.inject({ method: "POST", url: "/api/voice/webhook",
+      headers: { "content-type": "application/webhook+json", authorization: await signWebhook(body) },
+      payload: body });
+    expect(res.statusCode).toBe(200);
+
+    const event = await eventP;
+    expect(event).toEqual({ type: "voice.joined", channelId, userId: "some-user-id" });
+
+    ws.close();
+  });
+
   it("ignores a participant_joined for a channel that no longer exists", async () => {
     const body = JSON.stringify({
       event: "participant_joined",

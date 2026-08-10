@@ -44,9 +44,13 @@ export function registerVoiceWebhookRoute(
   // parser inside `app.register(async (instance) => ...)` keeps every other
   // route on the default JSON parser.
   app.register(async (instance) => {
-    instance.addContentTypeParser("application/json", { parseAs: "string" }, (_req, body, done) => {
-      done(null, body);
-    });
+    instance.addContentTypeParser(
+      ["application/json", "application/webhook+json"],
+      { parseAs: "string" },
+      (_req, body, done) => {
+        done(null, body);
+      },
+    );
 
     instance.post("/api/voice/webhook", async (req, reply) => {
       const rawBody = req.body as string;
