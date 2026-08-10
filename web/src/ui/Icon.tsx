@@ -1,5 +1,6 @@
 import {
   Camera,
+  CameraOff,
   File,
   ChevronDown,
   Hash,
@@ -10,6 +11,7 @@ import {
   Mic,
   Minimize2,
   MonitorUp,
+  MonitorOff,
   PhoneOff,
   Plus,
   Send,
@@ -21,6 +23,7 @@ import {
 
 type IconName =
   | "camera"
+  | "cameraOff"
   | "file"
   | "chevron"
   | "hash"
@@ -31,6 +34,7 @@ type IconName =
   | "microphone"
   | "minimize"
   | "monitor"
+  | "monitorOff"
   | "phone"
   | "plus"
   | "send"
@@ -40,6 +44,7 @@ type IconName =
 
 const icons: Record<IconName, LucideIcon> = {
   camera: Camera,
+  cameraOff: CameraOff,
   file: File,
   chevron: ChevronDown,
   hash: Hash,
@@ -50,6 +55,7 @@ const icons: Record<IconName, LucideIcon> = {
   microphone: Mic,
   minimize: Minimize2,
   monitor: MonitorUp,
+  monitorOff: MonitorOff,
   phone: PhoneOff,
   plus: Plus,
   send: Send,
