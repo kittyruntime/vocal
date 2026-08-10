@@ -9,5 +9,12 @@ services:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+  livekit:
+    image: livekit/livekit-server:latest
+    command: --dev
+    ports:
+      - "7880:7880"
+      - "7881:7881"
+      - "7882:7882/udp"
 volumes:
   pgdata:
