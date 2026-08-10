@@ -54,7 +54,7 @@ Dernière mise à jour : 2026-08-10
 
 ## À faire ensuite
 
-- [ ] Appliquer réellement le seuil VAD à la transmission (le seuil actuel est visuel).
+- [x] Appliquer réellement le seuil VAD à la transmission avec porte audio et délai anti-coupure.
 - [ ] Reconnexion et messages d'erreur média détaillés.
 - [ ] Vérification réelle à deux navigateurs via le déploiement Coolify.
 - [ ] TURN/TLS et durcissement production.
@@ -63,9 +63,14 @@ Dernière mise à jour : 2026-08-10
 
 Le composant principal est `web/src/voice/VoiceView.tsx`. La refonte frontend,
 les périphériques, le vumètre, le push-to-talk, les vues d'appel animées, les
-profils de qualité et l'inscription publique sont implémentés. Le `400` Fastify
-sur `voice-token` est corrigé à la source. Le prochain point prioritaire est de
-redéployer sur Coolify puis de tester le média à deux navigateurs, notamment le
-mode Jeu selon les limites du navigateur et de la connexion. Toute nouvelle
+profils de qualité, l'administration serveur et la porte audio VAD sont
+implémentés. La porte audio vit dans `web/src/voice/VoiceGateProcessor.ts` : elle
+ouvre le signal au-dessus du seuil et conserve 280 ms de marge avant fermeture.
+
+**Prochaine étape exacte :** implémenter la reconnexion LiveKit avec un état
+visuel dédié et des messages différenciés pour refus de permissions micro,
+caméra, partage annulé, périphérique absent et perte réseau. Ensuite seulement,
+redéployer sur Coolify et effectuer le test réel à deux navigateurs, notamment
+le mode Jeu selon les limites du navigateur et de la connexion. Toute nouvelle
 tranche doit finir par les tests frontend et backend, les typechecks, le build,
 puis une mise à jour de ce fichier.
