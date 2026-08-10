@@ -677,7 +677,6 @@ export function VoiceView({
                     <span className="participant-avatar">{participant.name.slice(0, 1).toUpperCase()}</span>
                   </div>
                   <strong>{participant.name}{participant.local ? " (you)" : ""}</strong>
-                  <span>{speaking ? "Speaking" : "Listening"}</span>
                 </article>
               );
             })}
