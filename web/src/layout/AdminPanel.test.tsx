@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { AdminPanel } from "./AdminPanel";
 import * as api from "../api/client";
@@ -13,12 +13,14 @@ vi.mock("../api/client", async () => {
 const admin: CurrentUser = { id: "u1", username: "theo", capabilities: ["manage_channels", "manage_server", "moderate", "publish_voice"] };
 const alice: AdminUser = { id: "u2", username: "alice", capabilities: [], createdAt: "now", bannedAt: null, voiceMuted: false };
 
-function renderPanel(users: AdminUser[] = [alice]) {
+function renderPanel(users: AdminUser[] = [alice], openMembers = true) {
   vi.mocked(api.listAdminUsers).mockResolvedValue(users);
   vi.mocked(api.getAdminSettings).mockResolvedValue({ registrationOpen: true, maxImageSizeMb: 5, maxFileSizeMb: 10, maxMessageLength: 4000 });
-  return render(
+  const result = render(
     <AdminPanel currentUser={admin} onClose={vi.fn()} />,
   );
+  if (openMembers) fireEvent.click(screen.getByRole("button", { name: /Members/ }));
+  return result;
 }
 
 beforeEach(() => {
@@ -30,6 +32,18 @@ beforeEach(() => {
 });
 
 describe("AdminPanel moderation", () => {
+  it("opens on General and paginates the member directory", async () => {
+    const members = Array.from({ length: 9 }, (_, index): AdminUser => ({ ...alice, id: `u${index + 2}`, username: `member-${index + 1}` }));
+    renderPanel(members, false);
+    expect(screen.getByRole("button", { name: "General" })).toHaveAttribute("aria-pressed", "true");
+    await userEvent.setup().click(screen.getByRole("button", { name: /Members/ }));
+    expect(await screen.findByText("member-8")).toBeInTheDocument();
+    expect(screen.queryByText("member-9")).not.toBeInTheDocument();
+    await userEvent.setup().click(screen.getByRole("button", { name: "Next" }));
+    expect(screen.getByText("member-9")).toBeInTheDocument();
+    expect(screen.getByText("Page 2 of 2")).toBeInTheDocument();
+  });
+
   it("kicks a user after confirmation", async () => {
     vi.mocked(api.kickUser).mockResolvedValue({ ok: true });
     renderPanel();
