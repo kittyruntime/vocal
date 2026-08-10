@@ -111,10 +111,11 @@ describe("profile", () => {
       payload: { username: "theo", password: "correct horse battery" } });
     const cookie = sidCookie(setup);
     const avatarUrl = `data:image/png;base64,${Buffer.from("avatar").toString("base64")}`;
+    const bannerUrl = `data:image/jpeg;base64,${Buffer.from("banner").toString("base64")}`;
 
     const update = await app.inject({
       method: "PATCH", url: "/api/me", headers: { cookie },
-      payload: { username: "theophile", email: "theo@example.com", description: "Building Vocal", avatarUrl },
+      payload: { username: "theophile", email: "theo@example.com", description: "Building Vocal", avatarUrl, bannerUrl },
     });
 
     expect(update.statusCode).toBe(200);
@@ -125,6 +126,15 @@ describe("profile", () => {
     expect(avatar.statusCode).toBe(200);
     expect(avatar.headers["content-type"]).toContain("image/png");
     expect(avatar.rawPayload).toEqual(Buffer.from("avatar"));
+    const profile = await app.inject({ method: "GET", url: `/api/users/${me.json().id}/profile`, headers: { cookie } });
+    expect(profile.json()).toEqual({
+      id: me.json().id, username: "theophile", description: "Building Vocal",
+      avatarUrl: `/api/users/${me.json().id}/avatar`, bannerUrl: `/api/users/${me.json().id}/banner`,
+    });
+    expect(profile.json()).not.toHaveProperty("email");
+    const banner = await app.inject({ method: "GET", url: profile.json().bannerUrl, headers: { cookie } });
+    expect(banner.headers["content-type"]).toContain("image/jpeg");
+    expect(banner.rawPayload).toEqual(Buffer.from("banner"));
   });
 
   it("allows a profile without an email address", async () => {

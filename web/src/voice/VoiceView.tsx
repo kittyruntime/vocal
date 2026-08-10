@@ -172,6 +172,7 @@ export function VoiceView({
   currentUser,
   visible = true,
   onOpenSidebar,
+  onViewProfile,
   onSpeakingChange,
   onParticipantsChange,
   onSelfPresenceChange,
@@ -180,6 +181,7 @@ export function VoiceView({
   currentUser: CurrentUser;
   visible?: boolean;
   onOpenSidebar?(): void;
+  onViewProfile?(userId: string): void;
   onSpeakingChange?(userIds: string[]): void;
   onParticipantsChange?(participants: { userId: string; username: string; avatarUrl?: string | null }[]): void;
   onSelfPresenceChange?(present: boolean): void;
@@ -732,7 +734,7 @@ export function VoiceView({
             {callParticipants.map((participant) => {
               const speaking = activeSpeakerIds.has(participant.identity) || (participant.local && localSpeaking);
               return (
-                <article key={participant.identity} className={`voice-participant ${speaking ? "is-speaking" : ""}`}>
+                <article key={participant.identity} className={`voice-participant ${speaking ? "is-speaking" : ""}`} onClick={() => onViewProfile?.(participant.identity)}>
                   <div className="participant-avatar-wrap">
                     <span className="participant-avatar">{participant.avatarUrl ? <img src={participant.avatarUrl} alt="" /> : participant.name.slice(0, 1).toUpperCase()}</span>
                   </div>

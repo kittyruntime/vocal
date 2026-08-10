@@ -26,6 +26,7 @@ export function Sidebar({
   onChannelCreated,
   onChannelUpdated,
   onChannelDeleted,
+  onViewProfile,
 }: {
   channels: Channel[];
   selectedChannelId: string | null;
@@ -38,6 +39,7 @@ export function Sidebar({
   onChannelCreated(channel: Channel): void;
   onChannelUpdated?(channel: Channel): void;
   onChannelDeleted?(channelId: string): void;
+  onViewProfile?(userId: string): void;
 }) {
   const { showToast } = useToast();
   const textChannels = channels.filter((c) => c.type === "text");
@@ -65,6 +67,7 @@ export function Sidebar({
         unreadChannelIds={unreadChannelIds}
         onSelectChannel={onSelectChannel}
         onEditChannel={canManageChannels ? setEditingChannelId : undefined}
+        onViewProfile={onViewProfile}
       />
       <ChannelGroup
         title="Voice channels"
@@ -76,6 +79,7 @@ export function Sidebar({
         unreadChannelIds={unreadChannelIds}
         onSelectChannel={onSelectChannel}
         onEditChannel={canManageChannels ? setEditingChannelId : undefined}
+        onViewProfile={onViewProfile}
       />
       <p className="sidebar-presence"><span className="online-dot" /> {onlineUserIds.length} online</p>
       {(canManageServer || canModerate) && (
@@ -114,6 +118,7 @@ function ChannelGroup({
   unreadChannelIds,
   onSelectChannel,
   onEditChannel,
+  onViewProfile,
 }: {
   title: string;
   channels: Channel[];
@@ -124,6 +129,7 @@ function ChannelGroup({
   unreadChannelIds?: string[];
   onSelectChannel(channelId: string): void;
   onEditChannel?(channelId: string): void;
+  onViewProfile?(userId: string): void;
 }) {
   if (channels.length === 0) return null;
   return (
@@ -162,7 +168,7 @@ function ChannelGroup({
                 {occupants.map((participant) => {
                   const speaking = voiceSpeakingUserIds?.includes(participant.userId) ?? false;
                   return (
-                    <li key={participant.userId} className={speaking ? "is-speaking" : ""}>
+                    <li key={participant.userId} className={speaking ? "is-speaking" : ""} onClick={() => onViewProfile?.(participant.userId)}>
                       <span className="member-avatar">{participant.avatarUrl ? <img src={participant.avatarUrl} alt="" /> : participant.username.slice(0, 1).toUpperCase()}</span>
                       {participant.userId === currentUserId ? `${participant.username} (you)` : participant.username}
                     </li>
