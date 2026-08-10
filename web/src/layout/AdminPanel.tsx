@@ -29,6 +29,25 @@ export function AdminPanel({ channels, currentUser, onChannelUpdated, onChannelD
     }
   }
 
+  async function kick(username: string, userId: string) {
+    if (!window.confirm(`Expulser ${username} ? Ses sessions actives seront déconnectées ; iel pourra se reconnecter.`)) return;
+    try {
+      await api.kickUser(userId);
+    } catch {
+      setError("Impossible d’expulser cet utilisateur.");
+    }
+  }
+
+  async function toggleBan(user: AdminUser) {
+    if (!user.bannedAt && !window.confirm(`Bannir ${user.username} ? Iel sera déconnecté·e et ne pourra plus se reconnecter tant que le bannissement n’est pas levé.`)) return;
+    try {
+      const updated = user.bannedAt ? await api.unbanUser(user.id) : await api.banUser(user.id);
+      setUsers((value) => value.map((value_) => value_.id === user.id ? updated : value_));
+    } catch (reason) {
+      setError(reason instanceof api.ApiError && reason.message === "cannot ban yourself" ? "Tu ne peux pas te bannir toi-même." : "Impossible de modifier le statut de bannissement.");
+    }
+  }
+
   async function toggleRegistration() {
     try {
       setSettings(await api.updateAdminSettings({ registrationOpen: !settings.registrationOpen }));
@@ -45,7 +64,7 @@ export function AdminPanel({ channels, currentUser, onChannelUpdated, onChannelD
             <div><h3>Inscriptions publiques</h3><p>Les invitations restent utilisables lorsque les inscriptions sont fermées.</p></div>
             <button type="button" className={`setting-switch ${settings.registrationOpen ? "active" : ""}`} aria-pressed={settings.registrationOpen} onClick={() => void toggleRegistration()}>{settings.registrationOpen ? "Ouvertes" : "Fermées"}</button>
           </div>
-          <div className="settings-section"><h3>Membres et rôles</h3><div className="admin-user-list">{users.map((user) => <div className="admin-user" key={user.id}><span className="member-avatar">{user.username[0].toUpperCase()}</span><strong>{user.username}{user.id === currentUser.id ? " (vous)" : ""}</strong><select aria-label={`Rôle de ${user.username}`} value={user.role} onChange={(event) => void changeRole(user.id, event.target.value as Role)}><option value="member">Membre</option><option value="moderator">Modérateur</option><option value="admin">Administrateur</option></select></div>)}</div></div>
+          <div className="settings-section"><h3>Membres et rôles</h3><div className="admin-user-list">{users.map((user) => <div className={`admin-user ${user.bannedAt ? "is-banned" : ""}`} key={user.id}><span className="member-avatar">{user.username[0].toUpperCase()}</span><strong>{user.username}{user.id === currentUser.id ? " (vous)" : ""}{user.bannedAt ? <span className="ban-badge">Banni</span> : null}</strong><select aria-label={`Rôle de ${user.username}`} value={user.role} onChange={(event) => void changeRole(user.id, event.target.value as Role)}><option value="member">Membre</option><option value="moderator">Modérateur</option><option value="admin">Administrateur</option></select>{user.id === currentUser.id ? null : <div className="admin-user-actions"><button type="button" className="danger-link" onClick={() => void kick(user.username, user.id)}>Expulser</button><button type="button" className={user.bannedAt ? "" : "danger-link"} onClick={() => void toggleBan(user)}>{user.bannedAt ? "Débannir" : "Bannir"}</button></div>}</div>)}</div></div>
           <div className="settings-section"><h3>Salons</h3><div className="admin-channel-list">{channels.map((channel) => <ChannelSettings key={channel.id} channel={channel} onUpdated={onChannelUpdated} onDeleted={onChannelDeleted} />)}</div></div>
         </div>
       </section>

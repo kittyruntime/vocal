@@ -353,8 +353,13 @@ summary:focus-visible {
 .setting-switch { padding: 8px 12px; border: 0; border-radius: 5px; background: #4e5058; color: #fff; cursor: pointer; }
 .setting-switch.active { background: #23a55a; }
 .admin-user-list, .admin-channel-list { display: flex; flex-direction: column; gap: 8px; }
-.admin-user { display: grid; grid-template-columns: 28px 1fr minmax(130px, 180px); align-items: center; gap: 10px; padding: 8px; border-radius: 6px; background: #2b2d31; }
+.admin-user { display: grid; grid-template-columns: 28px 1fr minmax(130px, 180px) auto; align-items: center; gap: 10px; padding: 8px; border-radius: 6px; background: #2b2d31; }
+.admin-user.is-banned { opacity: .65; }
 .admin-user select, .admin-channel select, .admin-channel input { min-width: 0; padding: 8px; border: 1px solid #1e1f22; border-radius: 4px; background: #1e1f22; color: #dbdee1; }
+.ban-badge { margin-left: 6px; padding: 1px 6px; border-radius: 4px; background: rgb(218 55 60 / 20%); color: #fa777c; font-size: 10px; font-weight: 700; text-transform: uppercase; }
+.admin-user-actions { display: flex; gap: 6px; }
+.admin-user-actions button { padding: 6px 9px; border: 0; border-radius: 4px; background: #4e5058; color: #f2f3f5; font-size: 12px; cursor: pointer; }
+.admin-user-actions .danger-link { background: transparent; color: #fa777c; }
 .admin-channel { padding: 12px; border-radius: 7px; background: #2b2d31; }
 .admin-channel-head { display: grid; grid-template-columns: 1fr minmax(150px, 220px); gap: 10px; }
 .admin-quality-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 10px; }
@@ -387,7 +392,7 @@ summary:focus-visible {
   .input-mode-options { grid-template-columns: 1fr; }
   .admin-channel-head, .admin-quality-row { grid-template-columns: 1fr; }
   .admin-user { grid-template-columns: 28px 1fr; }
-  .admin-user select { grid-column: 2; }
+  .admin-user select, .admin-user-actions { grid-column: 2; }
   .voice-modal-backdrop { padding: 8px; }
   .voice-settings-modal { max-height: calc(100% - 8px); }
   .chat-message { padding-inline: 12px; }

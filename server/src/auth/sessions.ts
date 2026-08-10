@@ -26,7 +26,7 @@ export async function getSessionUser(
   const res = await pool.query(
     `SELECT u.id, u.username, u.role FROM sessions s
      JOIN users u ON u.id = s.user_id
-     WHERE s.token_hash = $1 AND s.expires_at > now()`,
+     WHERE s.token_hash = $1 AND s.expires_at > now() AND u.banned_at IS NULL`,
     [hashToken(token)],
   );
   // role is DB-constrained to the admin/moderator/member CHECK, so this
