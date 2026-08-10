@@ -65,7 +65,7 @@ beforeEach(() => {
 });
 
 function renderView() {
-  render(<ToastProvider><VoiceView channel={channel} currentUser={currentUser} /></ToastProvider>);
+  return render(<ToastProvider><VoiceView channel={channel} currentUser={currentUser} /></ToastProvider>);
 }
 
 describe("VoiceView", () => {
@@ -119,5 +119,18 @@ describe("VoiceView", () => {
       expect.objectContaining({ resolution: expect.objectContaining({ width: 1920, height: 1080, frameRate: 60 }) }),
       expect.objectContaining({ screenShareEncoding: expect.objectContaining({ maxFramerate: 60 }) }),
     );
+  });
+
+  it("keeps the voice session connected while the view is hidden", async () => {
+    const view = renderView();
+    await userEvent.setup().click(screen.getByRole("button", { name: "Rejoindre" }));
+    await screen.findByText(/Connecté en tant que theo/);
+
+    view.rerender(
+      <ToastProvider><VoiceView channel={channel} currentUser={currentUser} visible={false} /></ToastProvider>,
+    );
+
+    expect(view.container.querySelector(".voice-view")).not.toBeVisible();
+    expect(disconnect).not.toHaveBeenCalled();
   });
 });

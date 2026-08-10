@@ -1,5 +1,5 @@
-import { lazy, Suspense, useCallback, useEffect, useReducer } from "react";
-import type { CurrentUser } from "../api/client";
+import { lazy, Suspense, useCallback, useEffect, useReducer, useState } from "react";
+import type { Channel, CurrentUser } from "../api/client";
 import * as api from "../api/client";
 import { appReducer, initialAppState } from "../store/appState";
 import { createSocketClient } from "../ws/socketClient";
@@ -16,6 +16,7 @@ export function MainLayout({ currentUser }: { currentUser: CurrentUser }) {
   const { signOut } = useAuth();
   const { showToast } = useToast();
   const [state, dispatch] = useReducer(appReducer, { ...initialAppState, currentUser });
+  const [retainedVoiceChannel, setRetainedVoiceChannel] = useState<Channel | null>(null);
 
   useEffect(() => {
     api
@@ -70,6 +71,11 @@ export function MainLayout({ currentUser }: { currentUser: CurrentUser }) {
   }, []);
 
   const selectedChannel = state.channels.find((c) => c.id === state.selectedChannelId) ?? null;
+  const voiceChannel = selectedChannel?.type === "voice" ? selectedChannel : retainedVoiceChannel;
+
+  useEffect(() => {
+    if (selectedChannel?.type === "voice") setRetainedVoiceChannel(selectedChannel);
+  }, [selectedChannel]);
 
   return (
     <div className="app-shell">
@@ -99,13 +105,18 @@ export function MainLayout({ currentUser }: { currentUser: CurrentUser }) {
                 dispatch({ type: "messages/prepended", channelId: selectedChannel.id, messages })
               }
             />
-          ) : selectedChannel?.type === "voice" ? (
-            <Suspense fallback={<div className="no-channel">Chargement du vocal…</div>}>
-              <VoiceView channel={selectedChannel} currentUser={currentUser} />
-            </Suspense>
-          ) : (
+          ) : selectedChannel?.type !== "voice" ? (
             <div className="no-channel">Aucun channel</div>
-          )}
+          ) : null}
+          {voiceChannel ? (
+            <Suspense fallback={<div className="no-channel">Chargement du vocal…</div>}>
+              <VoiceView
+                channel={voiceChannel}
+                currentUser={currentUser}
+                visible={selectedChannel?.type === "voice"}
+              />
+            </Suspense>
+          ) : null}
         </div>
       </div>
     </div>
