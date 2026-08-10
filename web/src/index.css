@@ -173,6 +173,29 @@ summary:focus-visible {
 .channel-icon { width: 20px; flex: 0 0 20px; display: grid; place-items: center; color: #80848e; }
 .channel-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
 
+.channel-row { display: flex; align-items: center; gap: 2px; }
+.channel-row .channel-link { flex: 1; min-width: 0; }
+.channel-settings-button {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: #80848e;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 120ms ease-out, background 120ms ease-out, color 120ms ease-out;
+}
+.channel-row:hover .channel-settings-button,
+.channel-settings-button:focus-visible { opacity: 1; }
+.channel-settings-button:hover { background: #35373c; color: #dbdee1; }
+.channel-settings-modal { width: min(480px, 100%); }
+.admin-hint { color: #949ba4; font-size: 12px; line-height: 1.5; }
+.admin-hint .icon { vertical-align: -2px; }
+
 .voice-occupants { padding: 3px 0 3px 31px !important; }
 .voice-occupants li { display: flex; align-items: center; gap: 8px; min-height: 30px; color: #949ba4; font-size: 13px; }
 .member-avatar,

@@ -65,6 +65,18 @@ describe("Sidebar", () => {
     expect(screen.queryByLabelText("New channel name")).not.toBeInTheDocument();
   });
 
+  it("shows a per-channel settings icon for admins, opening that channel's settings", async () => {
+    renderSidebar(admin);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Settings for salle" }));
+    expect(await screen.findByRole("dialog", { name: "salle" })).toBeInTheDocument();
+  });
+
+  it("hides the per-channel settings icon from non-admins", () => {
+    renderSidebar(member);
+    expect(screen.queryByRole("button", { name: "Settings for salle" })).not.toBeInTheDocument();
+  });
+
   it("creates a channel and reports it back to the parent", async () => {
     const created: Channel = { id: "c3", name: "annonces", type: "text", minRole: "member", position: 2, createdAt: "now" };
     vi.mocked(api.createChannel).mockResolvedValue(created);

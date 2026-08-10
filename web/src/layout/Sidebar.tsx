@@ -5,6 +5,7 @@ import { useToast } from "../toast/ToastContext";
 import type { VoiceParticipant } from "../ws/protocol";
 import { Icon } from "../ui/Icon";
 import { AdminPanel } from "./AdminPanel";
+import { ChannelSettingsModal } from "./ChannelSettingsModal";
 
 export function Sidebar({
   channels,
@@ -31,6 +32,9 @@ export function Sidebar({
   const textChannels = channels.filter((c) => c.type === "text");
   const voiceChannels = channels.filter((c) => c.type === "voice");
   const [adminOpen, setAdminOpen] = useState(false);
+  const [editingChannelId, setEditingChannelId] = useState<string | null>(null);
+  const editingChannel = channels.find((c) => c.id === editingChannelId) ?? null;
+  const isAdmin = currentUser.role === "admin";
 
   return (
     <nav className="sidebar" aria-label="Channels">
@@ -45,6 +49,7 @@ export function Sidebar({
         currentUserId={currentUser.id}
         selectedChannelId={selectedChannelId}
         onSelectChannel={onSelectChannel}
+        onEditChannel={isAdmin ? setEditingChannelId : undefined}
       />
       <ChannelGroup
         title="Voice channels"
@@ -53,13 +58,22 @@ export function Sidebar({
         currentUserId={currentUser.id}
         selectedChannelId={selectedChannelId}
         onSelectChannel={onSelectChannel}
+        onEditChannel={isAdmin ? setEditingChannelId : undefined}
       />
       <p className="sidebar-presence"><span className="online-dot" /> {onlineUserIds.length} online</p>
-      {currentUser.role === "admin" && (
+      {isAdmin && (
         <><button type="button" className="server-settings-button" onClick={() => setAdminOpen(true)}><Icon name="settings" size={15} /> Server settings</button><CreateChannelForm
           onCreated={onChannelCreated}
           onError={() => showToast("Could not create the channel")}
-        />{adminOpen ? <AdminPanel channels={channels} currentUser={currentUser} onChannelUpdated={onChannelUpdated ?? (() => {})} onChannelDeleted={onChannelDeleted ?? (() => {})} onClose={() => setAdminOpen(false)} /> : null}</>
+        />{adminOpen ? <AdminPanel currentUser={currentUser} onClose={() => setAdminOpen(false)} /> : null}
+        {editingChannel ? (
+          <ChannelSettingsModal
+            channel={editingChannel}
+            onUpdated={(channel) => { onChannelUpdated?.(channel); setEditingChannelId(null); }}
+            onDeleted={(channelId) => { onChannelDeleted?.(channelId); setEditingChannelId(null); }}
+            onClose={() => setEditingChannelId(null)}
+          />
+        ) : null}</>
       )}
     </nav>
   );
@@ -72,6 +86,7 @@ function ChannelGroup({
   currentUserId,
   selectedChannelId,
   onSelectChannel,
+  onEditChannel,
 }: {
   title: string;
   channels: Channel[];
@@ -79,6 +94,7 @@ function ChannelGroup({
   currentUserId: string;
   selectedChannelId: string | null;
   onSelectChannel(channelId: string): void;
+  onEditChannel?(channelId: string): void;
 }) {
   if (channels.length === 0) return null;
   return (
@@ -88,14 +104,27 @@ function ChannelGroup({
         {channels.map((channel) => {
           const occupants = voiceOccupancy[channel.id] ?? [];
           return <li key={channel.id}>
-            <button
-              type="button"
-              className={channel.id === selectedChannelId ? "channel-link active" : "channel-link"}
-              onClick={() => onSelectChannel(channel.id)}
-            >
-              <span className="channel-icon" aria-hidden="true"><Icon name={channel.type === "voice" ? "volume" : "hash"} /></span>
-              <span className="channel-name">{channel.name}</span>
-            </button>
+            <div className="channel-row">
+              <button
+                type="button"
+                className={channel.id === selectedChannelId ? "channel-link active" : "channel-link"}
+                onClick={() => onSelectChannel(channel.id)}
+              >
+                <span className="channel-icon" aria-hidden="true"><Icon name={channel.type === "voice" ? "volume" : "hash"} /></span>
+                <span className="channel-name">{channel.name}</span>
+              </button>
+              {onEditChannel ? (
+                <button
+                  type="button"
+                  className="channel-settings-button"
+                  aria-label={`Settings for ${channel.name}`}
+                  title={`Settings for ${channel.name}`}
+                  onClick={() => onEditChannel(channel.id)}
+                >
+                  <Icon name="settings" size={14} />
+                </button>
+              ) : null}
+            </div>
             {channel.type === "voice" && occupants.length > 0 && (
               <ul className="voice-occupants" aria-label={`Participants in ${channel.name}`}>
                 {occupants.map((participant) => (

@@ -4,6 +4,7 @@ Dernière mise à jour : 2026-08-10 (soir)
 
 ## Terminé
 
+- [x] Réglages d'un salon (nom, accès, qualité média par défaut, suppression) déplacés du panneau admin global vers une icône réglages par salon dans la sidebar (`ChannelSettingsModal.tsx`), visible aux admins uniquement. Le panneau admin ne garde que les réglages serveur (inscriptions, membres/rôles).
 - [x] Interface entièrement traduite en anglais (composants + tests + `lang="en"`). Les noms de salons restent du contenu utilisateur, non traduits.
 - [x] SDK `livekit-client` chargé à la demande.
 - [x] Récupération d'un jeton vocal court auprès du backend.
