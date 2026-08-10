@@ -30,6 +30,7 @@ Dernière mise à jour : 2026-08-10
 - [x] Inscription publique sans invitation, avec session immédiate.
 - [x] Correction des POST sans body (`voice-token` n'envoie plus un faux JSON vide).
 - [x] Polish visuel : typographie système stable, icônes SVG et hiérarchie affinée.
+- [x] Icônes standardisées avec Lucide (suppression des tracés SVG maison).
 
 ## À faire ensuite
 
