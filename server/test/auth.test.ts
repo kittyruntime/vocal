@@ -148,6 +148,7 @@ describe("profile", () => {
     const invalidImage = await app.inject({ method: "PATCH", url: "/api/me", headers: { cookie },
       payload: { username: "theo", email: "", description: "", avatarUrl: "https://example.com/avatar.png" } });
     expect(invalidImage.statusCode).toBe(400);
+    expect(invalidImage.json()).toEqual({ error: "invalid profile picture" });
   });
 });
 
