@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { AdminUser, Capability, CurrentUser, ServerSettings } from "../api/client";
 import { CAPABILITIES } from "../api/client";
 import * as api from "../api/client";
@@ -10,6 +10,7 @@ const CAPABILITY_LABEL: Record<Capability, string> = {
   moderate: "Moderate",
   publish_voice: "Publish in voice",
 };
+const MEMBERS_PER_PAGE = 8;
 
 export function AdminPanel({ currentUser, onClose }: {
   currentUser: CurrentUser;
@@ -18,9 +19,20 @@ export function AdminPanel({ currentUser, onClose }: {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [settings, setSettings] = useState<ServerSettings>({ registrationOpen: true, maxImageSizeMb: 5, maxFileSizeMb: 10, maxMessageLength: 4000 });
   const [error, setError] = useState("");
-  const [activeTab, setActiveTab] = useState<"members" | "general">("members");
   const canManageServer = currentUser.capabilities.includes("manage_server");
   const canModerate = currentUser.capabilities.includes("moderate");
+  const [activeTab, setActiveTab] = useState<"members" | "general">(canManageServer ? "general" : "members");
+  const [memberSearch, setMemberSearch] = useState("");
+  const [memberPage, setMemberPage] = useState(1);
+  const filteredUsers = useMemo(() => {
+    const search = memberSearch.trim().toLocaleLowerCase();
+    return search ? users.filter((user) => user.username.toLocaleLowerCase().includes(search)) : users;
+  }, [memberSearch, users]);
+  const memberPageCount = Math.max(1, Math.ceil(filteredUsers.length / MEMBERS_PER_PAGE));
+  const visibleUsers = filteredUsers.slice((memberPage - 1) * MEMBERS_PER_PAGE, memberPage * MEMBERS_PER_PAGE);
+
+  useEffect(() => { setMemberPage(1); }, [memberSearch]);
+  useEffect(() => { setMemberPage((page) => Math.min(page, memberPageCount)); }, [memberPageCount]);
 
   useEffect(() => {
     void Promise.all([api.listAdminUsers(), canManageServer ? api.getAdminSettings() : Promise.resolve(null)])
@@ -89,9 +101,10 @@ export function AdminPanel({ currentUser, onClose }: {
     <div className="voice-modal-backdrop admin-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
       <section className="voice-settings-modal admin-modal" role="dialog" aria-modal="true" aria-labelledby="admin-title">
         <header><div><span>ADMINISTRATION</span><h2 id="admin-title">Server settings</h2></div><button type="button" className="modal-close" aria-label="Close administration" onClick={onClose}><Icon name="close" size={20} /></button></header>
+        <div className="admin-settings-layout">
         <nav className="settings-tabs" aria-label="Server settings sections">
-          <button type="button" className={activeTab === "members" ? "active" : ""} aria-pressed={activeTab === "members"} onClick={() => setActiveTab("members")}><Icon name="users" size={17} /> Members</button>
           {canManageServer ? <button type="button" className={activeTab === "general" ? "active" : ""} aria-pressed={activeTab === "general"} onClick={() => setActiveTab("general")}><Icon name="settings" size={17} /> General</button> : null}
+          <button type="button" className={activeTab === "members" ? "active" : ""} aria-pressed={activeTab === "members"} onClick={() => setActiveTab("members")}><Icon name="users" size={17} /> Members <span className="settings-tab-count">{users.length}</span></button>
         </nav>
         <div className="voice-settings-content admin-settings-content">
           {error ? <p className="admin-error" role="alert">{error}</p> : null}
@@ -115,12 +128,12 @@ export function AdminPanel({ currentUser, onClose }: {
             </div>
           </div>
           <p className="admin-hint">Channel-specific access and voice quality remain under the <Icon name="settings" size={13} /> icon beside each channel.</p></> : null}
-          {activeTab === "members" ? <div className="settings-section">
-            <h3>Members and capabilities</h3>
+          {activeTab === "members" ? <div className="settings-section admin-members-section">
+            <div className="admin-members-heading"><div><h3>Members</h3><p>{filteredUsers.length} {filteredUsers.length === 1 ? "member" : "members"}</p></div><input type="search" aria-label="Search members" placeholder="Search members" value={memberSearch} onChange={(event) => setMemberSearch(event.target.value)} /></div>
             <div className="admin-user-list">
-              {users.map((user) => (
+              {visibleUsers.map((user) => (
                 <div className={`admin-user ${user.bannedAt ? "is-banned" : ""}`} key={user.id}>
-                  <span className="member-avatar">{user.username[0].toUpperCase()}</span>
+                  <span className="member-avatar">{user.avatarUrl ? <img src={user.avatarUrl} alt="" /> : user.username[0].toUpperCase()}</span>
                   <strong>{user.username}{user.id === currentUser.id ? " (you)" : ""}{user.bannedAt ? <span className="ban-badge">Banned</span> : null}{user.voiceMuted ? <span className="mute-badge">Voice muted</span> : null}</strong>
                   <div className="admin-user-capabilities">
                     {canManageServer ? CAPABILITIES.map((capability) => (
@@ -141,8 +154,11 @@ export function AdminPanel({ currentUser, onClose }: {
                   )}
                 </div>
               ))}
+              {visibleUsers.length === 0 ? <p className="admin-members-empty">No member matches this search.</p> : null}
             </div>
+            {memberPageCount > 1 ? <nav className="admin-pagination" aria-label="Members pagination"><button type="button" disabled={memberPage === 1} onClick={() => setMemberPage((page) => page - 1)}>Previous</button><span>Page {memberPage} of {memberPageCount}</span><button type="button" disabled={memberPage === memberPageCount} onClick={() => setMemberPage((page) => page + 1)}>Next</button></nav> : null}
           </div> : null}
+        </div>
         </div>
       </section>
     </div>
