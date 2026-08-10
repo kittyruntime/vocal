@@ -15,24 +15,45 @@ import type { Channel, CurrentUser } from "../api/client";
 import * as api from "../api/client";
 import { useToast } from "../toast/ToastContext";
 import { Icon } from "../ui/Icon";
+import { audioProfiles, cameraProfiles, screenProfiles, type MediaQuality, type QualityProfile, type ScreenQuality } from "./quality";
 
 type VoiceStatus = "idle" | "connecting" | "connected";
 type DeviceSelections = Partial<Record<MediaDeviceKind, string>>;
+type VoiceSettings = {
+  devices: DeviceSelections;
+  vadThreshold: number;
+  pushToTalk: boolean;
+  audioQuality: MediaQuality;
+  cameraQuality: MediaQuality;
+  screenQuality: ScreenQuality;
+};
 
 const SETTINGS_KEY = "vocal.voice-settings.v1";
 
-function loadSettings(): { devices: DeviceSelections; vadThreshold: number; pushToTalk: boolean } {
+function isQuality(value: unknown): value is MediaQuality {
+  return value === "low" || value === "standard" || value === "high";
+}
+
+function isScreenQuality(value: unknown): value is ScreenQuality {
+  return isQuality(value) || value === "game";
+}
+
+function loadSettings(): VoiceSettings {
   try {
     const parsed = JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? "{}") as {
       devices?: DeviceSelections; vadThreshold?: number; pushToTalk?: boolean;
+      audioQuality?: unknown; cameraQuality?: unknown; screenQuality?: unknown;
     };
     return {
       devices: parsed.devices ?? {},
       vadThreshold: typeof parsed.vadThreshold === "number" ? parsed.vadThreshold : 0.15,
       pushToTalk: parsed.pushToTalk === true,
+      audioQuality: isQuality(parsed.audioQuality) ? parsed.audioQuality : "standard",
+      cameraQuality: isQuality(parsed.cameraQuality) ? parsed.cameraQuality : "standard",
+      screenQuality: isScreenQuality(parsed.screenQuality) ? parsed.screenQuality : "standard",
     };
   } catch {
-    return { devices: {}, vadThreshold: 0.15, pushToTalk: false };
+    return { devices: {}, vadThreshold: 0.15, pushToTalk: false, audioQuality: "standard", cameraQuality: "standard", screenQuality: "standard" };
   }
 }
 
@@ -46,6 +67,9 @@ export function VoiceView({ channel, currentUser }: { channel: Channel; currentU
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
   const [settings, setSettings] = useState(loadSettings);
   const [audioLevel, setAudioLevel] = useState(0);
+  const [participantCount, setParticipantCount] = useState(1);
+  const [remoteVideoCount, setRemoteVideoCount] = useState(0);
+  const [remoteScreenCount, setRemoteScreenCount] = useState(0);
   const roomRef = useRef<Room | null>(null);
   const audioRef = useRef<HTMLDivElement>(null);
   const remoteVideoRef = useRef<HTMLDivElement>(null);
@@ -117,6 +141,9 @@ export function VoiceView({ channel, currentUser }: { channel: Channel; currentU
     deafenedRef.current = false;
     setCameraEnabled(false);
     setScreenShareEnabled(false);
+    setParticipantCount(1);
+    setRemoteVideoCount(0);
+    setRemoteScreenCount(0);
     activeSpeakersRef.current.clear();
     stopMeter();
   }
@@ -147,6 +174,8 @@ export function VoiceView({ channel, currentUser }: { channel: Channel; currentU
           return;
         }
         if (track.kind === Track.Kind.Video) {
+          setRemoteVideoCount((count) => count + 1);
+          if (publication.source === Track.Source.ScreenShare) setRemoteScreenCount((count) => count + 1);
           const tile = document.createElement("figure");
           tile.className = publication.source === Track.Source.ScreenShare ? "video-tile screen-share" : "video-tile";
           tile.dataset.trackSid = track.sid;
@@ -161,10 +190,14 @@ export function VoiceView({ channel, currentUser }: { channel: Channel; currentU
         }
       },
     );
-    room.on(RoomEvent.TrackUnsubscribed, (track: RemoteTrack) => {
+    room.on(RoomEvent.TrackUnsubscribed, (track: RemoteTrack, publication: RemoteTrackPublication) => {
       for (const element of track.detach()) element.remove();
       for (const child of remoteVideoRef.current?.children ?? []) {
         if ((child as HTMLElement).dataset.trackSid === track.sid) child.remove();
+      }
+      if (track.kind === Track.Kind.Video) {
+        setRemoteVideoCount((count) => Math.max(0, count - 1));
+        if (publication.source === Track.Source.ScreenShare) setRemoteScreenCount((count) => Math.max(0, count - 1));
       }
     });
     room.on(RoomEvent.LocalTrackUnpublished, (publication: LocalTrackPublication) => {
@@ -179,6 +212,9 @@ export function VoiceView({ channel, currentUser }: { channel: Channel; currentU
     room.on(RoomEvent.ActiveSpeakersChanged, (speakers: Participant[]) => {
       updateSpeakingTiles(new Set(speakers.map((participant) => participant.identity)));
     });
+    const refreshParticipantCount = () => setParticipantCount(room.remoteParticipants.size + 1);
+    room.on(RoomEvent.ParticipantConnected, refreshParticipantCount);
+    room.on(RoomEvent.ParticipantDisconnected, refreshParticipantCount);
     room.on(RoomEvent.Disconnected, () => {
       if (roomRef.current === room) {
         roomRef.current = null;
@@ -186,6 +222,9 @@ export function VoiceView({ channel, currentUser }: { channel: Channel; currentU
         setMicrophoneEnabled(false);
         setCameraEnabled(false);
         setScreenShareEnabled(false);
+        setParticipantCount(1);
+        setRemoteVideoCount(0);
+        setRemoteScreenCount(0);
         clearMedia();
       }
     });
@@ -196,10 +235,12 @@ export function VoiceView({ channel, currentUser }: { channel: Channel; currentU
       for (const [kind, deviceId] of Object.entries(settings.devices)) {
         if (deviceId) await room.switchActiveDevice(kind as MediaDeviceKind, deviceId, false);
       }
-      const microphone = await room.localParticipant.setMicrophoneEnabled(!settings.pushToTalk);
+      const audioProfile = audioProfiles[settings.audioQuality];
+      const microphone = await room.localParticipant.setMicrophoneEnabled(!settings.pushToTalk, audioProfile.capture, audioProfile.publish);
       setMicrophoneEnabled(!settings.pushToTalk);
       if (microphone?.audioTrack) startMeter(microphone.audioTrack);
       setDevices(await Room.getLocalDevices(undefined, false));
+      setParticipantCount(room.remoteParticipants.size + 1);
       setStatus("connected");
     } catch (error) {
       await room.disconnect();
@@ -234,7 +275,8 @@ export function VoiceView({ channel, currentUser }: { channel: Channel; currentU
     saveSettings({ ...settings, pushToTalk: enabled });
     pttPressedRef.current = false;
     try {
-      await room.localParticipant.setMicrophoneEnabled(!enabled);
+      const profile = audioProfiles[settings.audioQuality];
+      await room.localParticipant.setMicrophoneEnabled(!enabled, profile.capture, profile.publish);
       setMicrophoneEnabled(!enabled);
     } catch {
       showToast("Impossible d’activer le push-to-talk");
@@ -248,7 +290,8 @@ export function VoiceView({ channel, currentUser }: { channel: Channel; currentU
       pttPressedRef.current = pressed;
       const room = roomRef.current;
       if (!room) return;
-      void room.localParticipant.setMicrophoneEnabled(pressed).then(() => {
+      const profile = audioProfiles[settings.audioQuality];
+      void room.localParticipant.setMicrophoneEnabled(pressed, profile.capture, profile.publish).then(() => {
         setMicrophoneEnabled(pressed);
       }).catch(() => showToast("Impossible de modifier le microphone"));
     };
@@ -276,14 +319,15 @@ export function VoiceView({ channel, currentUser }: { channel: Channel; currentU
       window.removeEventListener("blur", onBlur);
       setPressed(false);
     };
-  }, [settings.pushToTalk, showToast, status]);
+  }, [settings.audioQuality, settings.pushToTalk, showToast, status]);
 
   async function toggleMicrophone() {
     const room = roomRef.current;
     if (!room || status !== "connected") return;
     const enabled = !microphoneEnabled;
     try {
-      await room.localParticipant.setMicrophoneEnabled(enabled);
+      const profile = audioProfiles[settings.audioQuality];
+      await room.localParticipant.setMicrophoneEnabled(enabled, profile.capture, profile.publish);
       setMicrophoneEnabled(enabled);
     } catch {
       showToast("Impossible de modifier le microphone");
@@ -305,7 +349,8 @@ export function VoiceView({ channel, currentUser }: { channel: Channel; currentU
     const enabled = !cameraEnabled;
     const previousTrack = room.localParticipant.getTrackPublication(Track.Source.Camera)?.track;
     try {
-      const publication = await room.localParticipant.setCameraEnabled(enabled);
+      const profile = cameraProfiles[settings.cameraQuality];
+      const publication = await room.localParticipant.setCameraEnabled(enabled, profile.capture, profile.publish);
       localCameraRef.current?.replaceChildren();
       if (enabled && publication?.track) {
         const element = publication.track.attach();
@@ -327,7 +372,8 @@ export function VoiceView({ channel, currentUser }: { channel: Channel; currentU
     const enabled = !screenShareEnabled;
     const previousTrack = room.localParticipant.getTrackPublication(Track.Source.ScreenShare)?.track;
     try {
-      const publication = await room.localParticipant.setScreenShareEnabled(enabled);
+      const profile = screenProfiles[settings.screenQuality];
+      const publication = await room.localParticipant.setScreenShareEnabled(enabled, profile.capture, profile.publish);
       localScreenRef.current?.replaceChildren();
       if (enabled && publication?.track) {
         const element = publication.track.attach();
@@ -343,16 +389,38 @@ export function VoiceView({ channel, currentUser }: { channel: Channel; currentU
     }
   }
 
+  function selectQuality(kind: "audio" | "camera", quality: MediaQuality): void;
+  function selectQuality(kind: "screen", quality: ScreenQuality): void;
+  function selectQuality(kind: "audio" | "camera" | "screen", quality: ScreenQuality) {
+    const key = `${kind}Quality` as const;
+    saveSettings({ ...settings, [key]: quality });
+    const active = kind === "audio" ? microphoneEnabled : kind === "camera" ? cameraEnabled : screenShareEnabled;
+    if (active) showToast(`La nouvelle qualité ${kind === "audio" ? "audio" : kind === "camera" ? "webcam" : "d’écran"} sera appliquée à la prochaine activation.`);
+  }
+
+  const hasVideo = cameraEnabled || screenShareEnabled || remoteVideoCount > 0;
+  const hasScreenShare = screenShareEnabled || remoteScreenCount > 0;
+
   return (
     <section className="voice-view" aria-label={`Salon vocal ${channel.name}`}>
       <header className="chat-header"><span className="header-channel-icon"><Icon name="volume" size={21} /></span> {channel.name}</header>
       <div className="voice-stage">
-        <div className="voice-hero">
+        <div className={`voice-hero ${status === "connected" ? "is-connected" : ""}`}>
           <div className="voice-hero-icon"><Icon name="volume" size={28} /></div>
           <h1>{channel.name}</h1>
-          <p>{status === "connected" ? `Connecté en tant que ${currentUser.username}` : "Rejoignez le salon pour parler, partager votre caméra ou votre écran."}</p>
+          <p>{status === "connected" ? `${participantCount} participant${participantCount > 1 ? "s" : ""} · Connecté en tant que ${currentUser.username}` : "Rejoignez le salon pour parler, partager votre caméra ou votre écran."}</p>
         </div>
-        <div className="video-grid" aria-label="Vidéos du salon">
+        {status === "connected" && !hasVideo ? (
+          <div className="call-audio-view">
+            <div className="call-avatar-wrap">
+              <span className={`call-avatar ${microphoneEnabled ? "is-live" : ""}`}>{currentUser.username.slice(0, 1).toUpperCase()}</span>
+              <i /><i />
+            </div>
+            <strong>Appel vocal en cours</strong>
+            <span>{microphoneEnabled ? "Votre micro est actif" : "Votre micro est coupé"}</span>
+          </div>
+        ) : null}
+        <div className={`video-grid ${hasScreenShare ? "has-screen-share" : ""} ${!hasVideo ? "is-empty" : ""}`} aria-label="Vidéos du salon">
           <div ref={localScreenRef} className="local-video local-screen" data-participant-id={currentUser.id} />
           <div ref={localCameraRef} className="local-video" data-participant-id={currentUser.id} />
           <div ref={remoteVideoRef} className="remote-videos" />
@@ -362,7 +430,7 @@ export function VoiceView({ channel, currentUser }: { channel: Channel; currentU
             Rejoindre
           </button>
         ) : status === "connecting" ? (
-          <button type="button" className="voice-primary" disabled>Connexion…</button>
+          <button type="button" className="voice-primary connecting" disabled>Connexion<span className="connecting-dots" aria-hidden="true"><i /><i /><i /></span></button>
         ) : (
           <>
           <details className="voice-settings-panel">
@@ -379,6 +447,9 @@ export function VoiceView({ channel, currentUser }: { channel: Channel; currentU
               value={settings.devices.audioinput}
               onChange={selectDevice}
             />
+            <QualitySelect label="Qualité audio" value={settings.audioQuality} profiles={audioProfiles} onChange={(quality) => selectQuality("audio", quality)} />
+            <QualitySelect label="Qualité webcam" value={settings.cameraQuality} profiles={cameraProfiles} onChange={(quality) => selectQuality("camera", quality)} />
+            <QualitySelect<ScreenQuality> label="Qualité du partage" value={settings.screenQuality} profiles={screenProfiles} onChange={(quality) => selectQuality("screen", quality)} />
             <DeviceSelect
               label="Caméra"
               kind="videoinput"
@@ -438,6 +509,29 @@ export function VoiceView({ channel, currentUser }: { channel: Channel; currentU
       </div>
       <div ref={audioRef} className="remote-audio" aria-hidden="true" />
     </section>
+  );
+}
+
+function QualitySelect<TQuality extends string = MediaQuality>({
+  label,
+  value,
+  profiles,
+  onChange,
+}: {
+  label: string;
+  value: TQuality;
+  profiles: Record<TQuality, QualityProfile<unknown>>;
+  onChange(value: TQuality): void;
+}) {
+  return (
+    <label>
+      {label}
+      <select value={value} onChange={(event) => onChange(event.target.value as TQuality)}>
+        {(Object.entries(profiles) as [TQuality, QualityProfile<unknown>][]).map(([key, profile]) => (
+          <option key={key} value={key}>{profile.label} — {profile.detail}</option>
+        ))}
+      </select>
+    </label>
   );
 }
 

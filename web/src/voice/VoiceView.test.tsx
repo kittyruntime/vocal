@@ -16,6 +16,7 @@ const switchActiveDevice = vi.fn();
 vi.mock("livekit-client", () => ({
   Room: class {
     static getLocalDevices() { return Promise.resolve([]); }
+    remoteParticipants = new Map();
     connect = connect;
     disconnect = disconnect;
     switchActiveDevice = switchActiveDevice;
@@ -27,6 +28,8 @@ vi.mock("livekit-client", () => ({
     TrackUnsubscribed: "trackUnsubscribed",
     LocalTrackUnpublished: "localTrackUnpublished",
     ActiveSpeakersChanged: "activeSpeakersChanged",
+    ParticipantConnected: "participantConnected",
+    ParticipantDisconnected: "participantDisconnected",
     Disconnected: "disconnected",
   },
   Track: {
@@ -46,6 +49,7 @@ const currentUser = { id: "u1", username: "theo", role: "member" } as const;
 
 beforeEach(() => {
   vi.clearAllMocks();
+  localStorage.clear();
   vi.mocked(api.getVoiceToken).mockResolvedValue({ token: "jwt", url: "ws://livekit" });
   connect.mockResolvedValue(undefined);
   disconnect.mockResolvedValue(undefined);
@@ -68,10 +72,10 @@ describe("VoiceView", () => {
   it("joins LiveKit and enables the microphone", async () => {
     renderView();
     await userEvent.setup().click(screen.getByRole("button", { name: "Rejoindre" }));
-    await screen.findByText("Connecté en tant que theo");
+    await screen.findByText(/Connecté en tant que theo/);
     expect(api.getVoiceToken).toHaveBeenCalledWith("c2");
     expect(connect).toHaveBeenCalledWith("ws://livekit", "jwt");
-    expect(setMicrophoneEnabled).toHaveBeenCalledWith(true);
+    expect(setMicrophoneEnabled).toHaveBeenCalledWith(true, expect.any(Object), expect.any(Object));
   });
 
   it("mutes and leaves the room", async () => {
@@ -79,7 +83,7 @@ describe("VoiceView", () => {
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: "Rejoindre" }));
     await user.click(await screen.findByRole("button", { name: "Couper le micro" }));
-    expect(setMicrophoneEnabled).toHaveBeenLastCalledWith(false);
+    expect(setMicrophoneEnabled).toHaveBeenLastCalledWith(false, expect.any(Object), expect.any(Object));
     await user.click(screen.getByRole("button", { name: "Quitter" }));
     await waitFor(() => expect(disconnect).toHaveBeenCalled());
     expect(screen.getByRole("button", { name: "Rejoindre" })).toBeInTheDocument();
@@ -94,11 +98,26 @@ describe("VoiceView", () => {
     expect(screen.getByRole("button", { name: "Rétablir le son" })).toHaveAttribute("aria-pressed", "true");
 
     await user.click(screen.getByRole("button", { name: "Activer la caméra" }));
-    expect(setCameraEnabled).toHaveBeenCalledWith(true);
+    expect(setCameraEnabled).toHaveBeenCalledWith(true, expect.any(Object), expect.any(Object));
     expect(screen.getByRole("button", { name: "Arrêter la caméra" })).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Partager l’écran" }));
-    expect(setScreenShareEnabled).toHaveBeenCalledWith(true);
+    expect(setScreenShareEnabled).toHaveBeenCalledWith(true, expect.any(Object), expect.any(Object));
     expect(screen.getByRole("button", { name: "Arrêter le partage" })).toBeInTheDocument();
+  });
+
+  it("publishes screen sharing in 1080p60 game mode", async () => {
+    renderView();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Rejoindre" }));
+    await user.click(await screen.findByText("Réglages audio et vidéo"));
+    await user.selectOptions(screen.getByLabelText("Qualité du partage"), "game");
+    await user.click(screen.getByRole("button", { name: "Partager l’écran" }));
+
+    expect(setScreenShareEnabled).toHaveBeenLastCalledWith(
+      true,
+      expect.objectContaining({ resolution: expect.objectContaining({ width: 1920, height: 1080, frameRate: 60 }) }),
+      expect.objectContaining({ screenShareEncoding: expect.objectContaining({ maxFramerate: 60 }) }),
+    );
   });
 });
