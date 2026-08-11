@@ -860,6 +860,7 @@ export function VoiceView({
         for (const element of previousTrack.detach()) element.remove();
       }
       setScreenShareEnabled(enabled);
+      playAppSound("screenShare");
       if (!enabled) setPinnedTileId((value) => value === "local-screen" ? null : value);
     } catch (error) {
       showToast(describeMediaError(MediaDeviceFailure, error, "screen"));
@@ -1064,6 +1065,7 @@ export function VoiceView({
                   <QualitySelect label="Audio" value={settings.audioQuality} profiles={audioProfiles} onChange={(quality) => selectQuality("audio", quality)} />
                   <QualitySelect label="Webcam" value={settings.cameraQuality} profiles={cameraProfiles} onChange={(quality) => selectQuality("camera", quality)} />
                   <QualitySelect<ScreenQuality> label="Screen share" value={settings.screenQuality} profiles={screenProfiles} onChange={(quality) => selectQuality("screen", quality)} />
+                  <p className="form-hint">To share game, tab, or system audio, enable audio in your browser's sharing picker.</p>
                 </div>
               </div>
               <div className="settings-section">

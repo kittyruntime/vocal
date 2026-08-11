@@ -56,8 +56,8 @@ export function MainLayout({ currentUser }: { currentUser: CurrentUser }) {
   useEffect(() => { void api.getChatSettings().then(setChatSettings).catch(() => {}); }, []);
 
   useEffect(() => {
-    void Promise.all([api.getSoundSettings(), api.getMySoundVolumes()])
-      .then(([soundSettings, soundVolumes]) => configureSounds(soundSettings, soundVolumes))
+    void Promise.all([api.getSoundSettings(), api.getMySoundVolumes(), api.getMySoundSettings()])
+      .then(([soundSettings, soundVolumes, userSoundSettings]) => configureSounds(soundSettings, soundVolumes, userSoundSettings))
       .catch(() => {});
   }, []);
 
