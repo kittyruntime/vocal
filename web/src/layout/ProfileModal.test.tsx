@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import * as api from "../api/client";
 import { ProfileModal } from "./ProfileModal";
@@ -7,9 +7,22 @@ import { ProfileModal } from "./ProfileModal";
 vi.mock("../api/client", async () => ({
   ...(await vi.importActual<typeof import("../api/client")>("../api/client")),
   updateProfile: vi.fn(),
+  getSoundSettings: vi.fn(),
+  getMySoundVolumes: vi.fn(),
+  updateMySoundVolume: vi.fn(),
 }));
 
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => {
+  vi.clearAllMocks();
+  vi.mocked(api.getSoundSettings).mockResolvedValue({
+    message: { enabled: true, hasCustom: false },
+    userJoin: { enabled: true, hasCustom: false },
+    userLeave: { enabled: true, hasCustom: false },
+    muteToggle: { enabled: true, hasCustom: false },
+    forceMuted: { enabled: true, hasCustom: false },
+  });
+  vi.mocked(api.getMySoundVolumes).mockResolvedValue({ message: 55, userJoin: 55, userLeave: 55, muteToggle: 55, forceMuted: 55 });
+});
 
 describe("ProfileModal", () => {
   it("edits and saves account details", async () => {
@@ -39,5 +52,14 @@ describe("ProfileModal", () => {
     render(<ProfileModal currentUser={{ id: "u1", username: "theo", capabilities: [] }} onSaved={vi.fn()} onClose={vi.fn()} />);
     await userEvent.setup().click(screen.getByRole("button", { name: "Save changes" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("username taken");
+  });
+
+  it("adjusts and saves a per-sound volume", async () => {
+    vi.mocked(api.updateMySoundVolume).mockResolvedValue({ message: 80, userJoin: 55, userLeave: 55, muteToggle: 55, forceMuted: 55 });
+    render(<ProfileModal currentUser={{ id: "u1", username: "theo", capabilities: [] }} onSaved={vi.fn()} onClose={vi.fn()} />);
+    const slider = await screen.findByLabelText("Message received volume");
+    fireEvent.change(slider, { target: { value: "80" } });
+    fireEvent.mouseUp(slider);
+    await waitFor(() => expect(api.updateMySoundVolume).toHaveBeenCalledWith("message", 80));
   });
 });

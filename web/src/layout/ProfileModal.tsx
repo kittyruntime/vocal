@@ -1,9 +1,24 @@
 import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
-import type { CurrentUser } from "../api/client";
+import type { CurrentUser, SoundEvent, SoundSettings, SoundVolumes } from "../api/client";
+import { SOUND_EVENTS } from "../api/client";
 import * as api from "../api/client";
+import { previewSound } from "../audio/sounds";
 import { Icon } from "../ui/Icon";
 
 const MAX_AVATAR_BYTES = 512 * 1024;
+const SOUND_EVENT_LABEL: Record<SoundEvent, string> = {
+  message: "Message received",
+  userJoin: "Voice join",
+  userLeave: "Voice leave",
+  muteToggle: "Microphone mute/unmute",
+  forceMuted: "Force-muted by a moderator",
+};
+const DEFAULT_SOUND_SETTINGS: SoundSettings = Object.fromEntries(
+  SOUND_EVENTS.map((event) => [event, { enabled: true, hasCustom: false }]),
+) as SoundSettings;
+const DEFAULT_SOUND_VOLUMES: SoundVolumes = Object.fromEntries(
+  SOUND_EVENTS.map((event) => [event, 55]),
+) as SoundVolumes;
 
 export function ProfileModal({ currentUser, onClose, onSaved }: {
   currentUser: CurrentUser;
@@ -19,6 +34,20 @@ export function ProfileModal({ currentUser, onClose, onSaved }: {
   const [error, setError] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const bannerInputRef = useRef<HTMLInputElement>(null);
+  const [soundSettings, setSoundSettings] = useState<SoundSettings>(DEFAULT_SOUND_SETTINGS);
+  const [soundVolumes, setSoundVolumes] = useState<SoundVolumes>(DEFAULT_SOUND_VOLUMES);
+
+  useEffect(() => {
+    void Promise.all([api.getSoundSettings(), api.getMySoundVolumes()])
+      .then(([nextSettings, nextVolumes]) => { setSoundSettings(nextSettings); setSoundVolumes(nextVolumes); })
+      .catch(() => {});
+  }, []);
+
+  async function saveVolume(event: SoundEvent, volume: number) {
+    setSoundVolumes((value) => ({ ...value, [event]: volume }));
+    try { setSoundVolumes(await api.updateMySoundVolume(event, volume)); }
+    catch { /* keep the optimistic local value; a transient failure isn't worth surfacing here */ }
+  }
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
@@ -113,6 +142,31 @@ export function ProfileModal({ currentUser, onClose, onSaved }: {
               <button type="button" onClick={() => bannerInputRef.current?.click()}>Upload banner</button>
               {bannerUrl ? <button type="button" className="danger-link" onClick={() => setBannerUrl(null)}>Remove banner</button> : null}
               <small>Recommended ratio 3:1 · 512 KB max</small>
+            </div>
+          </div>
+          <div className="settings-section sound-volume-section">
+            <h3>Notification sounds</h3>
+            <p className="admin-setting-description">Adjust how loud each sound plays for you. The server admin controls which sounds are enabled.</p>
+            <div className="sound-volume-list">
+              {SOUND_EVENTS.map((event) => (
+                <div className="sound-volume-row" key={event}>
+                  <div className="sound-volume-row-head"><span>{SOUND_EVENT_LABEL[event]}</span><small>{soundVolumes[event]}%</small></div>
+                  <div className="sound-volume-row-controls">
+                    <input
+                      type="range"
+                      min={0}
+                      max={100}
+                      step={5}
+                      aria-label={`${SOUND_EVENT_LABEL[event]} volume`}
+                      value={soundVolumes[event]}
+                      onChange={(evt) => setSoundVolumes((value) => ({ ...value, [event]: Number(evt.target.value) }))}
+                      onMouseUp={(evt) => void saveVolume(event, Number((evt.target as HTMLInputElement).value))}
+                      onKeyUp={(evt) => void saveVolume(event, Number((evt.target as HTMLInputElement).value))}
+                    />
+                    <button type="button" aria-label={`Preview ${SOUND_EVENT_LABEL[event]}`} onClick={() => previewSound(event, soundSettings[event].hasCustom, soundVolumes[event])}><Icon name="volume" size={15} /></button>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
           {error ? <p className="admin-error" role="alert">{error}</p> : null}
