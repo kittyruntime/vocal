@@ -10,8 +10,8 @@ This file is the hand-off point for the current product pass. Update it after ev
 - [x] Message interactions: replies, reactions, edit and delete
 - [x] Typing presence, mentions and notification preferences
 - [x] Named roles with colors and reusable permissions
-- [ ] Global search across messages, attachments, channels and members — **in progress**
-- [ ] Configurable, revocable invitation links
+- [x] Global search across messages, attachments, channels and members
+- [ ] Configurable, revocable invitation links — **in progress**
 - [ ] Voice layouts: pinning, speaker/grid modes, hidden audio-only participants and ordering
 - [ ] Call network diagnostics and automatic quality adaptation
 - [ ] Server-side member pagination, long-list virtualization and LiveKit bundle optimization
@@ -28,3 +28,4 @@ This file is the hand-off point for the current product pass. Update it after ev
 - `message-interactions`: encrypted reply previews, realtime reaction aggregation, author editing, author/moderator deletion, Discord-style message toolbar and inline editing.
 - `notifications`: realtime typing presence, highlighted mentions, unread counters, mention badges and per-channel all/mentions/muted preferences.
 - `roles`: additive named roles with colors, reusable capabilities, multi-role member assignment and backwards-compatible effective permissions.
+- `search`: permission-aware global search for encrypted messages, attachment names, channels and members, with a responsive command-style modal.

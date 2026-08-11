@@ -18,6 +18,7 @@ import { registerAdminRoutes } from "./routes/admin.js";
 import { createVoicePresence, type VoicePresence } from "./voice/presence.js";
 import { createVoiceAdminService, type VoiceAdminService } from "./voice/admin.js";
 import { registerRoleRoutes } from "./routes/roles.js";
+import { registerSearchRoutes } from "./routes/search.js";
 
 export async function buildApp(
   opts: { pool: pg.Pool; voiceAdmin?: VoiceAdminService },
@@ -53,6 +54,7 @@ export async function buildApp(
   registerInviteRoutes(app, opts.pool);
   registerChannelRoutes(app, opts.pool, hub);
   registerMessageRoutes(app, opts.pool, key, hub);
+  registerSearchRoutes(app, opts.pool, key);
   registerVoiceTokenRoute(app, opts.pool, liveKitConfig);
   registerVoiceWebhookRoute(app, opts.pool, hub, liveKitConfig, voicePresence);
   registerWsRoute(app, opts.pool, hub, voicePresence);

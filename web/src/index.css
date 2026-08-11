@@ -576,6 +576,19 @@ summary:focus-visible {
 .public-profile-about strong { color: #b5bac1; font-size: 11px; text-transform: uppercase; }
 .public-profile-about p { margin: 6px 0 0; color: #dbdee1; font-size: 13px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
 .public-profile-loading { padding: 80px 20px; color: #949ba4; text-align: center; }
+.search-modal { width: min(680px, 100%); max-height: min(720px, calc(100% - 32px)); overflow: hidden; display: flex; flex-direction: column; border: 1px solid var(--divider); border-radius: 12px; background: #1e1f22; box-shadow: 0 24px 80px rgb(0 0 0 / 62%); animation: modal-enter 160ms ease-out both; }
+.search-input { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-bottom: 1px solid var(--divider); color: #949ba4; }
+.search-input input { flex: 1; min-width: 0; padding: 8px 0; border: 0; outline: 0; background: transparent; color: #f2f3f5; font-size: 17px; }
+.search-input button { width: 32px; height: 32px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 50%; background: #35373c; color: #b5bac1; }
+.search-results { min-height: 180px; overflow-y: auto; padding: 10px; }
+.search-results section + section { margin-top: 12px; }
+.search-results h2 { margin: 0 8px 5px; color: #949ba4; font-size: 11px; letter-spacing: .045em; text-transform: uppercase; }
+.search-results section > button { width: 100%; min-width: 0; display: flex; align-items: center; gap: 10px; padding: 9px 10px; border: 0; border-radius: 5px; background: transparent; color: #dbdee1; text-align: left; }
+.search-results section > button:hover { background: #35373c; }
+.search-message-result > span { min-width: 0; display: flex; flex-direction: column; }
+.search-message-result strong { font-size: 13px; }
+.search-message-result small { overflow: hidden; color: #b5bac1; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.search-status { margin: 50px 10px; color: #949ba4; text-align: center; }
 .voice-settings-modal { width: min(760px, 100%); max-height: min(720px, calc(100% - 16px)); overflow: hidden; display: flex; flex-direction: column; border: 1px solid rgb(255 255 255 / 6%); border-radius: 12px; background: #313338; color: #dbdee1; box-shadow: 0 24px 72px rgb(0 0 0 / 55%); animation: modal-enter 180ms ease-out both; }
 .voice-settings-modal > header { flex: 0 0 auto; display: flex; align-items: flex-start; justify-content: space-between; padding: 22px 24px 18px; border-bottom: 1px solid #242528; background: #2b2d31; }
 .voice-settings-modal header span { color: #949ba4; font-size: 10px; font-weight: 700; letter-spacing: .08em; }

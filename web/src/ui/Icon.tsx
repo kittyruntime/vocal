@@ -20,6 +20,7 @@ import {
   Plus,
   Pencil,
   Send,
+  Search,
   Settings,
   Smile,
   Trash2,
@@ -52,6 +53,7 @@ type IconName =
   | "plus"
   | "edit"
   | "send"
+  | "search"
   | "settings"
   | "smile"
   | "trash"
@@ -82,6 +84,7 @@ const icons: Record<IconName, LucideIcon> = {
   plus: Plus,
   edit: Pencil,
   send: Send,
+  search: Search,
   settings: Settings,
   smile: Smile,
   trash: Trash2,
