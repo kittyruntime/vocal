@@ -73,6 +73,20 @@ summary:focus-visible {
 .form-field > label { color: var(--text-muted); font-size: 12px; font-weight: 700; letter-spacing: .025em; text-transform: uppercase; }
 .form-hint { margin: 0; color: var(--text-muted); font-size: 12px; }
 .form-error { margin: 0; padding: 10px 12px; border-radius: var(--radius-sm); background: rgb(218 55 60 / 14%); color: #ffb4b7; font-size: 13px; }
+.form-input {
+  width: 100%;
+  border: 1px solid rgb(255 255 255 / 10%);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  background: var(--bg-sunken);
+  color: var(--text-normal);
+  outline: none;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+.form-input:focus-visible {
+  border-color: var(--brand);
+  box-shadow: 0 0 0 4px rgb(88 101 242 / 18%);
+}
 
 /* Authentication */
 .auth-screen,
