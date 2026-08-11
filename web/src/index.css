@@ -95,6 +95,7 @@ textarea.form-input { resize: vertical; }
 .switch-thumb { position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; border-radius: 50%; background: #fff; transition: left 140ms ease; }
 .switch.on .switch-thumb { left: 18px; }
 .switch:focus-visible { outline: none; box-shadow: 0 0 0 4px rgb(88 101 242 / 18%); }
+.form-range { width: 100%; accent-color: var(--brand); }
 
 /* Authentication */
 .auth-screen,
