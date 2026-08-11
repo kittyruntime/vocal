@@ -27,6 +27,7 @@ import type {
 } from "livekit-client";
 import type { Channel, CurrentUser } from "../api/client";
 import * as api from "../api/client";
+import { playAppSound } from "../audio/sounds";
 import { useToast } from "../toast/ToastContext";
 import { Icon } from "../ui/Icon";
 import { audioProfiles, cameraProfiles, screenProfiles, type MediaQuality, type QualityProfile, type ScreenQuality } from "./quality";
@@ -583,6 +584,12 @@ export function VoiceView({
     };
     room.on(RoomEvent.ParticipantConnected, refreshParticipants);
     room.on(RoomEvent.ParticipantDisconnected, refreshParticipants);
+    room.on(RoomEvent.ParticipantPermissionsChanged, (prevPermissions, participant) => {
+      if (!participant.isLocal) return;
+      if (prevPermissions?.canPublish && participant.permissions?.canPublish === false) {
+        playAppSound("forceMuted");
+      }
+    });
     room.on(RoomEvent.Reconnecting, () => {
       reconnectingRef.current = true;
       if (roomRef.current === room) setStatus("reconnecting");
@@ -717,6 +724,7 @@ export function VoiceView({
       const profile = audioProfiles[settings.audioQuality];
       await room.localParticipant.setMicrophoneEnabled(enabled, profile.capture, profile.publish);
       setMicrophoneEnabled(enabled);
+      playAppSound("muteToggle");
     } catch (error) {
       const { MediaDeviceFailure } = await loadLiveKit();
       showToast(describeMediaError(MediaDeviceFailure, error, "microphone"));
