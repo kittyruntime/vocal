@@ -136,7 +136,7 @@ export function registerAuthRoutes(app: FastifyInstance, pool: pg.Pool): void {
       if (body.data.inviteToken) {
         const invite = await client.query<{ id: string }>(
           `SELECT id FROM invites
-           WHERE token_hash = $1 AND used_by IS NULL AND expires_at > now()
+           WHERE token_hash = $1 AND revoked_at IS NULL AND use_count < max_uses AND expires_at > now()
            FOR UPDATE`,
           [hashToken(body.data.inviteToken)],
         );
@@ -157,7 +157,7 @@ export function registerAuthRoutes(app: FastifyInstance, pool: pg.Pool): void {
       );
       if (inviteId) {
         await client.query(
-          "UPDATE invites SET used_by = $1, used_at = now() WHERE id = $2",
+          "UPDATE invites SET used_by = $1, used_at = now(), use_count = use_count + 1 WHERE id = $2",
           [user.rows[0].id, inviteId],
         );
       }

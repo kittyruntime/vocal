@@ -48,6 +48,7 @@ export type SearchResults = {
   members: { id: string; username: string; avatarUrl: string | null }[];
   messages: { id: string; channelId: string; channelName: string; username: string; content: string; filenames: string[]; createdAt: string }[];
 };
+export type Invite = { id: string; token?: string; expiresAt: string; maxUses: number; useCount: number; createdAt?: string; revokedAt?: string | null };
 
 export type VoiceToken = { token: string; url: string };
 
@@ -113,6 +114,9 @@ export function updateProfile(profile: ProfileUpdate): Promise<CurrentUser> {
 }
 export function getPublicProfile(userId: string): Promise<PublicProfile> { return request(`/api/users/${userId}/profile`); }
 export function search(query: string): Promise<SearchResults> { return request(`/api/search?q=${encodeURIComponent(query)}`); }
+export function listInvites(): Promise<Invite[]> { return request("/api/invites"); }
+export function createInvite(settings: { expiresInHours: number; maxUses: number }): Promise<Invite> { return request("/api/invites", { method: "POST", body: JSON.stringify(settings) }); }
+export function revokeInvite(inviteId: string): Promise<void> { return request(`/api/invites/${inviteId}`, { method: "DELETE" }); }
 
 export function listChannels(): Promise<Channel[]> {
   return request("/api/channels");

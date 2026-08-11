@@ -698,6 +698,17 @@ summary:focus-visible {
 .admin-role-editor > div { grid-column: 1 / -1; display: flex; justify-content: flex-end; gap: 8px; }
 .admin-role-editor > div button { padding: 8px 12px; border: 0; border-radius: 4px; background: #5865f2; color: #fff; font-weight: 600; }
 .admin-role-editor > div .danger-link { background: transparent; color: #fa777c; }
+.invite-create-form { display: grid; grid-template-columns: 1fr 1fr auto; align-items: end; gap: 12px; padding: 14px; border-radius: 8px; background: #2b2d31; }
+.invite-create-form label { display: grid; gap: 6px; color: #b5bac1; font-size: 11px; font-weight: 700; text-transform: uppercase; }
+.invite-create-form select, .invite-create-form input, .invite-created input { min-width: 0; min-height: 40px; padding: 8px 10px; border: 1px solid #1e1f22; border-radius: 4px; background: #1e1f22; color: #fff; }
+.invite-create-form button, .invite-created button { min-height: 40px; padding: 8px 13px; border: 0; border-radius: 4px; background: #5865f2; color: #fff; font-weight: 600; }
+.invite-created { display: flex; gap: 8px; margin-top: 12px; }
+.invite-created input { flex: 1; color: #b5bac1; }
+.invite-list { display: flex; flex-direction: column; gap: 6px; margin-top: 16px; }
+.invite-list > div { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; border-radius: 6px; background: #2b2d31; }
+.invite-list span { display: flex; flex-direction: column; }
+.invite-list small { color: #949ba4; }
+.invite-list button { padding: 6px 9px; border: 0; border-radius: 4px; background: transparent; color: #fa777c; }
 .admin-channel { padding: 12px; border-radius: 7px; background: #2b2d31; }
 .admin-channel-head { display: grid; grid-template-columns: 1fr minmax(150px, 220px); gap: 10px; }
 .admin-quality-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 10px; }
@@ -919,6 +930,7 @@ summary:focus-visible {
   .admin-role-layout { grid-template-columns: 1fr; }
   .admin-role-list { max-height: 160px; overflow-y: auto; }
   .admin-role-editor fieldset { grid-template-columns: 1fr; }
+  .invite-create-form { grid-template-columns: 1fr; }
   .emote-picker { position: fixed; right: 8px; bottom: calc(74px + env(safe-area-inset-bottom)); left: 8px; width: auto; }
   .emote-picker::after { display: none; }
   .emote-grid { grid-template-columns: repeat(8, 1fr); }

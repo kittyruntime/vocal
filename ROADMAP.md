@@ -11,8 +11,8 @@ This file is the hand-off point for the current product pass. Update it after ev
 - [x] Typing presence, mentions and notification preferences
 - [x] Named roles with colors and reusable permissions
 - [x] Global search across messages, attachments, channels and members
-- [ ] Configurable, revocable invitation links — **in progress**
-- [ ] Voice layouts: pinning, speaker/grid modes, hidden audio-only participants and ordering
+- [x] Configurable, revocable invitation links
+- [ ] Voice layouts: pinning, speaker/grid modes, hidden audio-only participants and ordering — **in progress**
 - [ ] Call network diagnostics and automatic quality adaptation
 - [ ] Server-side member pagination, long-list virtualization and LiveKit bundle optimization
 - [ ] Final integration, responsive and deployment verification
@@ -29,3 +29,4 @@ This file is the hand-off point for the current product pass. Update it after ev
 - `notifications`: realtime typing presence, highlighted mentions, unread counters, mention badges and per-channel all/mentions/muted preferences.
 - `roles`: additive named roles with colors, reusable capabilities, multi-role member assignment and backwards-compatible effective permissions.
 - `search`: permission-aware global search for encrypted messages, attachment names, channels and members, with a responsive command-style modal.
+- `invites`: configurable expiry and use limits, active-link inventory, copy flow, revocation and concurrency-safe consumption.
