@@ -33,15 +33,18 @@ vi.mock("livekit-client", () => ({
     TrackUnsubscribed: "trackUnsubscribed",
     LocalTrackUnpublished: "localTrackUnpublished",
     ActiveSpeakersChanged: "activeSpeakersChanged",
+    ConnectionQualityChanged: "connectionQualityChanged",
     ParticipantConnected: "participantConnected",
     ParticipantDisconnected: "participantDisconnected",
     Reconnecting: "reconnecting",
     Reconnected: "reconnected",
     Disconnected: "disconnected",
   },
+  ConnectionQuality: { Excellent: "excellent", Good: "good", Poor: "poor", Lost: "lost", Unknown: "unknown" },
+  VideoQuality: { LOW: 0, MEDIUM: 1, HIGH: 2 },
   Track: {
     Kind: { Audio: "audio", Video: "video" },
-    Source: { Camera: "camera", ScreenShare: "screen_share" },
+    Source: { Camera: "camera", ScreenShare: "screen_share", Microphone: "microphone" },
   },
   createAudioAnalyser: vi.fn(),
   MediaDeviceFailure: Object.assign(
@@ -107,8 +110,19 @@ beforeEach(() => {
   Object.defineProperty(document, "fullscreenElement", { value: null, writable: true, configurable: true });
 });
 
-function renderView(extraProps: Partial<ComponentProps<typeof VoiceView>> = {}) {
-  return render(<ToastProvider><VoiceView channel={channel} currentUser={currentUser} {...extraProps} /></ToastProvider>);
+// Joining is never automatic (see VoiceView's removed auto-join effect) --
+// this helper renders the view and clicks "Join" by default so existing
+// tests that only care about the connected state don't each have to repeat
+// that step. Pass `{ join: false }` to inspect the pre-join state itself.
+async function renderView(
+  extraProps: Partial<ComponentProps<typeof VoiceView>> = {},
+  options: { join?: boolean } = {},
+) {
+  const view = render(<ToastProvider><VoiceView channel={channel} currentUser={currentUser} {...extraProps} /></ToastProvider>);
+  if (options.join !== false) {
+    await userEvent.setup().click(await screen.findByRole("button", { name: "Join" }));
+  }
+  return view;
 }
 
 describe("VoiceView", () => {
@@ -127,7 +141,7 @@ describe("VoiceView", () => {
     remoteParticipants.set(participant.identity, participant);
     const onParticipantsChange = vi.fn();
 
-    renderView({ onParticipantsChange });
+    await renderView({ onParticipantsChange });
 
     await screen.findByRole("button", { name: "Mute microphone" });
     expect(onParticipantsChange).toHaveBeenLastCalledWith([
@@ -139,7 +153,7 @@ describe("VoiceView", () => {
   });
 
   it("joins LiveKit and enables the microphone", async () => {
-    renderView();
+    await renderView();
     await screen.findByRole("button", { name: "Mute microphone" });
     expect(api.getVoiceToken).toHaveBeenCalledWith("c2");
     expect(connect).toHaveBeenCalledWith("ws://livekit", "jwt");
@@ -147,7 +161,7 @@ describe("VoiceView", () => {
   });
 
   it("mutes and leaves the room", async () => {
-    renderView();
+    await renderView();
     const user = userEvent.setup();
     await user.click(await screen.findByRole("button", { name: "Mute microphone" }));
     expect(setMicrophoneEnabled).toHaveBeenLastCalledWith(false, expect.any(Object), expect.any(Object));
@@ -157,7 +171,7 @@ describe("VoiceView", () => {
   });
 
   it("controls deafen, camera, and screen sharing", async () => {
-    renderView();
+    await renderView();
     const user = userEvent.setup();
     await user.click(await screen.findByRole("button", { name: "Deafen" }));
     expect(screen.getByRole("button", { name: "Undeafen" })).toHaveAttribute("aria-pressed", "true");
@@ -172,7 +186,7 @@ describe("VoiceView", () => {
   });
 
   it("shows a fullscreen button on a local video tile and requests fullscreen on click", async () => {
-    renderView();
+    await renderView();
     const user = userEvent.setup();
     await user.click(await screen.findByRole("button", { name: "Turn on camera" }));
     const fullscreenButton = await screen.findByRole("button", { name: "Enter fullscreen" });
@@ -181,7 +195,7 @@ describe("VoiceView", () => {
   });
 
   it("switches to an exit-fullscreen affordance once fullscreen is active, and can exit", async () => {
-    renderView();
+    await renderView();
     const user = userEvent.setup();
     await user.click(await screen.findByRole("button", { name: "Turn on camera" }));
     const fullscreenButton = await screen.findByRole("button", { name: "Enter fullscreen" });
@@ -196,7 +210,7 @@ describe("VoiceView", () => {
   });
 
   it("shows a fullscreen button on remote video tiles too", async () => {
-    renderView();
+    await renderView();
     await screen.findByRole("button", { name: "Mute microphone" });
     const remoteTrack = {
       kind: "video",
@@ -212,7 +226,7 @@ describe("VoiceView", () => {
   });
 
   it("publishes screen sharing in 1080p60 game mode", async () => {
-    renderView();
+    await renderView();
     const user = userEvent.setup();
     await user.click(await screen.findByRole("button", { name: "Settings" }));
     await screen.findByRole("dialog", { name: "Voice & Video" });
@@ -227,7 +241,7 @@ describe("VoiceView", () => {
   });
 
   it("opens voice settings in a modal and closes it with Escape", async () => {
-    renderView();
+    await renderView();
     const user = userEvent.setup();
     await user.click(await screen.findByRole("button", { name: "Settings" }));
     expect(screen.getByRole("dialog", { name: "Voice & Video" })).toBeVisible();
@@ -237,7 +251,7 @@ describe("VoiceView", () => {
   });
 
   it("highlights the participant who is speaking", async () => {
-    renderView();
+    await renderView();
     const participantName = await screen.findByText("theo (you)");
 
     act(() => roomHandlers.get("activeSpeakersChanged")?.([{ identity: "u1", name: "theo" }]));
@@ -248,7 +262,7 @@ describe("VoiceView", () => {
   });
 
   it("keeps the voice session connected while the view is hidden", async () => {
-    const view = renderView();
+    const view = await renderView();
     await screen.findByRole("button", { name: "Mute microphone" });
 
     view.rerender(
@@ -260,7 +274,7 @@ describe("VoiceView", () => {
   });
 
   it("shows a reconnect banner while LiveKit reconnects and clears it once reconnected", async () => {
-    renderView();
+    await renderView();
     await screen.findByRole("button", { name: "Mute microphone" });
 
     act(() => roomHandlers.get("reconnecting")?.());
@@ -271,7 +285,7 @@ describe("VoiceView", () => {
   });
 
   it("shows a toast and returns to idle when the connection is lost after failed reconnection attempts", async () => {
-    renderView();
+    await renderView();
     await screen.findByRole("button", { name: "Mute microphone" });
 
     act(() => roomHandlers.get("reconnecting")?.());
@@ -282,7 +296,7 @@ describe("VoiceView", () => {
   });
 
   it("does not show the reconnection-loss toast for a graceful disconnect", async () => {
-    renderView();
+    await renderView();
     const user = userEvent.setup();
     await screen.findByRole("button", { name: "Mute microphone" });
 
@@ -294,31 +308,31 @@ describe("VoiceView", () => {
 
   it("shows a differentiated toast when the microphone permission is denied on join", async () => {
     setMicrophoneEnabled.mockRejectedValueOnce(Object.assign(new Error("denied"), { name: "NotAllowedError" }));
-    renderView();
+    await renderView();
     await screen.findByText("Microphone permission denied. Check your browser settings.");
     expect(screen.getByRole("button", { name: "Join" })).toBeInTheDocument();
   });
 
   it("shows a differentiated toast when no microphone is found on join", async () => {
     setMicrophoneEnabled.mockRejectedValueOnce(Object.assign(new Error("missing"), { name: "NotFoundError" }));
-    renderView();
+    await renderView();
     await screen.findByText("No microphone detected on this device.");
   });
 
   it("shows a network-loss toast when the initial connection is unreachable", async () => {
     connect.mockRejectedValueOnce(ConnectionError.serverUnreachable("no route to host"));
-    renderView();
+    await renderView();
     await screen.findByText("Network connection failed. Check your connection and try again.");
   });
 
   it("falls back to a generic join error for an unrelated failure", async () => {
     connect.mockRejectedValueOnce(new Error("boom"));
-    renderView();
+    await renderView();
     await screen.findByText("Could not enable the microphone.");
   });
 
   it("shows a differentiated toast when the camera permission is denied", async () => {
-    renderView();
+    await renderView();
     const user = userEvent.setup();
     await screen.findByRole("button", { name: "Mute microphone" });
     setCameraEnabled.mockRejectedValueOnce(Object.assign(new Error("denied"), { name: "NotAllowedError" }));
@@ -327,7 +341,7 @@ describe("VoiceView", () => {
   });
 
   it("shows a cancelled toast when the screen-share picker is dismissed", async () => {
-    renderView();
+    await renderView();
     const user = userEvent.setup();
     await screen.findByRole("button", { name: "Mute microphone" });
     setScreenShareEnabled.mockRejectedValueOnce(Object.assign(new Error("cancel"), { name: "NotAllowedError" }));
@@ -336,7 +350,7 @@ describe("VoiceView", () => {
   });
 
   it("configures push-to-talk from voice settings", async () => {
-    renderView();
+    await renderView();
     const user = userEvent.setup();
     await user.click(await screen.findByRole("button", { name: "Settings" }));
     await user.click(screen.getByRole("radio", { name: /Push-to-talk/ }));
@@ -347,7 +361,7 @@ describe("VoiceView", () => {
 
   it("reports active speakers to the parent and clears them on leave", async () => {
     const onSpeakingChange = vi.fn();
-    renderView({ onSpeakingChange });
+    await renderView({ onSpeakingChange });
     await screen.findByRole("button", { name: "Mute microphone" });
 
     act(() => roomHandlers.get("activeSpeakersChanged")?.([{ identity: "u2", name: "alice" }]));
@@ -360,7 +374,7 @@ describe("VoiceView", () => {
 
   it("reports self-presence to the parent on join and on leave", async () => {
     const onSelfPresenceChange = vi.fn();
-    renderView({ onSelfPresenceChange });
+    await renderView({ onSelfPresenceChange });
     await screen.findByRole("button", { name: "Mute microphone" });
     expect(onSelfPresenceChange).toHaveBeenLastCalledWith(true);
 
@@ -371,7 +385,7 @@ describe("VoiceView", () => {
 
   it("clears self-presence when disconnected involuntarily", async () => {
     const onSelfPresenceChange = vi.fn();
-    renderView({ onSelfPresenceChange });
+    await renderView({ onSelfPresenceChange });
     await screen.findByRole("button", { name: "Mute microphone" });
     onSelfPresenceChange.mockClear();
 
@@ -379,9 +393,9 @@ describe("VoiceView", () => {
     await waitFor(() => expect(onSelfPresenceChange).toHaveBeenCalledWith(false));
   });
 
-  it("re-joins the new channel when switching directly between two voice channels while connected", async () => {
+  it("cleanly leaves the old channel when switching directly to another voice channel, without auto-joining the new one", async () => {
     const onSelfPresenceChange = vi.fn();
-    const view = renderView({ onSelfPresenceChange });
+    const view = await renderView({ onSelfPresenceChange });
     await screen.findByRole("button", { name: "Mute microphone" });
     expect(connect).toHaveBeenCalledTimes(1);
 
@@ -394,8 +408,85 @@ describe("VoiceView", () => {
 
     expect(disconnect).toHaveBeenCalledTimes(1);
     expect(onSelfPresenceChange).toHaveBeenCalledWith(false);
-    await waitFor(() => expect(api.getVoiceToken).toHaveBeenCalledWith("c3"));
+    await screen.findByRole("button", { name: "Join" });
+    expect(connect).toHaveBeenCalledTimes(1);
+    expect(api.getVoiceToken).not.toHaveBeenCalledWith("c3");
+  });
+
+  it("never joins automatically -- selecting a voice channel requires an explicit Join click", async () => {
+    await renderView({}, { join: false });
+    await screen.findByRole("button", { name: "Join" });
+    expect(connect).not.toHaveBeenCalled();
+    expect(api.getVoiceToken).not.toHaveBeenCalled();
+  });
+
+  it("shows a connection-quality badge driven only by the local participant's quality", async () => {
+    await renderView();
     await screen.findByRole("button", { name: "Mute microphone" });
-    expect(connect).toHaveBeenCalledTimes(2);
+
+    act(() => roomHandlers.get("connectionQualityChanged")?.("poor", { identity: "u2", isLocal: false }));
+    expect(screen.queryByText("Poor")).not.toBeInTheDocument();
+
+    act(() => roomHandlers.get("connectionQualityChanged")?.("poor", { identity: "u1", isLocal: true }));
+    expect(await screen.findByText("Poor")).toBeInTheDocument();
+
+    act(() => roomHandlers.get("connectionQualityChanged")?.("lost", { identity: "u1", isLocal: true }));
+    expect(await screen.findByText("Lost")).toBeInTheDocument();
+
+    act(() => roomHandlers.get("connectionQualityChanged")?.("good", { identity: "u1", isLocal: true }));
+    expect(await screen.findByText("Good")).toBeInTheDocument();
+  });
+
+  it("downgrades remote video to LOW on poor connection quality and restores HIGH after three consecutive good samples", async () => {
+    const setVideoQuality = vi.fn();
+    remoteParticipants.set("u2", {
+      identity: "u2",
+      name: "alice",
+      trackPublications: new Map(),
+      videoTrackPublications: new Map([["pub1", { setVideoQuality }]]),
+    });
+
+    await renderView();
+    await screen.findByRole("button", { name: "Mute microphone" });
+
+    act(() => roomHandlers.get("connectionQualityChanged")?.("poor", { identity: "u1", isLocal: true }));
+    expect(setVideoQuality).toHaveBeenLastCalledWith(0);
+
+    setVideoQuality.mockClear();
+    act(() => roomHandlers.get("connectionQualityChanged")?.("good", { identity: "u1", isLocal: true }));
+    act(() => roomHandlers.get("connectionQualityChanged")?.("good", { identity: "u1", isLocal: true }));
+    expect(setVideoQuality).not.toHaveBeenCalled();
+
+    act(() => roomHandlers.get("connectionQualityChanged")?.("good", { identity: "u1", isLocal: true }));
+    expect(setVideoQuality).toHaveBeenLastCalledWith(2);
+  });
+
+  it("starts a newly subscribed remote video track at LOW quality while the call is already downgraded", async () => {
+    await renderView();
+    await screen.findByRole("button", { name: "Mute microphone" });
+    act(() => roomHandlers.get("connectionQualityChanged")?.("poor", { identity: "u1", isLocal: true }));
+
+    const setVideoQuality = vi.fn();
+    const remoteTrack = { kind: "video", sid: "t1", attach: vi.fn(() => document.createElement("video")), detach: vi.fn(() => []) };
+    const publication = { source: "camera", setVideoQuality };
+    const participant = { identity: "u2", name: "alice" };
+    act(() => roomHandlers.get("trackSubscribed")?.(remoteTrack, publication, participant));
+
+    expect(setVideoQuality).toHaveBeenCalledWith(0);
+  });
+
+  it("samples RTT and packet loss once connected and surfaces them in the quality badge tooltip", async () => {
+    const fakeReport = new Map<string, unknown>([
+      ["cp1", { type: "candidate-pair", nominated: true, currentRoundTripTime: 0.042 }],
+      ["ri1", { type: "remote-inbound-rtp", fractionLost: 0.02 }],
+    ]);
+    getTrackPublication.mockReturnValue({ track: { getRTCStatsReport: vi.fn().mockResolvedValue(fakeReport) } });
+
+    await renderView();
+    await screen.findByRole("button", { name: "Mute microphone" });
+    act(() => roomHandlers.get("connectionQualityChanged")?.("good", { identity: "u1", isLocal: true }));
+
+    const badge = await screen.findByText("Good");
+    await waitFor(() => expect(badge).toHaveAttribute("title", "42 ms · 2% loss"));
   });
 });
