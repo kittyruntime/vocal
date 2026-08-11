@@ -38,7 +38,14 @@ type NetworkQuality = "good" | "poor" | "lost";
 type NetworkStats = { rttMs: number | null; packetLossPercent: number | null };
 type MediaKind = "microphone" | "camera" | "screen";
 type DeviceSelections = Partial<Record<MediaDeviceKind, string>>;
-type CallParticipant = { identity: string; name: string; avatarUrl: string | null; local: boolean };
+type CallParticipant = {
+  identity: string;
+  name: string;
+  avatarUrl: string | null;
+  local: boolean;
+  microphoneMuted: boolean;
+  deafened: boolean;
+};
 type VoiceSettings = {
   devices: DeviceSelections;
   vadThreshold: number;
@@ -49,6 +56,7 @@ type VoiceSettings = {
 };
 
 const SETTINGS_KEY = "vocal.voice-settings.v1";
+const DEAFENED_ATTRIBUTE = "vocal.deafened";
 
 function loadLiveKit() {
   return import("livekit-client");
@@ -233,6 +241,7 @@ export function VoiceView({
   onViewProfile,
   onSpeakingChange,
   onParticipantsChange,
+  onSelfMediaStatusChange,
   onSelfPresenceChange,
 }: {
   channel: Channel;
@@ -242,6 +251,7 @@ export function VoiceView({
   onViewProfile?(userId: string): void;
   onSpeakingChange?(userIds: string[]): void;
   onParticipantsChange?(participants: { userId: string; username: string; avatarUrl?: string | null }[]): void;
+  onSelfMediaStatusChange?(channelId: string, status: { microphoneMuted: boolean; deafened: boolean }): void;
   onSelfPresenceChange?(present: boolean): void;
 }) {
   const { showToast } = useToast();
@@ -272,6 +282,7 @@ export function VoiceView({
   const roomRef = useRef<Room | null>(null);
   const voiceViewRef = useRef<HTMLElement>(null);
   const audioRef = useRef<HTMLDivElement>(null);
+  const refreshParticipantsRef = useRef<((localState?: { microphoneMuted?: boolean; deafened?: boolean }) => void) | null>(null);
   const remoteVideoRef = useRef<HTMLDivElement>(null);
   const localCameraRef = useRef<HTMLDivElement>(null);
   const localScreenRef = useRef<HTMLDivElement>(null);
@@ -562,28 +573,64 @@ export function VoiceView({
         }
       }
     });
-    const refreshParticipants = () => {
+    const refreshParticipants = (localState: { microphoneMuted?: boolean; deafened?: boolean } = {}) => {
       const localIdentity = room.localParticipant.identity || currentUser.id;
+      const localMicrophone = room.localParticipant.getTrackPublication(Track.Source.Microphone);
       const participants: CallParticipant[] = [
-        { identity: localIdentity, name: room.localParticipant.name || currentUser.username, avatarUrl: currentUser.avatarUrl ?? null, local: true },
+        {
+          identity: localIdentity,
+          name: room.localParticipant.name || currentUser.username,
+          avatarUrl: currentUser.avatarUrl ?? null,
+          local: true,
+          microphoneMuted: localState.microphoneMuted ?? localMicrophone?.isMuted ?? true,
+          deafened: localState.deafened ?? room.localParticipant.attributes?.[DEAFENED_ATTRIBUTE] === "true",
+        },
         ...[...room.remoteParticipants.values()].map((participant) => {
           let avatarUrl: string | null = null;
           try {
             const metadata = JSON.parse(participant.metadata || "{}");
             if (typeof metadata.avatarUrl === "string") avatarUrl = metadata.avatarUrl;
           } catch { /* Participant metadata is optional. */ }
-          return { identity: participant.identity, name: participant.name || participant.identity, avatarUrl, local: false };
+          const microphone = participant.getTrackPublication?.(Track.Source.Microphone)
+            ?? [...(participant.audioTrackPublications?.values?.() ?? [])].find((publication) => publication.source === Track.Source.Microphone);
+          return {
+            identity: participant.identity,
+            name: participant.name || participant.identity,
+            avatarUrl,
+            local: false,
+            microphoneMuted: microphone?.isMuted ?? true,
+            deafened: participant.attributes?.[DEAFENED_ATTRIBUTE] === "true",
+          };
         }),
       ];
       setCallParticipants(participants);
+      for (const container of [remoteVideoRef.current, localCameraRef.current, localScreenRef.current]) {
+        if (!container) continue;
+        const tiles = container.dataset.participantId ? [container] : [...container.querySelectorAll<HTMLElement>("[data-participant-id]")];
+        for (const tile of tiles) {
+          const participant = participants.find((entry) => entry.identity === tile.dataset.participantId);
+          tile.querySelector(".tile-media-status")?.remove();
+          if (!participant || (!participant.microphoneMuted && !participant.deafened)) continue;
+          const status = document.createElement("span");
+          status.className = "tile-media-status";
+          status.textContent = [participant.microphoneMuted ? "Mic muted" : null, participant.deafened ? "Deafened" : null].filter(Boolean).join(" · ");
+          tile.append(status);
+        }
+      }
       onParticipantsChange?.(participants.map((participant) => ({
         userId: participant.identity,
         username: participant.name,
         avatarUrl: participant.avatarUrl,
+        microphoneMuted: participant.microphoneMuted,
+        deafened: participant.deafened,
       })));
     };
-    room.on(RoomEvent.ParticipantConnected, refreshParticipants);
-    room.on(RoomEvent.ParticipantDisconnected, refreshParticipants);
+    refreshParticipantsRef.current = refreshParticipants;
+    room.on(RoomEvent.ParticipantConnected, () => refreshParticipants());
+    room.on(RoomEvent.ParticipantDisconnected, () => refreshParticipants());
+    room.on(RoomEvent.TrackMuted, () => refreshParticipants());
+    room.on(RoomEvent.TrackUnmuted, () => refreshParticipants());
+    room.on(RoomEvent.ParticipantAttributesChanged, () => refreshParticipants());
     room.on(RoomEvent.ParticipantPermissionsChanged, (prevPermissions, participant) => {
       if (!participant.isLocal) return;
       if (prevPermissions?.canPublish && participant.permissions?.canPublish === false) {
@@ -625,12 +672,16 @@ export function VoiceView({
       const audioProfile = audioProfiles[settings.audioQuality];
       const microphone = await room.localParticipant.setMicrophoneEnabled(!settings.pushToTalk, audioProfile.capture, audioProfile.publish);
       setMicrophoneEnabled(!settings.pushToTalk);
+      void room.localParticipant.setAttributes({ [DEAFENED_ATTRIBUTE]: "false" }).catch(() => {
+        showToast("Could not share your sound status");
+      });
       if (microphone?.audioTrack) {
         startMeter(createAudioAnalyser, microphone.audioTrack);
         if (!settings.pushToTalk) await installVoiceGate(microphone.audioTrack);
       }
       setDevices(await Room.getLocalDevices(undefined, false));
-      refreshParticipants();
+      refreshParticipants({ microphoneMuted: settings.pushToTalk, deafened: false });
+      onSelfMediaStatusChange?.(channel.id, { microphoneMuted: settings.pushToTalk, deafened: false });
       setStatus("connected");
       onSelfPresenceChange?.(true);
     } catch (error) {
@@ -670,6 +721,8 @@ export function VoiceView({
         await installVoiceGate(publication.audioTrack);
       }
       setMicrophoneEnabled(!enabled);
+      refreshParticipantsRef.current?.({ microphoneMuted: enabled, deafened });
+      onSelfMediaStatusChange?.(channel.id, { microphoneMuted: enabled, deafened });
     } catch {
       showToast("Could not enable push-to-talk");
     }
@@ -685,6 +738,8 @@ export function VoiceView({
       const profile = audioProfiles[settings.audioQuality];
       void room.localParticipant.setMicrophoneEnabled(pressed, profile.capture, profile.publish).then(() => {
         setMicrophoneEnabled(pressed);
+        refreshParticipantsRef.current?.({ microphoneMuted: !pressed, deafened });
+        onSelfMediaStatusChange?.(channel.id, { microphoneMuted: !pressed, deafened });
       }).catch(async (error) => {
         const { MediaDeviceFailure } = await loadLiveKit();
         showToast(describeMediaError(MediaDeviceFailure, error, "microphone"));
@@ -714,7 +769,7 @@ export function VoiceView({
       window.removeEventListener("blur", onBlur);
       setPressed(false);
     };
-  }, [settings.audioQuality, settings.pushToTalk, showToast, status]);
+  }, [deafened, onSelfMediaStatusChange, settings.audioQuality, settings.pushToTalk, showToast, status]);
 
   async function toggleMicrophone() {
     const room = roomRef.current;
@@ -724,6 +779,8 @@ export function VoiceView({
       const profile = audioProfiles[settings.audioQuality];
       await room.localParticipant.setMicrophoneEnabled(enabled, profile.capture, profile.publish);
       setMicrophoneEnabled(enabled);
+      refreshParticipantsRef.current?.({ microphoneMuted: !enabled, deafened });
+      onSelfMediaStatusChange?.(channel.id, { microphoneMuted: !enabled, deafened });
       playAppSound("muteToggle");
     } catch (error) {
       const { MediaDeviceFailure } = await loadLiveKit();
@@ -731,12 +788,21 @@ export function VoiceView({
     }
   }
 
-  function toggleDeafen() {
+  async function toggleDeafen() {
+    const room = roomRef.current;
+    if (!room) return;
     const next = !deafened;
     deafenedRef.current = next;
     setDeafened(next);
     for (const element of audioRef.current?.querySelectorAll("audio") ?? []) {
       element.muted = next;
+    }
+    refreshParticipantsRef.current?.({ microphoneMuted: !microphoneEnabled, deafened: next });
+    onSelfMediaStatusChange?.(channel.id, { microphoneMuted: !microphoneEnabled, deafened: next });
+    try {
+      await room.localParticipant.setAttributes({ [DEAFENED_ATTRIBUTE]: String(next) });
+    } catch {
+      showToast("Could not share your sound status");
     }
   }
 
@@ -919,6 +985,10 @@ export function VoiceView({
                     <span className="participant-avatar">{participant.avatarUrl ? <img src={participant.avatarUrl} alt="" /> : participant.name.slice(0, 1).toUpperCase()}</span>
                   </div>
                   <strong>{participant.name}{participant.local ? " (you)" : ""}</strong>
+                  <div className="participant-media-status" aria-label={`${participant.name}: ${participant.microphoneMuted ? "microphone muted" : "microphone on"}${participant.deafened ? ", sound muted" : ""}`}>
+                    {participant.microphoneMuted ? <span><Icon name="microphoneOff" size={14} /> Muted</span> : null}
+                    {participant.deafened ? <span><Icon name="headphonesOff" size={14} /> Deafened</span> : null}
+                  </div>
                 </article>
               );
             })}
@@ -929,7 +999,7 @@ export function VoiceView({
           <div ref={localCameraRef} className={`local-video ${pinnedTileId === "local-camera" ? "is-pinned" : ""} ${localSpeaking ? "is-speaking" : ""}`} data-participant-id={currentUser.id} onClick={() => cameraEnabled && setPinnedTileId((value) => value === "local-camera" ? null : "local-camera")} />
           <div ref={remoteVideoRef} className="remote-videos" />
         </div>
-        {hasVideo && !hideAudioOnly && audioOnlyParticipants.length > 0 ? <div className="voice-audio-strip">{audioOnlyParticipants.map((participant) => <button type="button" key={participant.identity} onClick={() => onViewProfile?.(participant.identity)}><span className={`member-avatar ${activeSpeakerIds.has(participant.identity) ? "is-speaking" : ""}`}>{participant.avatarUrl ? <img src={participant.avatarUrl} alt="" /> : participant.name[0].toUpperCase()}</span><span>{participant.name}{participant.local ? " (you)" : ""}</span></button>)}</div> : null}
+        {hasVideo && !hideAudioOnly && audioOnlyParticipants.length > 0 ? <div className="voice-audio-strip">{audioOnlyParticipants.map((participant) => <button type="button" key={participant.identity} onClick={() => onViewProfile?.(participant.identity)}><span className={`member-avatar ${activeSpeakerIds.has(participant.identity) ? "is-speaking" : ""}`}>{participant.avatarUrl ? <img src={participant.avatarUrl} alt="" /> : participant.name[0].toUpperCase()}</span><span>{participant.name}{participant.local ? " (you)" : ""}</span><span className="voice-media-status" aria-label={`${participant.name}: ${participant.microphoneMuted ? "microphone muted" : "microphone on"}${participant.deafened ? ", sound muted" : ""}`}>{participant.microphoneMuted ? <Icon name="microphoneOff" size={14} /> : null}{participant.deafened ? <Icon name="headphonesOff" size={14} /> : null}</span></button>)}</div> : null}
         {status === "idle" ? (
           <button type="button" className="voice-primary" onClick={() => void joinRoom()}>
             Join
@@ -942,7 +1012,7 @@ export function VoiceView({
             <button type="button" title={microphoneEnabled ? "Mute microphone" : "Unmute microphone"} aria-label={settings.pushToTalk ? (microphoneEnabled ? "You're talking…" : "Hold Space") : (microphoneEnabled ? "Mute microphone" : "Unmute microphone")} className={!microphoneEnabled ? "control-off" : ""} onClick={() => void toggleMicrophone()}>
               <Icon name="microphone" size={19} />
             </button>
-            <button type="button" title={deafened ? "Undeafen" : "Deafen"} aria-label={deafened ? "Undeafen" : "Deafen"} className={deafened ? "control-off" : ""} aria-pressed={deafened} onClick={toggleDeafen}>
+            <button type="button" title={deafened ? "Undeafen" : "Deafen"} aria-label={deafened ? "Undeafen" : "Deafen"} className={deafened ? "control-off" : ""} aria-pressed={deafened} onClick={() => void toggleDeafen()}>
               <Icon name="headphones" size={19} />
             </button>
             <button type="button" title={cameraEnabled ? "Stop camera" : "Turn on camera"} aria-label={cameraEnabled ? "Stop camera" : "Turn on camera"} className={!cameraEnabled ? "control-off" : ""} aria-pressed={cameraEnabled} onClick={() => void toggleCamera()}>

@@ -16,6 +16,7 @@ const setCameraEnabled = vi.fn();
 const setScreenShareEnabled = vi.fn();
 const getTrackPublication = vi.fn();
 const switchActiveDevice = vi.fn();
+const setAttributes = vi.fn();
 const roomHandlers = new Map<string, (...args: unknown[]) => void>();
 const remoteParticipants = new Map<string, any>();
 
@@ -26,7 +27,7 @@ vi.mock("livekit-client", () => ({
     connect = connect;
     disconnect = disconnect;
     switchActiveDevice = switchActiveDevice;
-    localParticipant = { setMicrophoneEnabled, setCameraEnabled, setScreenShareEnabled, getTrackPublication };
+    localParticipant = { identity: "u1", name: "theo", attributes: {}, setMicrophoneEnabled, setCameraEnabled, setScreenShareEnabled, getTrackPublication, setAttributes };
     on(event: string, handler: (...args: unknown[]) => void) { roomHandlers.set(event, handler); return this; }
   },
   RoomEvent: {
@@ -38,6 +39,9 @@ vi.mock("livekit-client", () => ({
     ParticipantConnected: "participantConnected",
     ParticipantDisconnected: "participantDisconnected",
     ParticipantPermissionsChanged: "participantPermissionsChanged",
+    ParticipantAttributesChanged: "participantAttributesChanged",
+    TrackMuted: "trackMuted",
+    TrackUnmuted: "trackUnmuted",
     Reconnecting: "reconnecting",
     Reconnected: "reconnected",
     Disconnected: "disconnected",
@@ -101,6 +105,7 @@ beforeEach(() => {
   connect.mockResolvedValue(undefined);
   disconnect.mockResolvedValue(undefined);
   switchActiveDevice.mockResolvedValue(true);
+  setAttributes.mockResolvedValue(undefined);
   setMicrophoneEnabled.mockResolvedValue(undefined);
   getTrackPublication.mockReturnValue(undefined);
   const videoTrack = {
@@ -149,8 +154,8 @@ describe("VoiceView", () => {
 
     await screen.findByRole("button", { name: "Mute microphone" });
     expect(onParticipantsChange).toHaveBeenLastCalledWith([
-      { userId: "u1", username: "theo", avatarUrl: null },
-      { userId: "u2", username: "alice", avatarUrl: null },
+      { userId: "u1", username: "theo", avatarUrl: null, microphoneMuted: false, deafened: false },
+      { userId: "u2", username: "alice", avatarUrl: null, microphoneMuted: true, deafened: false },
     ]);
     expect(screen.getByLabelText("Channel videos").querySelectorAll(".screen-share")).toHaveLength(1);
     expect(existingTrack.attach).toHaveBeenCalledOnce();
@@ -162,6 +167,26 @@ describe("VoiceView", () => {
     expect(api.getVoiceToken).toHaveBeenCalledWith("c2");
     expect(connect).toHaveBeenCalledWith("ws://livekit", "jwt");
     expect(setMicrophoneEnabled).toHaveBeenCalledWith(true, expect.any(Object), expect.any(Object));
+  });
+
+  it("shows remote microphone and sound status and refreshes it from LiveKit events", async () => {
+    const microphone = { source: "microphone", isMuted: true };
+    const participant = {
+      identity: "u2",
+      name: "alice",
+      attributes: { "vocal.deafened": "true" },
+      getTrackPublication: vi.fn(() => microphone),
+      trackPublications: new Map(),
+    };
+    remoteParticipants.set(participant.identity, participant);
+
+    await renderView();
+    expect(await screen.findByLabelText("alice: microphone muted, sound muted")).toBeInTheDocument();
+
+    microphone.isMuted = false;
+    participant.attributes["vocal.deafened"] = "false";
+    act(() => roomHandlers.get("trackUnmuted")?.());
+    expect(screen.getByLabelText("alice: microphone on")).toBeInTheDocument();
   });
 
   it("mutes and leaves the room", async () => {
@@ -202,6 +227,7 @@ describe("VoiceView", () => {
     const user = userEvent.setup();
     await user.click(await screen.findByRole("button", { name: "Deafen" }));
     expect(screen.getByRole("button", { name: "Undeafen" })).toHaveAttribute("aria-pressed", "true");
+    expect(setAttributes).toHaveBeenLastCalledWith({ "vocal.deafened": "true" });
 
     await user.click(screen.getByRole("button", { name: "Turn on camera" }));
     expect(setCameraEnabled).toHaveBeenCalledWith(true, expect.any(Object), expect.any(Object));
