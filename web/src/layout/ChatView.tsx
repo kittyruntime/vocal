@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ClipboardEvent, type DragEvent, type FormEvent, type UIEvent } from "react";
-import type { Channel, Message } from "../api/client";
+import type { Channel, CurrentUser, Message } from "../api/client";
 import * as api from "../api/client";
 import { useToast } from "../toast/ToastContext";
 import { Icon } from "../ui/Icon";
@@ -24,6 +24,7 @@ export function ChatView({
   onMessagesPrepended,
   onOpenSidebar,
   onViewProfile,
+  currentUser,
 }: {
   channel: Channel;
   maxMessageLength?: number;
@@ -32,6 +33,7 @@ export function ChatView({
   onMessagesPrepended(messages: Message[]): void;
   onOpenSidebar?(): void;
   onViewProfile?(userId: string): void;
+  currentUser?: CurrentUser;
 }) {
   const { showToast } = useToast();
   const [draft, setDraft] = useState("");
@@ -39,6 +41,9 @@ export function ChatView({
   const [files, setFiles] = useState<File[]>([]);
   const [dragActive, setDragActive] = useState(false);
   const [emotesOpen, setEmotesOpen] = useState(false);
+  const [replyTo, setReplyTo] = useState<Message | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState("");
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
 
@@ -185,15 +190,42 @@ export function ChatView({
     if ((!content && files.length === 0) || sending) return;
     setSending(true);
     try {
-      await (files.length > 0 ? api.postMessage(channel.id, content, files) : api.postMessage(channel.id, content));
+      await (replyTo
+        ? api.postMessage(channel.id, content, files, replyTo.id)
+        : files.length > 0
+          ? api.postMessage(channel.id, content, files)
+          : api.postMessage(channel.id, content));
       setDraft("");
       setFiles([]);
+      setReplyTo(null);
     } catch {
       showToast("The message could not be sent");
     } finally {
       setSending(false);
       composerInputRef.current?.focus();
     }
+  }
+
+  async function saveEdit(messageId: string) {
+    const content = editDraft.trim();
+    if (!content) return;
+    try {
+      await api.updateMessage(channel.id, messageId, content);
+      setEditingId(null);
+    } catch { showToast("The message could not be edited"); }
+  }
+
+  async function removeMessage(message: Message) {
+    if (!window.confirm("Delete this message?")) return;
+    try { await api.deleteMessage(channel.id, message.id); }
+    catch { showToast("The message could not be deleted"); }
+  }
+
+  async function toggleReaction(message: Message, emoji: string) {
+    try {
+      const active = message.reactions?.find((reaction) => reaction.emoji === emoji)?.userIds.includes(currentUser?.id ?? "") ?? false;
+      await (active ? api.removeMessageReaction(channel.id, message.id, emoji) : api.addMessageReaction(channel.id, message.id, emoji));
+    } catch { showToast("The reaction could not be updated"); }
   }
 
   function insertEmote(emote: string) {
@@ -242,11 +274,12 @@ export function ChatView({
           <article key={message.id} className="chat-message">
             <button type="button" className="message-profile-trigger" aria-label={`View profile of ${message.username}`} onClick={() => onViewProfile?.(message.userId)}><span className="message-avatar" aria-hidden="true">{message.avatarUrl ? <img src={message.avatarUrl} alt="" /> : message.username.slice(0, 1).toUpperCase()}</span></button>
             <div className="message-body">
+              {message.replyTo ? <div className="message-reply-context"><Icon name="reply" size={13} /><strong>{message.replyTo.username}</strong><span>{message.replyTo.content || "Attachment"}</span></div> : null}
               <div className="message-meta">
                 <button type="button" className="chat-author" onClick={() => onViewProfile?.(message.userId)}>{message.username}</button>
-                <time dateTime={message.createdAt}>{formatMessageTime(message.createdAt)}</time>
+                <time dateTime={message.createdAt}>{formatMessageTime(message.createdAt)}</time>{message.editedAt ? <span className="message-edited">(edited)</span> : null}
               </div>
-              <div className="chat-content">{message.content}</div>
+              {editingId === message.id ? <form className="message-edit-form" onSubmit={(event) => { event.preventDefault(); void saveEdit(message.id); }}><input aria-label="Edit message" value={editDraft} maxLength={maxMessageLength} autoFocus onChange={(event) => setEditDraft(event.target.value)} /><div><button type="button" onClick={() => setEditingId(null)}>Cancel</button><button type="submit">Save</button></div></form> : <div className="chat-content">{message.content}</div>}
               {(message.attachments?.length ?? 0) > 0 ? <div className="message-attachments">
                 {message.attachments!.map((attachment) => attachment.mimeType.startsWith("image/") ? (
                   <a key={attachment.id} className="message-image" href={attachment.url} target="_blank" rel="noreferrer">
@@ -259,13 +292,16 @@ export function ChatView({
                   </a>
                 ))}
               </div> : null}
+              {(message.reactions?.length ?? 0) > 0 ? <div className="message-reactions">{message.reactions!.map((reaction) => <button type="button" key={reaction.emoji} className={reaction.userIds.includes(currentUser?.id ?? "") ? "active" : ""} aria-label={`${reaction.emoji}, ${reaction.count} reactions`} onClick={() => void toggleReaction(message, reaction.emoji)}><span>{reaction.emoji}</span>{reaction.count}</button>)}</div> : null}
             </div>
+            <div className="message-actions" aria-label="Message actions"><button type="button" aria-label="Reply" onClick={() => { setReplyTo(message); composerInputRef.current?.focus(); }}><Icon name="reply" size={16} /></button>{["👍", "❤️", "😂"].map((emoji) => <button type="button" key={emoji} aria-label={`React ${emoji}`} onClick={() => void toggleReaction(message, emoji)}>{emoji}</button>)}{message.userId === currentUser?.id ? <button type="button" aria-label="Edit message" onClick={() => { setEditingId(message.id); setEditDraft(message.content); }}><Icon name="edit" size={15} /></button> : null}{message.userId === currentUser?.id || currentUser?.capabilities.includes("moderate") ? <button type="button" className="danger" aria-label="Delete message" onClick={() => void removeMessage(message)}><Icon name="trash" size={15} /></button> : null}</div>
           </article>
         ))}
       </div>
       {files.length > 0 ? <div className="composer-attachments" aria-label="Files to send">
         {files.map((file, index) => <PendingFile key={`${file.name}-${file.lastModified}-${index}`} file={file} onRemove={() => setFiles((values) => values.filter((_, valueIndex) => valueIndex !== index))} />)}
       </div> : null}
+      {replyTo ? <div className="composer-reply"><span>Replying to <strong>{replyTo.username}</strong></span><button type="button" aria-label="Cancel reply" onClick={() => setReplyTo(null)}><Icon name="close" size={15} /></button></div> : null}
       <form className="chat-composer" onSubmit={handleSubmit}>
         <div className="composer-field">
           <button type="button" className="composer-attach-button" aria-label="Attach files" onClick={() => fileInputRef.current?.click()}><Icon name="plus" size={20} /></button>

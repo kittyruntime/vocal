@@ -36,6 +36,9 @@ export type Message = {
   avatarUrl?: string | null;
   content: string;
   createdAt: string;
+  editedAt?: string | null;
+  replyTo?: { id: string; userId: string; username: string; content: string } | null;
+  reactions?: { emoji: string; count: number; userIds: string[] }[];
   attachments?: MessageAttachment[];
 };
 export type MessageAttachment = { id: string; filename: string; mimeType: string; size: number; url: string };
@@ -150,12 +153,26 @@ export function listMessages(channelId: string, opts?: { before?: string; limit?
   return request(`/api/channels/${channelId}/messages${qs ? `?${qs}` : ""}`);
 }
 
-export function postMessage(channelId: string, content: string, files: File[] = []): Promise<Message> {
-  if (files.length === 0) return request(`/api/channels/${channelId}/messages`, { method: "POST", body: JSON.stringify({ content }) });
+export function postMessage(channelId: string, content: string, files: File[] = [], replyToMessageId?: string): Promise<Message> {
+  if (files.length === 0) return request(`/api/channels/${channelId}/messages`, { method: "POST", body: JSON.stringify({ content, replyToMessageId }) });
   const body = new FormData();
   body.set("content", content);
+  if (replyToMessageId) body.set("replyToMessageId", replyToMessageId);
   for (const file of files) body.append("files", file, file.name);
   return request(`/api/channels/${channelId}/messages`, { method: "POST", body });
+}
+
+export function updateMessage(channelId: string, messageId: string, content: string): Promise<Message> {
+  return request(`/api/channels/${channelId}/messages/${messageId}`, { method: "PATCH", body: JSON.stringify({ content }) });
+}
+export function deleteMessage(channelId: string, messageId: string): Promise<void> {
+  return request(`/api/channels/${channelId}/messages/${messageId}`, { method: "DELETE" });
+}
+export function addMessageReaction(channelId: string, messageId: string, emoji: string): Promise<Message> {
+  return request(`/api/channels/${channelId}/messages/${messageId}/reactions`, { method: "PUT", body: JSON.stringify({ emoji }) });
+}
+export function removeMessageReaction(channelId: string, messageId: string, emoji: string): Promise<Message> {
+  return request(`/api/channels/${channelId}/messages/${messageId}/reactions`, { method: "DELETE", body: JSON.stringify({ emoji }) });
 }
 
 export function getVoiceToken(channelId: string): Promise<VoiceToken> {

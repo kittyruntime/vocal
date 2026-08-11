@@ -20,12 +20,6 @@ function multipartBody(fields: Record<string, string>, file: { name: string; typ
   return { payload: Buffer.concat(chunks), contentType: `multipart/form-data; boundary=${boundary}` };
 }
 
-async function login(username: string, password: string): Promise<string> {
-  const res = await app.inject({ method: "POST", url: "/api/auth/login",
-    payload: { username, password } });
-  return `sid=${res.cookies.find((c) => c.name === "sid")!.value}`;
-}
-
 beforeAll(async () => {
   process.env.MESSAGE_MASTER_KEY ??= Buffer.alloc(32, 7).toString("base64");
   pool = await makeTestDb();
@@ -35,9 +29,9 @@ afterAll(async () => { await app.close(); await pool.end(); });
 
 beforeEach(async () => {
   await pool.query("TRUNCATE users, sessions, invites, channels, messages CASCADE");
-  await app.inject({ method: "POST", url: "/api/setup",
+  const setup = await app.inject({ method: "POST", url: "/api/setup",
     payload: { username: "theo", password: "correct horse battery" } });
-  adminCookie = await login("theo", "correct horse battery");
+  adminCookie = `sid=${setup.cookies.find((cookie) => cookie.name === "sid")!.value}`;
   const ch = await app.inject({ method: "POST", url: "/api/channels",
     headers: { cookie: adminCookie }, payload: { name: "général", type: "text" } });
   channelId = ch.json().id;
@@ -145,5 +139,39 @@ describe("messages", () => {
       url: "/api/channels/00000000-0000-0000-0000-000000000000/messages",
       headers: { cookie: adminCookie } });
     expect(res.statusCode).toBe(404);
+  });
+
+  it("replies to a message and returns its decrypted preview", async () => {
+    const original = await app.inject({ method: "POST", url: `/api/channels/${channelId}/messages`, headers: { cookie: adminCookie }, payload: { content: "original secret" } });
+    const reply = await app.inject({ method: "POST", url: `/api/channels/${channelId}/messages`, headers: { cookie: adminCookie }, payload: { content: "answer", replyToMessageId: original.json().id } });
+    expect(reply.statusCode).toBe(201);
+    expect(reply.json().replyTo).toMatchObject({ id: original.json().id, username: "theo", content: "original secret" });
+  });
+
+  it("edits an owned message and records the edit time", async () => {
+    const created = await app.inject({ method: "POST", url: `/api/channels/${channelId}/messages`, headers: { cookie: adminCookie }, payload: { content: "before" } });
+    const edited = await app.inject({ method: "PATCH", url: `/api/channels/${channelId}/messages/${created.json().id}`, headers: { cookie: adminCookie }, payload: { content: "after" } });
+    expect(edited.statusCode).toBe(200);
+    expect(edited.json()).toMatchObject({ content: "after" });
+    expect(edited.json().editedAt).toEqual(expect.any(String));
+  });
+
+  it("adds and removes a reaction idempotently", async () => {
+    const created = await app.inject({ method: "POST", url: `/api/channels/${channelId}/messages`, headers: { cookie: adminCookie }, payload: { content: "react" } });
+    const url = `/api/channels/${channelId}/messages/${created.json().id}/reactions`;
+    await app.inject({ method: "PUT", url, headers: { cookie: adminCookie }, payload: { emoji: "👍" } });
+    const added = await app.inject({ method: "PUT", url, headers: { cookie: adminCookie }, payload: { emoji: "👍" } });
+    expect(added.json().reactions).toMatchObject([{ emoji: "👍", count: 1 }]);
+    const removed = await app.inject({ method: "DELETE", url, headers: { cookie: adminCookie }, payload: { emoji: "👍" } });
+    expect(removed.json().reactions).toEqual([]);
+  });
+
+  it("prevents a member from editing another member's message", async () => {
+    const created = await app.inject({ method: "POST", url: `/api/channels/${channelId}/messages`, headers: { cookie: adminCookie }, payload: { content: "owned" } });
+    const invite = await app.inject({ method: "POST", url: "/api/invites", headers: { cookie: adminCookie } });
+    const registered = await app.inject({ method: "POST", url: "/api/auth/register", payload: { inviteToken: invite.json().token, username: "alice", password: "alicepass123" } });
+    const memberCookie = `sid=${registered.cookies.find((cookie) => cookie.name === "sid")!.value}`;
+    const edited = await app.inject({ method: "PATCH", url: `/api/channels/${channelId}/messages/${created.json().id}`, headers: { cookie: memberCookie }, payload: { content: "stolen" } });
+    expect(edited.statusCode).toBe(403);
   });
 });

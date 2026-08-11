@@ -63,6 +63,12 @@ export function MainLayout({ currentUser }: { currentUser: CurrentUser }) {
             dispatch({ type: "message/received", message: event.message });
             if (event.message.userId !== currentUser.id) playAppSound("message");
             break;
+          case "message.updated":
+            dispatch({ type: "message/updated", message: event.message });
+            break;
+          case "message.deleted":
+            dispatch({ type: "message/deleted", channelId: event.channelId, messageId: event.messageId });
+            break;
           case "channel.created":
             dispatch({ type: "channel/added", channel: event.channel });
             break;
@@ -147,6 +153,7 @@ export function MainLayout({ currentUser }: { currentUser: CurrentUser }) {
               }
               onOpenSidebar={() => setMobileSidebarOpen(true)}
               onViewProfile={setViewedProfileId}
+              currentUser={currentUser}
             />
           ) : selectedChannel?.type !== "voice" ? (
             <div className="no-channel">

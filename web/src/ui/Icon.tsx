@@ -8,15 +8,18 @@ import {
   LogOut,
   Maximize2,
   Menu,
+  MessageSquareReply,
   Mic,
   Minimize2,
   MonitorUp,
   MonitorOff,
   PhoneOff,
   Plus,
+  Pencil,
   Send,
   Settings,
   Smile,
+  Trash2,
   Volume2,
   Upload,
   Users,
@@ -34,15 +37,18 @@ type IconName =
   | "logout"
   | "maximize"
   | "menu"
+  | "reply"
   | "microphone"
   | "minimize"
   | "monitor"
   | "monitorOff"
   | "phone"
   | "plus"
+  | "edit"
   | "send"
   | "settings"
   | "smile"
+  | "trash"
   | "volume"
   | "upload"
   | "users"
@@ -58,15 +64,18 @@ const icons: Record<IconName, LucideIcon> = {
   logout: LogOut,
   maximize: Maximize2,
   menu: Menu,
+  reply: MessageSquareReply,
   microphone: Mic,
   minimize: Minimize2,
   monitor: MonitorUp,
   monitorOff: MonitorOff,
   phone: PhoneOff,
   plus: Plus,
+  edit: Pencil,
   send: Send,
   settings: Settings,
   smile: Smile,
+  trash: Trash2,
   volume: Volume2,
   upload: Upload,
   users: Users,

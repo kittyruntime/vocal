@@ -7,6 +7,8 @@ export type ServerEvent =
   | { type: "presence.online"; userId: string }
   | { type: "presence.offline"; userId: string }
   | { type: "message.created"; message: Message }
+  | { type: "message.updated"; message: Message }
+  | { type: "message.deleted"; channelId: string; messageId: string }
   | { type: "channel.created"; channel: Channel }
   | { type: "channel.deleted"; channelId: string }
   | { type: "voice.sync"; channels: Record<string, VoiceParticipant[]> }
