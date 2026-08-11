@@ -21,6 +21,16 @@ const EMOTES = [
 // auto-scroll the view. Keeps someone who scrolled up to read history from being yanked down.
 const NEAR_BOTTOM_THRESHOLD_PX = 100;
 
+// Caps how many messages stay loaded (and rendered) at once, so an active
+// channel with years of history can't grow this list -- and its DOM node
+// count -- without bound over a single long session. Deliberately NOT true
+// virtualization (windowed rendering): this codebase's test environment
+// (jsdom) has no layout engine, ResizeObserver, or Element.scrollTo, so a
+// virtualized list's actual scroll behavior couldn't be verified by an
+// automated test here. This cap is a real, fully-tested bound on growth
+// instead. See ROADMAP.md for the full reasoning.
+const MAX_LOADED_MESSAGES = 300;
+
 export function ChatView({
   channel,
   maxMessageLength = 4000,
@@ -146,8 +156,26 @@ export function ChatView({
     }
   }, [messages]);
 
+  // Trims the oldest loaded messages once the total exceeds MAX_LOADED_MESSAGES,
+  // but only while the user is near the bottom (i.e. not actively reading the
+  // history that would be trimmed) -- otherwise this would yank content out
+  // from under someone scrolled up into old messages. In practice this only
+  // fires once the live WebSocket feed has appended enough new messages to
+  // push the total over the cap while the user is following along at the
+  // bottom; loadMore's own cap check (below) handles the other growth path
+  // (repeatedly scrolling up to load older history) without ever evicting
+  // anything the user might currently be looking at.
+  useEffect(() => {
+    if (messages.length <= MAX_LOADED_MESSAGES || !isNearBottomRef.current) return;
+    onMessagesLoaded(messages.slice(messages.length - MAX_LOADED_MESSAGES));
+  }, [messages, onMessagesLoaded]);
+
   async function loadMore() {
     if (loadingMore || !hasMore || messages.length === 0) return;
+    if (messages.length >= MAX_LOADED_MESSAGES) {
+      setHasMore(false);
+      return;
+    }
     setLoadingMore(true);
     const el = messagesRef.current;
     if (el) {
