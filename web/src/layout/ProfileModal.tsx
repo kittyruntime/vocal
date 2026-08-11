@@ -4,6 +4,7 @@ import { SOUND_EVENTS } from "../api/client";
 import * as api from "../api/client";
 import { configureSounds, previewSound } from "../audio/sounds";
 import { Icon } from "../ui/Icon";
+import { RangeSlider, TextField, Textarea } from "../ui/form";
 
 const MAX_AVATAR_BYTES = 512 * 1024;
 const SOUND_EVENT_LABEL: Record<SoundEvent, string> = {
@@ -133,9 +134,11 @@ export function ProfileModal({ currentUser, onClose, onSaved }: {
           <input ref={fileInputRef} className="sr-only" type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={(event) => void selectAvatar(event)} />
           <input ref={bannerInputRef} className="sr-only" type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={(event) => void selectBanner(event)} />
           <div className="profile-fields">
-            <label>Username<input value={username} onChange={(event) => setUsername(event.target.value)} minLength={2} maxLength={32} required /></label>
-            <label>Email<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} maxLength={254} placeholder="you@example.com" /></label>
-            <label className="profile-description">About me<textarea aria-label="About me" value={description} onChange={(event) => setDescription(event.target.value)} maxLength={190} rows={4} placeholder="A few words about you…" /><small>{description.length}/190</small></label>
+            <TextField label="Username" value={username} onChange={(event) => setUsername(event.target.value)} minLength={2} maxLength={32} required />
+            <TextField label="Email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} maxLength={254} placeholder="you@example.com" />
+            <div className="profile-description">
+              <Textarea label="About me" value={description} onChange={(event) => setDescription(event.target.value)} maxLength={190} rows={4} placeholder="A few words about you…" hint={`${description.length}/190`} />
+            </div>
             <div className="profile-avatar-actions">
               <button type="button" onClick={() => fileInputRef.current?.click()}>Upload picture</button>
               {avatarUrl ? <button type="button" className="danger-link" onClick={() => setAvatarUrl(null)}>Remove</button> : null}
@@ -152,27 +155,21 @@ export function ProfileModal({ currentUser, onClose, onSaved }: {
             <p className="admin-setting-description">Adjust how loud each sound plays for you. The server admin controls which sounds are enabled.</p>
             <div className="sound-volume-list">
               {SOUND_EVENTS.map((event) => (
-                <div className="sound-volume-row" key={event}>
-                  <div className="sound-volume-row-head"><span>{SOUND_EVENT_LABEL[event]}</span><small>{soundVolumes[event]}%</small></div>
-                  <div className="sound-volume-row-controls">
-                    <input
-                      type="range"
-                      min={0}
-                      max={100}
-                      step={5}
-                      aria-label={`${SOUND_EVENT_LABEL[event]} volume`}
-                      value={soundVolumes[event]}
-                      onChange={(evt) => setSoundVolumes((value) => ({ ...value, [event]: Number(evt.target.value) }))}
-                      onMouseUp={(evt) => void saveVolume(event, Number((evt.target as HTMLInputElement).value))}
-                      onKeyUp={(evt) => void saveVolume(event, Number((evt.target as HTMLInputElement).value))}
-                    />
-                    <button type="button" aria-label={`Preview ${SOUND_EVENT_LABEL[event]}`} onClick={() => previewSound(event, soundSettings[event].hasCustom, soundVolumes[event])}><Icon name="volume" size={15} /></button>
-                  </div>
-                </div>
+                <RangeSlider
+                  key={event}
+                  label={`${SOUND_EVENT_LABEL[event]} — ${soundVolumes[event]}%`}
+                  min={0}
+                  max={100}
+                  step={5}
+                  value={soundVolumes[event]}
+                  onChange={(next) => setSoundVolumes((value) => ({ ...value, [event]: next }))}
+                  onCommit={(next) => void saveVolume(event, next)}
+                  trailing={<button type="button" aria-label={`Preview ${SOUND_EVENT_LABEL[event]}`} onClick={() => previewSound(event, soundSettings[event].hasCustom, soundVolumes[event])}><Icon name="volume" size={15} /></button>}
+                />
               ))}
             </div>
           </div>
-          {error ? <p className="admin-error" role="alert">{error}</p> : null}
+          {error ? <p className="form-error" role="alert">{error}</p> : null}
           <footer className="profile-actions">
             <button type="button" className="profile-cancel" onClick={onClose} disabled={saving}>Cancel</button>
             <button type="submit" className="profile-save" disabled={saving}>{saving ? "Saving…" : "Save changes"}</button>

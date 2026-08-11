@@ -605,9 +605,6 @@ textarea.form-input { resize: vertical; }
 .profile-avatar-button i { position: absolute; inset: 0; display: grid; place-items: center; background: rgb(0 0 0 / 60%); color: #fff; opacity: 0; transition: opacity 120ms ease; }
 .profile-avatar-button:hover i, .profile-avatar-button:focus-visible i { opacity: 1; }
 .profile-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
-.profile-fields label { min-width: 0; display: flex; flex-direction: column; gap: 7px; color: #b5bac1; font-size: 11px; font-weight: 700; letter-spacing: .035em; text-transform: uppercase; }
-.profile-fields input, .profile-fields textarea { width: 100%; padding: 10px 12px; border: 1px solid #1e1f22; border-radius: 5px; outline: 0; background: #1e1f22; color: #dbdee1; font: inherit; font-size: 14px; text-transform: none; resize: vertical; }
-.profile-fields input:focus, .profile-fields textarea:focus { border-color: #5865f2; }
 .profile-description, .profile-avatar-actions { grid-column: 1 / -1; }
 .profile-description { position: relative; }
 .profile-description small { align-self: flex-end; margin-top: -2px; color: #80848e; font-weight: 400; letter-spacing: 0; text-transform: none; }
@@ -779,13 +776,6 @@ textarea.form-input { resize: vertical; }
 .sound-setting-actions > button:not(.setting-switch) { padding: 6px 9px; border: 0; border-radius: 4px; background: #4e5058; color: #f2f3f5; font-size: 12px; cursor: pointer; }
 .sound-setting-actions .danger-link { background: transparent; color: #fa777c; }
 .sound-volume-list { display: flex; flex-direction: column; gap: 16px; }
-.sound-volume-row { display: flex; flex-direction: column; gap: 6px; }
-.sound-volume-row-head { display: flex; align-items: center; justify-content: space-between; }
-.sound-volume-row-head span { color: #b5bac1; font-size: 11px; font-weight: 700; text-transform: uppercase; }
-.sound-volume-row-head small { color: #949ba4; }
-.sound-volume-row-controls { display: flex; align-items: center; gap: 10px; }
-.sound-volume-row-controls input[type="range"] { flex: 1; accent-color: var(--brand); }
-.sound-volume-row-controls button { padding: 5px 9px; border: 0; border-radius: 4px; background: #4e5058; color: #f2f3f5; font-size: 12px; cursor: pointer; }
 
 /* Shared visual system — compact Discord navigation, calm Meet-style calls. */
 .sidebar-column { width: 272px; min-width: 272px; background: var(--bg-sidebar); }
@@ -861,23 +851,18 @@ textarea.form-input { resize: vertical; }
 .voice-settings-content { padding-top: 4px; }
 .settings-section { padding-block: 18px 20px; border-bottom-color: var(--divider); }
 .settings-section h3,
-.profile-fields label,
 .voice-settings label,
 .attachment-limit-grid label,
 .channel-overview-fields > label { letter-spacing: .045em; }
 .settings-tabs { gap: 3px; border-color: var(--divider); }
 .settings-tabs button { min-height: 36px; border-radius: var(--radius-sm); }
 .settings-tabs button.active { background: var(--bg-active); }
-.profile-fields input,
-.profile-fields textarea,
 .voice-settings select,
 .attachment-limit-grid input,
 .admin-channel select,
 .admin-channel input,
 .channel-settings-modal select,
 .create-channel-form select { min-height: 42px; border-color: transparent; border-radius: var(--radius-sm); background: var(--bg-sunken); }
-.profile-fields input:hover,
-.profile-fields textarea:hover,
 .voice-settings select:hover,
 .attachment-limit-grid input:hover { border-color: rgb(255 255 255 / 8%); }
 .profile-actions,

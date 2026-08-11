@@ -63,9 +63,9 @@ describe("ProfileModal", () => {
   it("adjusts and saves a per-sound volume", async () => {
     vi.mocked(api.updateMySoundVolume).mockResolvedValue({ message: 80, userJoin: 55, userLeave: 55, muteToggle: 55, forceMuted: 55 });
     render(<ProfileModal currentUser={{ id: "u1", username: "theo", capabilities: [] }} onSaved={vi.fn()} onClose={vi.fn()} />);
-    const slider = await screen.findByLabelText("Message received volume");
+    const slider = await screen.findByLabelText("Message received — 55%");
     fireEvent.change(slider, { target: { value: "80" } });
-    fireEvent.mouseUp(slider);
+    fireEvent.pointerUp(slider);
     await waitFor(() => expect(api.updateMySoundVolume).toHaveBeenCalledWith("message", 80));
   });
 
@@ -73,9 +73,9 @@ describe("ProfileModal", () => {
     const freshVolumes = { message: 80, userJoin: 55, userLeave: 55, muteToggle: 55, forceMuted: 55 };
     vi.mocked(api.updateMySoundVolume).mockResolvedValue(freshVolumes);
     render(<ProfileModal currentUser={{ id: "u1", username: "theo", capabilities: [] }} onSaved={vi.fn()} onClose={vi.fn()} />);
-    const slider = await screen.findByLabelText("Message received volume");
+    const slider = await screen.findByLabelText("Message received — 55%");
     fireEvent.change(slider, { target: { value: "80" } });
-    fireEvent.mouseUp(slider);
+    fireEvent.pointerUp(slider);
     await waitFor(() => expect(sounds.configureSounds).toHaveBeenCalledWith(
       {
         message: { enabled: true, hasCustom: false },
