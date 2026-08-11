@@ -1,6 +1,12 @@
 export const CAPABILITIES = ["manage_channels", "manage_server", "moderate", "publish_voice"] as const;
 export type Capability = (typeof CAPABILITIES)[number];
 
+export const SOUND_EVENTS = ["message", "userJoin", "userLeave", "muteToggle", "forceMuted"] as const;
+export type SoundEvent = (typeof SOUND_EVENTS)[number];
+export type SoundSetting = { enabled: boolean; hasCustom: boolean };
+export type SoundSettings = Record<SoundEvent, SoundSetting>;
+export type SoundVolumes = Record<SoundEvent, number>;
+
 export type CurrentUser = {
   id: string;
   username: string;
@@ -138,6 +144,14 @@ export function getAdminSettings(): Promise<ServerSettings> { return request("/a
 export function getChatSettings(): Promise<ChatSettings> { return request("/api/chat-settings"); }
 export function updateAdminSettings(settings: ServerSettings): Promise<ServerSettings> {
   return request("/api/admin/settings", { method: "PATCH", body: JSON.stringify(settings) });
+}
+export function getSoundSettings(): Promise<SoundSettings> { return request("/api/sounds"); }
+export function updateSoundSetting(event: SoundEvent, patch: { enabled?: boolean; audioData?: string | null }): Promise<SoundSetting> {
+  return request(`/api/admin/sounds/${event}`, { method: "PATCH", body: JSON.stringify(patch) });
+}
+export function getMySoundVolumes(): Promise<SoundVolumes> { return request("/api/me/sound-volumes"); }
+export function updateMySoundVolume(event: SoundEvent, volume: number): Promise<SoundVolumes> {
+  return request("/api/me/sound-volumes", { method: "PATCH", body: JSON.stringify({ event, volume }) });
 }
 export function listAdminUsers(opts?: { search?: string; page?: number; limit?: number }): Promise<{ users: AdminUser[]; total: number }> {
   const params = new URLSearchParams();
