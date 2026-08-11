@@ -174,4 +174,11 @@ describe("messages", () => {
     const edited = await app.inject({ method: "PATCH", url: `/api/channels/${channelId}/messages/${created.json().id}`, headers: { cookie: memberCookie }, payload: { content: "stolen" } });
     expect(edited.statusCode).toBe(403);
   });
+
+  it("searches decrypted message content without exposing inaccessible channels", async () => {
+    await app.inject({ method: "POST", url: `/api/channels/${channelId}/messages`, headers: { cookie: adminCookie }, payload: { content: "unique encrypted phrase" } });
+    const result = await app.inject({ method: "GET", url: "/api/search?q=encrypted", headers: { cookie: adminCookie } });
+    expect(result.statusCode).toBe(200);
+    expect(result.json().messages).toMatchObject([{ channelId, content: "unique encrypted phrase" }]);
+  });
 });

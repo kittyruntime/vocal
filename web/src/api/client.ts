@@ -43,6 +43,11 @@ export type Message = {
   attachments?: MessageAttachment[];
 };
 export type MessageAttachment = { id: string; filename: string; mimeType: string; size: number; url: string };
+export type SearchResults = {
+  channels: { id: string; name: string; type: Channel["type"] }[];
+  members: { id: string; username: string; avatarUrl: string | null }[];
+  messages: { id: string; channelId: string; channelName: string; username: string; content: string; filenames: string[]; createdAt: string }[];
+};
 
 export type VoiceToken = { token: string; url: string };
 
@@ -107,6 +112,7 @@ export function updateProfile(profile: ProfileUpdate): Promise<CurrentUser> {
   return request("/api/me", { method: "PATCH", body: JSON.stringify(profile) });
 }
 export function getPublicProfile(userId: string): Promise<PublicProfile> { return request(`/api/users/${userId}/profile`); }
+export function search(query: string): Promise<SearchResults> { return request(`/api/search?q=${encodeURIComponent(query)}`); }
 
 export function listChannels(): Promise<Channel[]> {
   return request("/api/channels");

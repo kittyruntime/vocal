@@ -29,6 +29,7 @@ export function Sidebar({
   onChannelUpdated,
   onChannelDeleted,
   onViewProfile,
+  onOpenSearch,
 }: {
   channels: Channel[];
   selectedChannelId: string | null;
@@ -44,6 +45,7 @@ export function Sidebar({
   onChannelUpdated?(channel: Channel): void;
   onChannelDeleted?(channelId: string): void;
   onViewProfile?(userId: string): void;
+  onOpenSearch?(): void;
 }) {
   const { showToast } = useToast();
   const textChannels = channels.filter((c) => c.type === "text");
@@ -61,6 +63,7 @@ export function Sidebar({
       <div className="sidebar-server-name">
         <span>Vocal</span>
         <div className="sidebar-server-actions">
+          <button type="button" className="server-settings-button" aria-label="Search" title="Search" onClick={onOpenSearch}><Icon name="search" size={17} /></button>
           <span className="online-dot" aria-label={`${onlineUserIds.length} members online`} />
           {(canManageServer || canModerate) ? <button type="button" className="server-settings-button" aria-label={canManageServer ? "Server settings" : "Moderation"} title={canManageServer ? "Server settings" : "Moderation"} onClick={() => setAdminOpen(true)}><Icon name="settings" size={17} /></button> : null}
         </div>

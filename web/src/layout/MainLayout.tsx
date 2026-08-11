@@ -13,6 +13,7 @@ import { playAppSound } from "../audio/sounds";
 import { Icon } from "../ui/Icon";
 import { ProfileModal } from "./ProfileModal";
 import { UserProfileModal } from "./UserProfileModal";
+import { SearchModal } from "./SearchModal";
 
 const VoiceView = lazy(() => import("../voice/VoiceView").then((module) => ({ default: module.VoiceView })));
 
@@ -24,6 +25,7 @@ export function MainLayout({ currentUser }: { currentUser: CurrentUser }) {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [viewedProfileId, setViewedProfileId] = useState<string | null>(null);
+  const [searchOpen, setSearchOpen] = useState(false);
   const [chatSettings, setChatSettings] = useState<ChatSettings>({ maxImageSizeMb: 5, maxFileSizeMb: 10, maxMessageLength: 4000 });
   const [notificationLevels, setNotificationLevels] = useState<Record<string, "all" | "mentions" | "none">>(() => {
     try { return JSON.parse(localStorage.getItem("vocal.notification-levels") ?? "{}"); } catch { return {}; }
@@ -159,6 +161,7 @@ export function MainLayout({ currentUser }: { currentUser: CurrentUser }) {
             unreadCounts={state.unreadCounts}
             mentionChannelIds={state.mentionChannelIds}
             onViewProfile={setViewedProfileId}
+            onOpenSearch={() => setSearchOpen(true)}
             currentUser={currentUser}
             onSelectChannel={selectChannel}
             onChannelCreated={(channel) => dispatch({ type: "channel/added", channel })}
@@ -229,6 +232,7 @@ export function MainLayout({ currentUser }: { currentUser: CurrentUser }) {
         </div>
         {profileOpen ? <ProfileModal currentUser={currentUser} onClose={() => setProfileOpen(false)} onSaved={refresh} /> : null}
         {viewedProfileId ? <UserProfileModal userId={viewedProfileId} onClose={() => setViewedProfileId(null)} /> : null}
+        {searchOpen ? <SearchModal onClose={() => setSearchOpen(false)} onSelectChannel={selectChannel} onViewProfile={setViewedProfileId} /> : null}
       </div>
     </div>
   );
