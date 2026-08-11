@@ -7,6 +7,7 @@ import { VoiceView } from "./VoiceView";
 import * as api from "../api/client";
 import type { CurrentUser } from "../api/client";
 import { ConnectionError } from "livekit-client";
+import { playAppSound } from "../audio/sounds";
 
 const connect = vi.fn();
 const disconnect = vi.fn();
@@ -36,6 +37,7 @@ vi.mock("livekit-client", () => ({
     ConnectionQualityChanged: "connectionQualityChanged",
     ParticipantConnected: "participantConnected",
     ParticipantDisconnected: "participantDisconnected",
+    ParticipantPermissionsChanged: "participantPermissionsChanged",
     Reconnecting: "reconnecting",
     Reconnected: "reconnected",
     Disconnected: "disconnected",
@@ -84,6 +86,8 @@ vi.mock("../api/client", async () => {
   const actual = await vi.importActual<typeof import("../api/client")>("../api/client");
   return { ...actual, getVoiceToken: vi.fn() };
 });
+
+vi.mock("../audio/sounds", () => ({ playAppSound: vi.fn() }));
 
 const channel = { id: "c2", name: "salle", type: "voice", requiredCapability: null, position: 0, createdAt: "now" } as const;
 const currentUser: CurrentUser = { id: "u1", username: "theo", capabilities: [] };
@@ -168,6 +172,29 @@ describe("VoiceView", () => {
     await user.click(screen.getByRole("button", { name: "Leave" }));
     await waitFor(() => expect(disconnect).toHaveBeenCalled());
     expect(screen.getByRole("button", { name: "Join" })).toBeInTheDocument();
+  });
+
+  it("plays a sound when toggling the microphone", async () => {
+    await renderView();
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "Mute microphone" }));
+    expect(playAppSound).toHaveBeenCalledWith("muteToggle");
+  });
+
+  it("plays a sound when a moderator force-mutes the local participant", async () => {
+    await renderView();
+    await screen.findByRole("button", { name: "Mute microphone" });
+    const handler = roomHandlers.get("participantPermissionsChanged");
+    handler?.({ canPublish: true }, { isLocal: true, permissions: { canPublish: false } });
+    expect(playAppSound).toHaveBeenCalledWith("forceMuted");
+  });
+
+  it("ignores a permission change on a remote participant", async () => {
+    await renderView();
+    await screen.findByRole("button", { name: "Mute microphone" });
+    const handler = roomHandlers.get("participantPermissionsChanged");
+    handler?.({ canPublish: true }, { isLocal: false, permissions: { canPublish: false } });
+    expect(playAppSound).not.toHaveBeenCalledWith("forceMuted");
   });
 
   it("controls deafen, camera, and screen sharing", async () => {
