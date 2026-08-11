@@ -106,6 +106,8 @@ textarea.form-input { resize: vertical; }
   outline: none;
   box-shadow: 0 0 0 4px rgb(88 101 242 / 18%);
 }
+.form-range-row { display: flex; align-items: center; gap: 10px; }
+.form-range-row .form-range { flex: 1; }
 .radio-group-wrap { display: flex; flex-direction: column; gap: 8px; }
 .radio-group-label { color: var(--text-muted); font-size: 12px; font-weight: 700; letter-spacing: .025em; text-transform: uppercase; }
 .radio-group { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }

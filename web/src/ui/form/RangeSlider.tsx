@@ -1,16 +1,7 @@
-import { useEffect, useId, useRef, type KeyboardEvent, type PointerEvent } from "react";
+import { useEffect, useId, useRef, type KeyboardEvent, type PointerEvent, type ReactNode } from "react";
 import { FormField } from "./FormField";
 
-const VALUE_CHANGING_KEYS = new Set([
-  "ArrowUp",
-  "ArrowDown",
-  "ArrowLeft",
-  "ArrowRight",
-  "Home",
-  "End",
-  "PageUp",
-  "PageDown",
-]);
+const VALUE_CHANGING_KEYS = new Set(["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Home", "End", "PageUp", "PageDown"]);
 
 export function RangeSlider({
   label,
@@ -19,6 +10,7 @@ export function RangeSlider({
   max,
   step,
   hint,
+  trailing,
   onChange,
   onCommit,
 }: {
@@ -28,6 +20,7 @@ export function RangeSlider({
   max: number;
   step?: number;
   hint?: string;
+  trailing?: ReactNode;
   onChange(next: number): void;
   onCommit(next: number): void;
 }) {
@@ -49,22 +42,25 @@ export function RangeSlider({
 
   return (
     <FormField label={label} htmlFor={id} hint={hint}>
-      <input
-        id={id}
-        type="range"
-        min={min}
-        max={max}
-        step={step ?? 1}
-        value={value}
-        className="form-range"
-        onChange={(event) => {
-          const nextValue = Number(event.target.value);
-          currentValueRef.current = nextValue;
-          onChange(nextValue);
-        }}
-        onPointerUp={commitOnPointerUp}
-        onKeyUp={commitOnKeyUp}
-      />
+      <div className="form-range-row">
+        <input
+          id={id}
+          type="range"
+          min={min}
+          max={max}
+          step={step ?? 1}
+          value={value}
+          className="form-range"
+          onChange={(event) => {
+            const nextValue = Number(event.target.value);
+            currentValueRef.current = nextValue;
+            onChange(nextValue);
+          }}
+          onPointerUp={commitOnPointerUp}
+          onKeyUp={commitOnKeyUp}
+        />
+        {trailing}
+      </div>
     </FormField>
   );
 }
