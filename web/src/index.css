@@ -88,6 +88,11 @@ summary:focus-visible {
   border-color: var(--brand);
   box-shadow: 0 0 0 4px rgb(88 101 242 / 18%);
 }
+.form-input-group { display: flex; align-items: center; overflow: hidden; border: 1px solid rgb(255 255 255 / 10%); border-radius: var(--radius-md); background: var(--bg-sunken); transition: border-color 120ms ease, box-shadow 120ms ease; }
+.form-input-group:focus-within { border-color: var(--brand); box-shadow: 0 0 0 4px rgb(88 101 242 / 18%); }
+.form-input-prefix { padding-left: 12px; color: var(--text-muted); font-size: 17px; }
+.form-input-group .form-input { border: 0; background: transparent; }
+.form-input-group .form-input:focus-visible { border-color: transparent; box-shadow: none; }
 textarea.form-input { resize: vertical; }
 .switch-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .switch-row > label { color: var(--text-normal); font-size: 14px; font-weight: 500; cursor: pointer; }

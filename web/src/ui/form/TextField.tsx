@@ -1,4 +1,4 @@
-import { useId, type InputHTMLAttributes } from "react";
+import { useId, type InputHTMLAttributes, type ReactNode } from "react";
 import { FormField } from "./FormField";
 
 export function TextField({
@@ -6,6 +6,7 @@ export function TextField({
   error,
   hint,
   visuallyHiddenLabel,
+  prefix,
   className,
   ...inputProps
 }: {
@@ -13,11 +14,20 @@ export function TextField({
   error?: string;
   hint?: string;
   visuallyHiddenLabel?: boolean;
+  prefix?: ReactNode;
 } & Omit<InputHTMLAttributes<HTMLInputElement>, "id">) {
   const id = useId();
+  const input = (
+    <input id={id} className={["form-input", className].filter(Boolean).join(" ")} {...inputProps} />
+  );
   return (
     <FormField label={label} htmlFor={id} error={error} hint={hint} visuallyHiddenLabel={visuallyHiddenLabel}>
-      <input id={id} className={["form-input", className].filter(Boolean).join(" ")} {...inputProps} />
+      {prefix ? (
+        <div className="form-input-group">
+          <span aria-hidden="true" className="form-input-prefix">{prefix}</span>
+          {input}
+        </div>
+      ) : input}
     </FormField>
   );
 }

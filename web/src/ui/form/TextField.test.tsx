@@ -25,4 +25,10 @@ describe("TextField", () => {
     expect(input).toBeRequired();
     expect(input).toHaveAttribute("maxlength", "256");
   });
+
+  it("renders an optional prefix without changing the input's accessible name", () => {
+    render(<TextField label="Channel name" value="general" onChange={() => {}} prefix="#" />);
+    expect(screen.getByText("#")).toBeInTheDocument();
+    expect(screen.getByLabelText("Channel name")).toHaveValue("general");
+  });
 });
