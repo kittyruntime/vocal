@@ -133,17 +133,6 @@ textarea.form-input { resize: vertical; }
 }
 
 .auth-card h1 { margin: 0 0 8px; color: #f2f3f5; font-size: 24px; line-height: 1.25; letter-spacing: -.02em; text-align: center; }
-.auth-card > label { color: #b5bac1; font-size: 12px; font-weight: 700; letter-spacing: .025em; text-transform: uppercase; }
-.auth-card input,
-.create-channel input,
-.create-channel select {
-  width: 100%;
-  border: 0;
-  border-radius: 3px;
-  padding: 10px;
-  background: #1e1f22;
-  color: #dbdee1;
-}
 
 .auth-card button,
 .create-channel button,
@@ -167,7 +156,6 @@ textarea.form-input { resize: vertical; }
 
 .auth-card .auth-link:hover { text-decoration: underline; }
 
-.auth-error,
 .auth-error-screen,
 .error-boundary-screen { color: #fa777c; text-align: center; }
 .auth-loading { min-height: 100vh; min-height: 100dvh; display: grid; place-items: center; color: #949ba4; }

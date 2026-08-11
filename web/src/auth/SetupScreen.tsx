@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { useAuth } from "./AuthContext";
 import { ApiError } from "../api/client";
+import { TextField } from "../ui/form";
 
 export function SetupScreen() {
   const { completeSetup } = useAuth();
@@ -27,21 +28,13 @@ export function SetupScreen() {
       <form className="auth-card" onSubmit={handleSubmit}>
         <h1>Welcome to Vocal</h1>
         <p>Create the first account: it will be an administrator.</p>
-        <label htmlFor="setup-username">Username</label>
-        <input id="setup-username" value={username} onChange={(e) => setUsername(e.target.value)} required />
-        <label htmlFor="setup-password">Password</label>
-        <input
-          id="setup-password"
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-        />
-        {error && (
-          <p role="alert" className="auth-error">
+        <TextField label="Username" value={username} onChange={(e) => setUsername(e.target.value)} required />
+        <TextField label="Password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+        {error ? (
+          <p role="alert" className="form-error">
             {error}
           </p>
-        )}
+        ) : null}
         <button type="submit" disabled={submitting}>
           Create admin account
         </button>
