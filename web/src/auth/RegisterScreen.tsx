@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { useAuth } from "./AuthContext";
 import { ApiError } from "../api/client";
+import { TextField } from "../ui/form";
 
 export function RegisterScreen({ inviteToken, onShowLogin }: { inviteToken?: string; onShowLogin(): void }) {
   const { signUp } = useAuth();
@@ -26,21 +27,13 @@ export function RegisterScreen({ inviteToken, onShowLogin }: { inviteToken?: str
     <div className="auth-screen">
       <form className="auth-card" onSubmit={handleSubmit}>
         <h1>Join Vocal</h1>
-        <label htmlFor="register-username">Username</label>
-        <input id="register-username" value={username} onChange={(e) => setUsername(e.target.value)} required />
-        <label htmlFor="register-password">Password</label>
-        <input
-          id="register-password"
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-        />
-        {error && (
-          <p role="alert" className="auth-error">
+        <TextField label="Username" value={username} onChange={(e) => setUsername(e.target.value)} required />
+        <TextField label="Password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+        {error ? (
+          <p role="alert" className="form-error">
             {error}
           </p>
-        )}
+        ) : null}
         <button type="submit" disabled={submitting}>
           Create my account
         </button>
