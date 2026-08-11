@@ -96,6 +96,18 @@ textarea.form-input { resize: vertical; }
 .switch.on .switch-thumb { left: 18px; }
 .switch:focus-visible { outline: none; box-shadow: 0 0 0 4px rgb(88 101 242 / 18%); }
 .form-range { width: 100%; accent-color: var(--brand); }
+.radio-group-wrap { display: flex; flex-direction: column; gap: 8px; }
+.radio-group-label { color: var(--text-muted); font-size: 12px; font-weight: 700; letter-spacing: .025em; text-transform: uppercase; }
+.radio-group { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
+.radio-option { min-width: 0; display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; border: 1px solid rgb(255 255 255 / 10%); border-radius: var(--radius-md); background: var(--bg-sidebar); color: var(--text-normal); text-align: left; cursor: pointer; }
+.radio-option.active { border-color: var(--brand); background: rgb(88 101 242 / 12%); box-shadow: inset 3px 0 var(--brand); }
+.radio-option strong { font-size: 14px; }
+.radio-option small { color: var(--text-muted); font-size: 12px; }
+.radio-option:focus-visible { outline: none; box-shadow: 0 0 0 4px rgb(88 101 242 / 18%); }
+
+@media (prefers-reduced-motion: reduce) {
+  .form-input, .switch, .switch-thumb, .radio-option { transition: none; }
+}
 
 /* Authentication */
 .auth-screen,
