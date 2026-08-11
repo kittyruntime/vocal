@@ -346,6 +346,10 @@ summary:focus-visible {
 .header-channel-icon { color: #80848e; font-size: 22px; }
 .chat-notification-button { width: 32px; height: 32px; display: grid; place-items: center; margin-left: auto; padding: 0; border: 0; border-radius: 4px; background: transparent; color: #b5bac1; }
 .chat-notification-button:hover { background: #3f4147; color: #fff; }
+.connection-quality-badge { flex: 0 0 auto; margin-left: 8px; padding: 2px 8px; border-radius: 10px; background: #3f4147; color: #dbdee1; font-size: 11px; font-weight: 700; letter-spacing: .02em; text-transform: uppercase; }
+.connection-quality-badge.quality-good { background: rgb(35 165 90 / 16%); color: #57d68d; }
+.connection-quality-badge.quality-poor { background: rgb(240 178 50 / 16%); color: #f0b232; }
+.connection-quality-badge.quality-lost { background: rgb(218 55 60 / 16%); color: #fa777c; }
 .voice-layout-actions { display: flex; gap: 4px; margin-left: auto; }
 .voice-layout-actions button { padding: 5px 9px; border: 0; border-radius: 4px; background: transparent; color: #949ba4; font-size: 12px; font-weight: 600; }
 .voice-layout-actions button:hover, .voice-layout-actions button.active { background: #404249; color: #fff; }

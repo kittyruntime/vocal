@@ -2,10 +2,12 @@ import { useEffect, useRef, useState, type CSSProperties } from "react";
 import {
   ConnectionError,
   ConnectionErrorReason,
+  ConnectionQuality,
   MediaDeviceFailure,
   Room,
   RoomEvent,
   Track,
+  VideoQuality,
   createAudioAnalyser,
   type LocalAudioTrack,
   type LocalTrackPublication,
@@ -22,6 +24,8 @@ import { audioProfiles, cameraProfiles, screenProfiles, type MediaQuality, type 
 import { shouldOpenVoiceGate, VoiceGateProcessor } from "./VoiceGateProcessor";
 
 type VoiceStatus = "idle" | "connecting" | "connected" | "reconnecting";
+type NetworkQuality = "good" | "poor" | "lost";
+type NetworkStats = { rttMs: number | null; packetLossPercent: number | null };
 type MediaKind = "microphone" | "camera" | "screen";
 type DeviceSelections = Partial<Record<MediaDeviceKind, string>>;
 type CallParticipant = { identity: string; name: string; avatarUrl: string | null; local: boolean };
@@ -113,6 +117,28 @@ function describeJoinError(error: unknown): string {
   return describeMediaError(error, "microphone");
 }
 
+// How often to sample WebRTC stats for the RTT/packet-loss readout while
+// connected -- frequent enough to feel live, cheap enough not to matter.
+const STATS_SAMPLE_INTERVAL_MS = 2500;
+// Consecutive "good" ConnectionQuality updates required before restoring
+// downgraded remote video back to HIGH, so a connection that's merely
+// flapping between poor/good doesn't thrash video quality back and forth.
+const GOOD_STREAK_TO_RESTORE_QUALITY = 3;
+
+function mapConnectionQuality(quality: ConnectionQuality): NetworkQuality | null {
+  switch (quality) {
+    case ConnectionQuality.Excellent:
+    case ConnectionQuality.Good:
+      return "good";
+    case ConnectionQuality.Poor:
+      return "poor";
+    case ConnectionQuality.Lost:
+      return "lost";
+    default:
+      return null;
+  }
+}
+
 // Built via DOM APIs rather than rendered through the <Icon> React component: these
 // buttons are appended to video tiles built with plain DOM calls (see TrackSubscribed
 // and the camera/screen-share toggles below), matching that imperative style instead
@@ -167,6 +193,14 @@ function addFullscreenButton(tile: HTMLElement): void {
   tile.append(button);
 }
 
+function applyRemoteVideoQuality(room: Room, quality: VideoQuality): void {
+  for (const participant of room.remoteParticipants.values()) {
+    for (const publication of participant.videoTrackPublications.values()) {
+      publication.setVideoQuality(quality);
+    }
+  }
+}
+
 export function VoiceView({
   channel,
   currentUser,
@@ -209,6 +243,8 @@ export function VoiceView({
   const [pinnedTileId, setPinnedTileId] = useState<string | null>(null);
   const [hideAudioOnly, setHideAudioOnly] = useState(true);
   const [videoParticipantIds, setVideoParticipantIds] = useState<Set<string>>(() => new Set());
+  const [connectionQuality, setConnectionQuality] = useState<NetworkQuality | null>(null);
+  const [networkStats, setNetworkStats] = useState<NetworkStats>({ rttMs: null, packetLossPercent: null });
   const roomRef = useRef<Room | null>(null);
   const voiceViewRef = useRef<HTMLElement>(null);
   const audioRef = useRef<HTMLDivElement>(null);
@@ -220,11 +256,12 @@ export function VoiceView({
   const meterCleanupRef = useRef<(() => Promise<void>) | null>(null);
   const meterFrameRef = useRef<number | null>(null);
   const pttPressedRef = useRef(false);
-  const autoJoinedChannelRef = useRef<string | null>(null);
   const voiceGateRef = useRef<VoiceGateProcessor | null>(null);
   const settingsRef = useRef(settings);
   const lastVoiceActivityRef = useRef(0);
   const reconnectingRef = useRef(false);
+  const videoDowngradedRef = useRef(false);
+  const goodQualityStreakRef = useRef(0);
 
   function saveSettings(next: typeof settings) {
     settingsRef.current = next;
@@ -316,7 +353,11 @@ export function VoiceView({
     setCallParticipants([]);
     setPinnedTileId(null);
     setVideoParticipantIds(new Set());
+    setConnectionQuality(null);
+    setNetworkStats({ rttMs: null, packetLossPercent: null });
     activeSpeakersRef.current.clear();
+    videoDowngradedRef.current = false;
+    goodQualityStreakRef.current = 0;
     stopMeter();
     onSpeakingChange?.([]);
     onSelfPresenceChange?.(false);
@@ -333,8 +374,9 @@ export function VoiceView({
   // Runs whenever `channel.id` changes, including switching directly from one
   // voice channel to another while still connected -- VoiceView isn't
   // remounted in that case (same component, new prop), so without this the
-  // old room would be dropped but `status` would stay stuck on "connected"
-  // and the auto-join effect below would never join the new channel.
+  // old room would stay connected in the background. Joining is always a
+  // deliberate user action (the "Join" button) -- switching channels never
+  // auto-connects to the new one, it only leaves the old one cleanly.
   useEffect(() => {
     return () => {
       const room = roomRef.current;
@@ -414,6 +456,9 @@ export function VoiceView({
       }
       if (track.kind !== Track.Kind.Video) return;
       if (remoteVideoRef.current?.querySelector(`[data-track-sid="${track.sid}"]`)) return;
+      // A newly subscribed video track should start out at the same quality
+      // the rest of the call is currently downgraded to, not default HIGH.
+      if (videoDowngradedRef.current) publication.setVideoQuality(VideoQuality.LOW);
       const tile = document.createElement("figure");
       const tileId = track.sid ?? publication.trackSid;
       tile.className = publication.source === Track.Source.ScreenShare ? "video-tile screen-share" : "video-tile";
@@ -461,6 +506,25 @@ export function VoiceView({
       updateSpeakingTiles(activeIds);
       setActiveSpeakerIds(activeIds);
       onSpeakingChange?.([...activeIds]);
+    });
+    room.on(RoomEvent.ConnectionQualityChanged, (quality: ConnectionQuality, participant: Participant) => {
+      if (!participant.isLocal) return;
+      const mapped = mapConnectionQuality(quality);
+      setConnectionQuality(mapped);
+      if (mapped === "poor" || mapped === "lost") {
+        goodQualityStreakRef.current = 0;
+        if (!videoDowngradedRef.current) {
+          videoDowngradedRef.current = true;
+          applyRemoteVideoQuality(room, VideoQuality.LOW);
+        }
+      } else if (mapped === "good" && videoDowngradedRef.current) {
+        goodQualityStreakRef.current += 1;
+        if (goodQualityStreakRef.current >= GOOD_STREAK_TO_RESTORE_QUALITY) {
+          videoDowngradedRef.current = false;
+          goodQualityStreakRef.current = 0;
+          applyRemoteVideoQuality(room, VideoQuality.HIGH);
+        }
+      }
     });
     const refreshParticipants = () => {
       const localIdentity = room.localParticipant.identity || currentUser.id;
@@ -718,25 +782,51 @@ export function VoiceView({
     if (preferred?.dataset.tileId) setPinnedTileId(preferred.dataset.tileId);
   }, [layoutMode, pinnedTileId, hasVideo, remoteVideoCount, cameraEnabled, screenShareEnabled]);
 
-  // Deliberately keyed on `status` too: switching directly from one voice
-  // channel to another (channel.id changes while still connected) doesn't
-  // remount this component, so the effect above disconnects the old room and
-  // schedules status back to "idle" -- this effect has to re-run once that
-  // state update lands (a separate commit; `status` read here during the
-  // same commit as the channel switch is still the stale "connected" value)
-  // to actually join the new channel. `autoJoinedChannelRef` only remembers
-  // the id we already attempted, so a channel switch (new id) always gets a
-  // fresh attempt while a failed join on the same channel doesn't auto-retry.
+  // Samples RTT and packet loss from whichever local track is currently
+  // active every couple of seconds while connected. Both figures are
+  // best-effort: not every browser exposes `remote-inbound-rtp` stats, so a
+  // missing value just stays null instead of showing a misleading number.
   useEffect(() => {
-    if (!visible) {
-      autoJoinedChannelRef.current = null;
+    if (status !== "connected") {
+      setNetworkStats({ rttMs: null, packetLossPercent: null });
       return;
     }
-    if (status !== "idle") return;
-    if (autoJoinedChannelRef.current === channel.id) return;
-    autoJoinedChannelRef.current = channel.id;
-    void joinRoom();
-  }, [channel.id, visible, status]);
+    let cancelled = false;
+    async function sample() {
+      const room = roomRef.current;
+      const track = room?.localParticipant.getTrackPublication(Track.Source.Microphone)?.track
+        ?? room?.localParticipant.getTrackPublication(Track.Source.Camera)?.track
+        ?? room?.localParticipant.getTrackPublication(Track.Source.ScreenShare)?.track;
+      if (!track) return;
+      let report: RTCStatsReport | undefined;
+      try {
+        report = await track.getRTCStatsReport();
+      } catch {
+        return;
+      }
+      if (!report || cancelled) return;
+      let rttMs: number | null = null;
+      let packetLossPercent: number | null = null;
+      report.forEach((stat: RTCStats) => {
+        const candidatePair = stat as RTCIceCandidatePairStats;
+        if (stat.type === "candidate-pair" && (candidatePair.nominated || candidatePair.state === "succeeded")
+          && typeof candidatePair.currentRoundTripTime === "number") {
+          rttMs = Math.round(candidatePair.currentRoundTripTime * 1000);
+        }
+        const remoteInbound = stat as RTCStats & { fractionLost?: number };
+        if (stat.type === "remote-inbound-rtp" && typeof remoteInbound.fractionLost === "number") {
+          packetLossPercent = Math.round(remoteInbound.fractionLost * 1000) / 10;
+        }
+      });
+      if (!cancelled) setNetworkStats({ rttMs, packetLossPercent });
+    }
+    void sample();
+    const interval = window.setInterval(() => void sample(), STATS_SAMPLE_INTERVAL_MS);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [status]);
 
   return (
     <section className="voice-view" aria-label={`Voice channel ${channel.name}`} hidden={!visible} ref={voiceViewRef}>
@@ -745,6 +835,16 @@ export function VoiceView({
           <Icon name="menu" size={20} />
         </button>
         <span className="header-channel-icon"><Icon name="volume" size={21} /></span> {channel.name}
+        {(status === "connected" || status === "reconnecting") && connectionQuality ? (
+          <span
+            className={`connection-quality-badge quality-${connectionQuality}`}
+            title={networkStats.rttMs !== null
+              ? `${networkStats.rttMs} ms${networkStats.packetLossPercent !== null ? ` · ${networkStats.packetLossPercent}% loss` : ""}`
+              : undefined}
+          >
+            {connectionQuality === "good" ? "Good" : connectionQuality === "poor" ? "Poor" : "Lost"}
+          </span>
+        ) : null}
         {(status === "connected" || status === "reconnecting") ? <div className="voice-layout-actions"><button type="button" className={layoutMode === "grid" ? "active" : ""} onClick={() => { setLayoutMode("grid"); setPinnedTileId(null); }}>Grid</button><button type="button" className={layoutMode === "focus" ? "active" : ""} onClick={() => setLayoutMode("focus")}>Focus</button>{hasVideo ? <button type="button" className={!hideAudioOnly ? "active" : ""} onClick={() => setHideAudioOnly((value) => !value)}>{hideAudioOnly ? "Show audio" : "Hide audio"}</button> : null}</div> : null}
       </header>
       <div className="voice-stage">
