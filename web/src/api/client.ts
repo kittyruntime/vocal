@@ -139,7 +139,14 @@ export function getChatSettings(): Promise<ChatSettings> { return request("/api/
 export function updateAdminSettings(settings: ServerSettings): Promise<ServerSettings> {
   return request("/api/admin/settings", { method: "PATCH", body: JSON.stringify(settings) });
 }
-export function listAdminUsers(): Promise<AdminUser[]> { return request("/api/admin/users"); }
+export function listAdminUsers(opts?: { search?: string; page?: number; limit?: number }): Promise<{ users: AdminUser[]; total: number }> {
+  const params = new URLSearchParams();
+  if (opts?.search) params.set("search", opts.search);
+  if (opts?.page) params.set("page", String(opts.page));
+  if (opts?.limit) params.set("limit", String(opts.limit));
+  const qs = params.toString();
+  return request(`/api/admin/users${qs ? `?${qs}` : ""}`);
+}
 export function listRoles(): Promise<Role[]> { return request("/api/admin/roles"); }
 export function createRole(input: Pick<Role, "name" | "color" | "capabilities">): Promise<Role> { return request("/api/admin/roles", { method: "POST", body: JSON.stringify(input) }); }
 export function updateRole(roleId: string, input: Pick<Role, "name" | "color" | "capabilities">): Promise<Role> { return request(`/api/admin/roles/${roleId}`, { method: "PATCH", body: JSON.stringify(input) }); }

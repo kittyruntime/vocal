@@ -36,10 +36,31 @@ describe("server administration", () => {
   it("lists users and changes their capabilities", async () => {
     await app.inject({ method: "POST", url: "/api/auth/register", payload: { username: "alice", password: "password123" } });
     const list = await app.inject({ method: "GET", url: "/api/admin/users", headers: { cookie: adminCookie } });
-    const alice = list.json().find((user: { username: string }) => user.username === "alice");
+    expect(list.json().total).toBe(2);
+    const alice = list.json().users.find((user: { username: string }) => user.username === "alice");
     expect(alice.capabilities).toEqual(["publish_voice"]);
     const update = await app.inject({ method: "PATCH", url: `/api/admin/users/${alice.id}`, headers: { cookie: adminCookie }, payload: { capabilities: ["moderate"] } });
     expect(update.json()).toMatchObject({ username: "alice", capabilities: ["moderate"] });
+  });
+
+  it("paginates and searches the member list server-side", async () => {
+    // Inserted directly rather than through POST /api/auth/register: that
+    // route is rate-limited (10/min) and shared across this whole test
+    // file's single app instance, and this test only cares about the
+    // listing endpoint's pagination/search, not the registration flow.
+    for (const username of ["alice", "bob", "carol", "dave"]) {
+      await pool.query("INSERT INTO users (username, password_hash) VALUES ($1, 'x')", [username]);
+    }
+    const page1 = await app.inject({ method: "GET", url: "/api/admin/users?limit=2&page=1", headers: { cookie: adminCookie } });
+    expect(page1.json().total).toBe(5);
+    expect(page1.json().users.map((user: { username: string }) => user.username)).toEqual(["alice", "bob"]);
+
+    const page2 = await app.inject({ method: "GET", url: "/api/admin/users?limit=2&page=2", headers: { cookie: adminCookie } });
+    expect(page2.json().users.map((user: { username: string }) => user.username)).toEqual(["carol", "dave"]);
+
+    const searched = await app.inject({ method: "GET", url: "/api/admin/users?search=ar", headers: { cookie: adminCookie } });
+    expect(searched.json().total).toBe(1);
+    expect(searched.json().users.map((user: { username: string }) => user.username)).toEqual(["carol"]);
   });
 
   it("refuses to remove manage_server from the last holder", async () => {
@@ -53,7 +74,7 @@ describe("server administration", () => {
     const reg = await app.inject({ method: "POST", url: "/api/auth/register", payload: { username: "alice", password: "password123" } });
     const cookie = `sid=${reg.cookies.find((c) => c.name === "sid")!.value}`;
     const list = await app.inject({ method: "GET", url: "/api/admin/users", headers: { cookie: adminCookie } });
-    const alice = list.json().find((user: { username: string }) => user.username === "alice");
+    const alice = list.json().users.find((user: { username: string }) => user.username === "alice");
     return { id: alice.id, cookie };
   }
 
@@ -116,7 +137,7 @@ describe("server administration", () => {
       expect(login.json()).toEqual({ error: "account banned" });
 
       const list = await app.inject({ method: "GET", url: "/api/admin/users", headers: { cookie: adminCookie } });
-      expect(list.json().find((user: { id: string }) => user.id === alice.id).bannedAt).not.toBeNull();
+      expect(list.json().users.find((user: { id: string }) => user.id === alice.id).bannedAt).not.toBeNull();
     });
 
     it("restores login after unban", async () => {
