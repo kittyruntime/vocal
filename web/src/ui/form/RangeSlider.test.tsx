@@ -49,4 +49,20 @@ describe("RangeSlider", () => {
     fireEvent.pointerUp(slider);
     expect(onCommit).toHaveBeenCalledWith(80);
   });
+
+  it("renders optional trailing content next to the slider", () => {
+    render(
+      <RangeSlider
+        label="Volume"
+        value={50}
+        min={0}
+        max={100}
+        onChange={() => {}}
+        onCommit={() => {}}
+        trailing={<button type="button">Preview</button>}
+      />,
+    );
+    expect(screen.getByRole("button", { name: "Preview" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Volume")).toBeInTheDocument();
+  });
 });
