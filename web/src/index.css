@@ -88,6 +88,13 @@ summary:focus-visible {
   box-shadow: 0 0 0 4px rgb(88 101 242 / 18%);
 }
 textarea.form-input { resize: vertical; }
+.switch-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.switch-row > label { color: var(--text-normal); font-size: 14px; font-weight: 500; cursor: pointer; }
+.switch { width: 40px; height: 24px; flex: 0 0 auto; padding: 0; border: 0; border-radius: 999px; background: var(--bg-active); position: relative; transition: background-color 140ms ease; }
+.switch.on { background: var(--brand); }
+.switch-thumb { position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; border-radius: 50%; background: #fff; transition: left 140ms ease; }
+.switch.on .switch-thumb { left: 18px; }
+.switch:focus-visible { outline: none; box-shadow: 0 0 0 4px rgb(88 101 242 / 18%); }
 
 /* Authentication */
 .auth-screen,
