@@ -346,6 +346,9 @@ summary:focus-visible {
 .header-channel-icon { color: #80848e; font-size: 22px; }
 .chat-notification-button { width: 32px; height: 32px; display: grid; place-items: center; margin-left: auto; padding: 0; border: 0; border-radius: 4px; background: transparent; color: #b5bac1; }
 .chat-notification-button:hover { background: #3f4147; color: #fff; }
+.voice-layout-actions { display: flex; gap: 4px; margin-left: auto; }
+.voice-layout-actions button { padding: 5px 9px; border: 0; border-radius: 4px; background: transparent; color: #949ba4; font-size: 12px; font-weight: 600; }
+.voice-layout-actions button:hover, .voice-layout-actions button.active { background: #404249; color: #fff; }
 .mobile-menu-button {
   display: none;
   flex: 0 0 auto;
@@ -458,6 +461,13 @@ summary:focus-visible {
 .video-tile figcaption { position: absolute; left: 10px; bottom: 10px; padding: 4px 7px; border-radius: 4px; background: rgb(0 0 0 / 65%); color: #fff; font-size: 12px; }
 .local-video-label { position: absolute; left: 10px; bottom: 10px; z-index: 2; padding: 4px 7px; border-radius: 4px; background: rgb(0 0 0 / 65%); color: #fff; font-size: 12px; }
 .video-tile.is-speaking, .local-video.is-speaking:not(:empty) { outline: 3px solid #23a55a; outline-offset: -3px; box-shadow: 0 0 0 6px rgb(35 165 90 / 12%), 0 8px 24px rgb(0 0 0 / 24%); }
+.video-tile, .local-video:not(:empty) { cursor: pointer; }
+.video-grid.has-pinned-tile { grid-template-columns: 1fr; grid-template-rows: 1fr; }
+.video-grid.has-pinned-tile > .local-video:not(.is-pinned), .video-grid.has-pinned-tile > .remote-videos > .video-tile:not(.is-pinned) { display: none; }
+.video-grid .is-pinned { grid-column: 1 / -1; grid-row: 1 / -1; }
+.voice-audio-strip { width: min(1280px, 100%); flex: 0 0 auto; display: flex; gap: 8px; overflow-x: auto; padding: 2px; }
+.voice-audio-strip button { min-width: 120px; display: flex; align-items: center; gap: 8px; padding: 7px 10px; border: 1px solid var(--divider); border-radius: 8px; background: #28292d; color: #dbdee1; }
+.voice-audio-strip .member-avatar.is-speaking { box-shadow: 0 0 0 2px #23a55a; }
 
 .tile-fullscreen-button {
   position: absolute;

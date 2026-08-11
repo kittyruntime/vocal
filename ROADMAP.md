@@ -12,8 +12,8 @@ This file is the hand-off point for the current product pass. Update it after ev
 - [x] Named roles with colors and reusable permissions
 - [x] Global search across messages, attachments, channels and members
 - [x] Configurable, revocable invitation links
-- [ ] Voice layouts: pinning, speaker/grid modes, hidden audio-only participants and ordering — **in progress**
-- [ ] Call network diagnostics and automatic quality adaptation
+- [x] Voice layouts: pinning, speaker/grid modes, hidden audio-only participants and ordering
+- [ ] Call network diagnostics and automatic quality adaptation — **in progress**
 - [ ] Server-side member pagination, long-list virtualization and LiveKit bundle optimization
 - [ ] Final integration, responsive and deployment verification
 
@@ -30,3 +30,4 @@ This file is the hand-off point for the current product pass. Update it after ev
 - `roles`: additive named roles with colors, reusable capabilities, multi-role member assignment and backwards-compatible effective permissions.
 - `search`: permission-aware global search for encrypted messages, attachment names, channels and members, with a responsive command-style modal.
 - `invites`: configurable expiry and use limits, active-link inventory, copy flow, revocation and concurrency-safe consumption.
+- `voice-layouts`: grid/focus modes, click-to-pin media, screen/speaker ordering and an optional audio-only participant strip.
