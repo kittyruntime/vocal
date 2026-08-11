@@ -17,7 +17,10 @@ This file is the hand-off point for the current product pass. Update it after ev
 - [x] Server-side member pagination
 - [x] LiveKit bundle deferred until Join click
 - [x] Chat message list bounded (cap, not full virtualization -- see notes below)
-- [ ] Final integration, responsive and deployment verification — **next**
+- [x] Final integration: migration verification, deployment docs, responsive audit
+
+All planned lots for this product pass are now delivered. See "Next steps"
+under Handoff for what's left, none of it blocking.
 
 ## Delivery notes
 
@@ -37,6 +40,7 @@ This file is the hand-off point for the current product pass. Update it after ev
 - `admin-pagination`: `GET /api/admin/users` now takes `?search=&page=&limit=` and returns `{users, total}` instead of every user unbounded; `AdminPanel.tsx` fetches the current page from the server (search box debounced 250ms) instead of loading everyone and slicing/filtering client-side.
 - `livekit-deferred-load`: `livekit-client`'s value imports in `VoiceView.tsx` (Room, RoomEvent, Track, ConnectionQuality, VideoQuality, MediaDeviceFailure, ConnectionError/Reason, createAudioAnalyser) switched to type-only imports plus a `loadLiveKit()` → `import("livekit-client")` helper called from `joinRoom()` and every other function that only runs once a room exists. Confirmed via the production build: `VoiceView` chunk dropped from ~517 kB to ~28 kB, with `livekit-client` now its own ~527 kB chunk that only loads on the "Join" click (not just from viewing a voice channel). Full `VoiceView.test.tsx` suite (30 tests) still passes -- `vi.mock("livekit-client")` covers dynamic imports the same as static ones.
 - `chat-message-cap`: `ChatView.tsx` now caps loaded messages at `MAX_LOADED_MESSAGES = 300` per channel instead of growing without bound. `loadMore()` (scroll-up pagination) stops fetching further history once the cap is hit, without ever discarding messages the user might be reading. Separately, once live WebSocket messages push the total over the cap while the user is near the bottom, the oldest messages are trimmed via the existing `onMessagesLoaded` callback. True windowed virtualization (`react-window`) was evaluated and explicitly rejected for this pass -- see the note under Handoff.
+- `final-integration`: added `README.md` (didn't exist before) covering local dev, the full server env-var reference, and a generic production deployment guide around the existing `deploy/*.Dockerfile`/`deploy/nginx.conf` -- both images rebuilt successfully against the current codebase, confirming they weren't stale. Verified `server/src/db/migrate.ts`'s full migration set (001 → 014) applies cleanly on top of realistic pre-existing data: seeded a database at the old `005_moderation.sql` schema with users of every legacy role and channels of every legacy `min_role`, ran the current `migrate()` against it, and confirmed every user/channel/message survived with role/min_role correctly backfilled into capabilities (admin → all 4, moderator → moderate+publish_voice, member → publish_voice; channel min_role → required_capability) and idempotent on re-run. Audited responsive coverage across the newer modals (search, profile, public profile, invite/role managers, emote picker, attachment grids) added since the earlier mobile-nav pass -- found already covered by existing `min(Npx, 100%)` sizing and the 520px/760px breakpoints; no gaps found, no changes made.
 
 ## Security fixes
 
@@ -44,15 +48,23 @@ This file is the hand-off point for the current product pass. Update it after ev
 
 ## Handoff for Claude
 
-Branch state: `main` is clean and synchronized with `origin/main` at `a8d78a4`.
+Branch state: `main` is clean and synchronized with `origin/main` at `c14a2ad`.
 
 Last verified test baseline:
 
 - server: 14 files, 101 tests passing;
 - web: 18 files, 137 tests passing;
 - server and web TypeScript checks passing;
-- production web build passing: `VoiceView` chunk ~28 kB, `livekit-client` split into its own ~527 kB chunk loaded only on Join (the remaining >500 kB chunk-size warning is that livekit-client chunk itself, which is expected -- see `livekit-deferred-load` above).
+- production web build passing: `VoiceView` chunk ~28 kB, `livekit-client` split into its own ~527 kB chunk loaded only on Join (the remaining >500 kB chunk-size warning is that livekit-client chunk itself, which is expected -- see `livekit-deferred-load` above);
+- `deploy/server.Dockerfile` and `deploy/web.Dockerfile` both build successfully against the current tree.
 
 **Why chat messages use a cap instead of true virtualization** (don't re-attempt windowed rendering without reading this first): this test environment (jsdom) implements neither `Element.scrollTo`, `ResizeObserver`, nor a real layout engine (`getBoundingClientRect` always returns zeros). A virtualization library (evaluated: `react-window` v2, a very different and simpler API than v1) depends on all three to measure its container and rows. That means a windowed rewrite of `ChatView.tsx`'s message list could not be verified by any automated test here -- it would ship as a large rewrite of an always-on feature with no working safety net beyond "it typechecks." Asked the user directly; they chose the safer bound (see `chat-message-cap` above) over shipping that risk. If real virtualization is wanted later, it needs to happen where actual browser testing is possible (Playwright against a real browser engine, or manual verification), not here.
 
-Next lot: **final integration pass** -- responsive behavior across the app (not just voice/mobile nav, which are already done), migrations verified against an existing/seeded database (not just a fresh one via `makeTestDb`), full test/typecheck/build sweep, and deployment documentation verification (docker-compose, env vars, TURN/TLS notes if any exist). No code for this lot has been written yet; start by auditing what "responsive" and "deployment documentation" concretely mean for this repo today (e.g. is there a README or deployment doc at all? check before assuming one needs to be written from scratch).
+All lots originally planned for this product pass are delivered. Nothing
+queued is blocking; pick based on what the user actually wants next.
+
+Next steps (none urgent, roughly in order of value):
+
+1. **TURN server + TLS hardening** -- still not configured anywhere (see README's "Known gaps"). Matters once real users are behind restrictive NATs.
+2. **Real E2E verification** -- a two-browser LiveKit join has only ever been checked manually/ad hoc in this project's history, never automated. Playwright against a real browser is also the only way to properly attempt chat-list virtualization later (see the jsdom limitation noted above).
+3. Server-side pagination was only done for `/api/admin/users` this pass -- check whether search results or other list endpoints have grown large enough on a real deployment to need the same treatment.
