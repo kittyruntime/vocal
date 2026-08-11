@@ -7,7 +7,7 @@ import type { AdminUser, CurrentUser } from "../api/client";
 
 vi.mock("../api/client", async () => {
   const actual = await vi.importActual<typeof import("../api/client")>("../api/client");
-  return { ...actual, listAdminUsers: vi.fn(), getAdminSettings: vi.fn(), kickUser: vi.fn(), banUser: vi.fn(), unbanUser: vi.fn(), setUserVoiceMuted: vi.fn() };
+  return { ...actual, listAdminUsers: vi.fn(), getAdminSettings: vi.fn(), listRoles: vi.fn(), createRole: vi.fn(), updateRole: vi.fn(), deleteRole: vi.fn(), setUserRoles: vi.fn(), kickUser: vi.fn(), banUser: vi.fn(), unbanUser: vi.fn(), setUserVoiceMuted: vi.fn() };
 });
 
 const admin: CurrentUser = { id: "u1", username: "theo", capabilities: ["manage_channels", "manage_server", "moderate", "publish_voice"] };
@@ -16,6 +16,7 @@ const alice: AdminUser = { id: "u2", username: "alice", capabilities: [], create
 function renderPanel(users: AdminUser[] = [alice], openMembers = true) {
   vi.mocked(api.listAdminUsers).mockResolvedValue(users);
   vi.mocked(api.getAdminSettings).mockResolvedValue({ registrationOpen: true, maxImageSizeMb: 5, maxFileSizeMb: 10, maxMessageLength: 4000 });
+  vi.mocked(api.listRoles).mockResolvedValue([]);
   const result = render(
     <AdminPanel currentUser={admin} onClose={vi.fn()} />,
   );
