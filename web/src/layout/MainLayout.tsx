@@ -9,7 +9,7 @@ import { Sidebar } from "./Sidebar";
 import { ChatView } from "./ChatView";
 import { UserBar } from "./UserBar";
 import { ConnectionBanner } from "./ConnectionBanner";
-import { playAppSound } from "../audio/sounds";
+import { configureSounds, playAppSound } from "../audio/sounds";
 import { Icon } from "../ui/Icon";
 import { ProfileModal } from "./ProfileModal";
 import { UserProfileModal } from "./UserProfileModal";
@@ -53,6 +53,12 @@ export function MainLayout({ currentUser }: { currentUser: CurrentUser }) {
   }, [showToast]);
 
   useEffect(() => { void api.getChatSettings().then(setChatSettings).catch(() => {}); }, []);
+
+  useEffect(() => {
+    void Promise.all([api.getSoundSettings(), api.getMySoundVolumes()])
+      .then(([soundSettings, soundVolumes]) => configureSounds(soundSettings, soundVolumes))
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
