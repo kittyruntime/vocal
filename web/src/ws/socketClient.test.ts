@@ -2,9 +2,12 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { createSocketClient } from "./socketClient";
 
 class FakeWebSocket {
+  static OPEN = 1;
   static instances: FakeWebSocket[] = [];
   static reset() { FakeWebSocket.instances = []; }
   listeners: Record<string, ((ev: unknown) => void)[]> = {};
+  readyState = FakeWebSocket.OPEN;
+  send = vi.fn();
   constructor(public url: string) { FakeWebSocket.instances.push(this); }
   addEventListener(type: string, cb: (ev: unknown) => void) { (this.listeners[type] ??= []).push(cb); }
   close() { this.emit("close", {}); }
@@ -36,6 +39,30 @@ describe("createSocketClient", () => {
     createSocketClient("ws://x/ws", { onEvent, onStatusChange: vi.fn() });
     FakeWebSocket.instances[0].emit("message", { data: JSON.stringify({ type: "pong" }) });
     expect(onEvent).toHaveBeenCalledWith({ type: "pong" });
+  });
+
+  it("sends a heartbeat often enough to keep the reverse proxy connection alive", () => {
+    const client = createSocketClient("ws://x/ws", { onEvent: vi.fn(), onStatusChange: vi.fn() });
+    const socket = FakeWebSocket.instances[0];
+    socket.emit("open");
+    vi.advanceTimersByTime(24_999);
+    expect(socket.send).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(1);
+    expect(socket.send).toHaveBeenCalledWith(JSON.stringify({ type: "ping" }));
+    client.close();
+  });
+
+  it("stops the old heartbeat when reconnecting", () => {
+    createSocketClient("ws://x/ws", { onEvent: vi.fn(), onStatusChange: vi.fn() });
+    const first = FakeWebSocket.instances[0];
+    first.emit("open");
+    first.emit("close");
+    vi.advanceTimersByTime(500);
+    const second = FakeWebSocket.instances[1];
+    second.emit("open");
+    vi.advanceTimersByTime(25_000);
+    expect(first.send).not.toHaveBeenCalled();
+    expect(second.send).toHaveBeenCalledTimes(1);
   });
 
   it("ignores malformed messages without throwing", () => {
