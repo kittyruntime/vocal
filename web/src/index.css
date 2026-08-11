@@ -730,6 +730,13 @@ summary:focus-visible {
 .admin-channel-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }
 .admin-channel-actions button { padding: 7px 10px; border: 0; border-radius: 4px; background: #5865f2; color: white; cursor: pointer; }
 .admin-channel-actions .danger-link { background: transparent; color: #fa777c; }
+.sound-settings-list { display: flex; flex-direction: column; gap: 8px; }
+.sound-setting-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 10px 12px; border-radius: 6px; background: #2b2d31; }
+.sound-setting-row h4 { margin: 0 0 3px; color: #f2f3f5; font-size: 13px; }
+.sound-setting-row p { margin: 0; color: #949ba4; font-size: 12px; }
+.sound-setting-actions { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; }
+.sound-setting-actions > button:not(.setting-switch) { padding: 6px 9px; border: 0; border-radius: 4px; background: #4e5058; color: #f2f3f5; font-size: 12px; cursor: pointer; }
+.sound-setting-actions .danger-link { background: transparent; color: #fa777c; }
 
 /* Shared visual system — compact Discord navigation, calm Meet-style calls. */
 .sidebar-column { width: 272px; min-width: 272px; background: var(--bg-sidebar); }

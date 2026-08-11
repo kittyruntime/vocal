@@ -3,11 +3,11 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { AdminPanel } from "./AdminPanel";
 import * as api from "../api/client";
-import type { AdminUser, CurrentUser } from "../api/client";
+import type { AdminUser, CurrentUser, SoundSettings } from "../api/client";
 
 vi.mock("../api/client", async () => {
   const actual = await vi.importActual<typeof import("../api/client")>("../api/client");
-  return { ...actual, listAdminUsers: vi.fn(), getAdminSettings: vi.fn(), listRoles: vi.fn(), createRole: vi.fn(), updateRole: vi.fn(), deleteRole: vi.fn(), setUserRoles: vi.fn(), kickUser: vi.fn(), banUser: vi.fn(), unbanUser: vi.fn(), setUserVoiceMuted: vi.fn() };
+  return { ...actual, listAdminUsers: vi.fn(), getAdminSettings: vi.fn(), listRoles: vi.fn(), createRole: vi.fn(), updateRole: vi.fn(), deleteRole: vi.fn(), setUserRoles: vi.fn(), kickUser: vi.fn(), banUser: vi.fn(), unbanUser: vi.fn(), setUserVoiceMuted: vi.fn(), getSoundSettings: vi.fn(), updateSoundSetting: vi.fn() };
 });
 
 const admin: CurrentUser = { id: "u1", username: "theo", capabilities: ["manage_channels", "manage_server", "moderate", "publish_voice"] };
@@ -26,10 +26,19 @@ function mockListUsers(users: AdminUser[]) {
   });
 }
 
-function renderPanel(users: AdminUser[] = [alice], openMembers = true) {
+const DEFAULT_SOUND_SETTINGS: SoundSettings = {
+  message: { enabled: true, hasCustom: false },
+  userJoin: { enabled: true, hasCustom: false },
+  userLeave: { enabled: true, hasCustom: false },
+  muteToggle: { enabled: true, hasCustom: false },
+  forceMuted: { enabled: true, hasCustom: false },
+};
+
+function renderPanel(users: AdminUser[] = [alice], openMembers = true, soundSettings: SoundSettings = DEFAULT_SOUND_SETTINGS) {
   mockListUsers(users);
   vi.mocked(api.getAdminSettings).mockResolvedValue({ registrationOpen: true, maxImageSizeMb: 5, maxFileSizeMb: 10, maxMessageLength: 4000 });
   vi.mocked(api.listRoles).mockResolvedValue([]);
+  vi.mocked(api.getSoundSettings).mockResolvedValue(soundSettings);
   const result = render(
     <AdminPanel currentUser={admin} onClose={vi.fn()} />,
   );
@@ -131,5 +140,38 @@ describe("AdminPanel moderation", () => {
     const rows = screen.getAllByText(/theo|alice/).map((el) => el.closest(".admin-user"));
     const theoRow = rows.find((row) => row?.textContent?.includes("theo"));
     expect(theoRow?.querySelector(".admin-user-actions")).toBeNull();
+  });
+});
+
+describe("AdminPanel sounds", () => {
+  it("toggles a sound's enabled state", async () => {
+    vi.mocked(api.updateSoundSetting).mockResolvedValue({ enabled: false, hasCustom: false });
+    renderPanel([], false);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Sounds" }));
+    // Every sound row starts "On" by default, so the accessible name alone
+    // doesn't uniquely identify a row; SOUND_EVENTS[0] is "message", so the
+    // first match is its toggle, matching the assertion below.
+    const onButtons = await screen.findAllByRole("button", { name: "On" });
+    await user.click(onButtons[0]);
+    await waitFor(() => expect(api.updateSoundSetting).toHaveBeenCalledWith("message", { enabled: false }));
+  });
+
+  it("resets a sound to default once a custom upload exists", async () => {
+    vi.mocked(api.updateSoundSetting).mockResolvedValue({ enabled: true, hasCustom: false });
+    // Passed through renderPanel (rather than set via a prior mockResolvedValue
+    // call) so it isn't clobbered by renderPanel's own default sound-settings
+    // mock, which is configured after this call would otherwise run.
+    renderPanel([], false, {
+      message: { enabled: true, hasCustom: true },
+      userJoin: { enabled: true, hasCustom: false },
+      userLeave: { enabled: true, hasCustom: false },
+      muteToggle: { enabled: true, hasCustom: false },
+      forceMuted: { enabled: true, hasCustom: false },
+    });
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Sounds" }));
+    await user.click(await screen.findByRole("button", { name: "Reset" }));
+    await waitFor(() => expect(api.updateSoundSetting).toHaveBeenCalledWith("message", { audioData: null }));
   });
 });

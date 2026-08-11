@@ -1,7 +1,8 @@
-import { useEffect, useState, type FormEvent } from "react";
-import type { AdminUser, Capability, CurrentUser, Invite, Role, ServerSettings } from "../api/client";
-import { CAPABILITIES } from "../api/client";
+import { useEffect, useRef, useState, type FormEvent } from "react";
+import type { AdminUser, Capability, CurrentUser, Invite, Role, ServerSettings, SoundEvent, SoundSettings } from "../api/client";
+import { CAPABILITIES, SOUND_EVENTS } from "../api/client";
 import * as api from "../api/client";
+import { previewSound } from "../audio/sounds";
 import { Icon } from "../ui/Icon";
 
 const CAPABILITY_LABEL: Record<Capability, string> = {
@@ -11,6 +12,14 @@ const CAPABILITY_LABEL: Record<Capability, string> = {
   publish_voice: "Publish in voice",
 };
 const MEMBERS_PER_PAGE = 8;
+const MAX_SOUND_BYTES = 5 * 1024 * 1024;
+const SOUND_EVENT_LABEL: Record<SoundEvent, { title: string; description: string }> = {
+  message: { title: "Message received", description: "Plays when a new message arrives in a channel you're not currently authoring." },
+  userJoin: { title: "Voice join", description: "Plays when someone joins the voice channel you're in." },
+  userLeave: { title: "Voice leave", description: "Plays when someone leaves the voice channel you're in." },
+  muteToggle: { title: "Microphone mute/unmute", description: "Plays when a member mutes or unmutes their own microphone." },
+  forceMuted: { title: "Force-muted by a moderator", description: "Plays for a member when a moderator revokes their voice permission." },
+};
 
 export function AdminPanel({ currentUser, onClose }: {
   currentUser: CurrentUser;
@@ -20,10 +29,13 @@ export function AdminPanel({ currentUser, onClose }: {
   const [totalUsers, setTotalUsers] = useState(0);
   const [roles, setRoles] = useState<Role[]>([]);
   const [settings, setSettings] = useState<ServerSettings>({ registrationOpen: true, maxImageSizeMb: 5, maxFileSizeMb: 10, maxMessageLength: 4000 });
+  const [soundSettings, setSoundSettings] = useState<SoundSettings>(() => Object.fromEntries(
+    SOUND_EVENTS.map((event) => [event, { enabled: true, hasCustom: false }]),
+  ) as SoundSettings);
   const [error, setError] = useState("");
   const canManageServer = currentUser.capabilities.includes("manage_server");
   const canModerate = currentUser.capabilities.includes("moderate");
-  const [activeTab, setActiveTab] = useState<"members" | "general" | "roles" | "invites">(canManageServer ? "general" : "members");
+  const [activeTab, setActiveTab] = useState<"members" | "general" | "sounds" | "roles" | "invites">(canManageServer ? "general" : "members");
   const [memberSearch, setMemberSearch] = useState("");
   const [debouncedMemberSearch, setDebouncedMemberSearch] = useState("");
   const [memberPage, setMemberPage] = useState(1);
@@ -38,8 +50,16 @@ export function AdminPanel({ currentUser, onClose }: {
   useEffect(() => { setMemberPage((page) => Math.min(page, memberPageCount)); }, [memberPageCount]);
 
   useEffect(() => {
-    void Promise.all([canManageServer ? api.getAdminSettings() : Promise.resolve(null), canManageServer ? api.listRoles() : Promise.resolve([])])
-      .then(([nextSettings, nextRoles]) => { setRoles(nextRoles); if (nextSettings) setSettings(nextSettings); })
+    void Promise.all([
+      canManageServer ? api.getAdminSettings() : Promise.resolve(null),
+      canManageServer ? api.listRoles() : Promise.resolve([]),
+      canManageServer ? api.getSoundSettings() : Promise.resolve(null),
+    ])
+      .then(([nextSettings, nextRoles, nextSoundSettings]) => {
+        setRoles(nextRoles);
+        if (nextSettings) setSettings(nextSettings);
+        if (nextSoundSettings) setSoundSettings(nextSoundSettings);
+      })
       .catch(() => setError("Could not load server settings."));
   }, [canManageServer]);
 
@@ -121,6 +141,7 @@ export function AdminPanel({ currentUser, onClose }: {
         <div className="admin-settings-layout">
         <nav className="settings-tabs" aria-label="Server settings sections">
           {canManageServer ? <button type="button" className={activeTab === "general" ? "active" : ""} aria-pressed={activeTab === "general"} onClick={() => setActiveTab("general")}><Icon name="settings" size={17} /> General</button> : null}
+          {canManageServer ? <button type="button" className={activeTab === "sounds" ? "active" : ""} aria-pressed={activeTab === "sounds"} onClick={() => setActiveTab("sounds")}><Icon name="volume" size={17} /> Sounds</button> : null}
           {canManageServer ? <button type="button" className={activeTab === "roles" ? "active" : ""} aria-pressed={activeTab === "roles"} onClick={() => setActiveTab("roles")}><Icon name="users" size={17} /> Roles <span className="settings-tab-count">{roles.length}</span></button> : null}
           {canManageServer ? <button type="button" className={activeTab === "invites" ? "active" : ""} aria-pressed={activeTab === "invites"} onClick={() => setActiveTab("invites")}><Icon name="plus" size={17} /> Invitations</button> : null}
           <button type="button" className={activeTab === "members" ? "active" : ""} aria-pressed={activeTab === "members"} onClick={() => setActiveTab("members")}><Icon name="users" size={17} /> Members <span className="settings-tab-count">{totalUsers}</span></button>
@@ -147,6 +168,7 @@ export function AdminPanel({ currentUser, onClose }: {
             </div>
           </div>
           <p className="admin-hint">Channel-specific access and voice quality remain under the <Icon name="settings" size={13} /> icon beside each channel.</p></> : null}
+          {activeTab === "sounds" && canManageServer ? <SoundSettingsManager soundSettings={soundSettings} onChange={setSoundSettings} onError={setError} /> : null}
           {activeTab === "roles" && canManageServer ? <RoleManager roles={roles} onChange={setRoles} onError={setError} /> : null}
           {activeTab === "invites" && canManageServer ? <InviteManager onError={setError} /> : null}
           {activeTab === "members" ? <div className="settings-section admin-members-section">
@@ -215,4 +237,76 @@ function RoleManager({ roles, onChange, onError }: { roles: Role[]; onChange(rol
     catch { onError("Could not delete this role."); }
   }
   return <div className="settings-section admin-roles-section"><div className="admin-roles-heading"><div><h3>Roles</h3><p>Group permissions and assign them to multiple members.</p></div><button type="button" onClick={() => edit()}>New role</button></div><div className="admin-role-layout"><div className="admin-role-list">{roles.map((role) => <button type="button" key={role.id} className={editingId === role.id ? "active" : ""} onClick={() => edit(role)}><i style={{ background: role.color }} /><span><strong>{role.name}</strong><small>{role.memberCount} members</small></span></button>)}</div><form className="admin-role-editor" onSubmit={save}><label>Role name<input value={name} maxLength={32} placeholder="Community manager" onChange={(event) => setName(event.target.value)} /></label><label>Color<input type="color" value={color} onChange={(event) => setColor(event.target.value)} /></label><fieldset><legend>Permissions</legend>{CAPABILITIES.map((capability) => <label key={capability}><input type="checkbox" checked={capabilities.includes(capability)} onChange={() => setCapabilities((values) => values.includes(capability) ? values.filter((value) => value !== capability) : [...values, capability])} />{CAPABILITY_LABEL[capability]}</label>)}</fieldset><div><button type="submit" disabled={!name.trim()}>{editingId ? "Save role" : "Create role"}</button>{editingId ? <button type="button" className="danger-link" onClick={() => void remove(roles.find((role) => role.id === editingId)!)}>Delete</button> : null}</div></form></div></div>;
+}
+
+function SoundSettingsManager({ soundSettings, onChange, onError }: {
+  soundSettings: SoundSettings;
+  onChange(settings: SoundSettings): void;
+  onError(message: string): void;
+}) {
+  const fileInputRefs = useRef<Partial<Record<SoundEvent, HTMLInputElement | null>>>({});
+
+  async function toggle(event: SoundEvent) {
+    try {
+      const updated = await api.updateSoundSetting(event, { enabled: !soundSettings[event].enabled });
+      onChange({ ...soundSettings, [event]: updated });
+    } catch { onError("Could not change this sound's status."); }
+  }
+
+  function upload(event: SoundEvent, file: File) {
+    if (!/^audio\/(mpeg|ogg|wav|webm)$/.test(file.type)) return onError("Choose an MP3, OGG, WAV or WebM audio file.");
+    if (file.size > MAX_SOUND_BYTES) return onError("The sound file must be smaller than 5 MB.");
+    const reader = new FileReader();
+    reader.onload = () => {
+      const audioData = typeof reader.result === "string" ? reader.result : null;
+      if (!audioData) return;
+      void api.updateSoundSetting(event, { audioData })
+        .then((updated) => onChange({ ...soundSettings, [event]: updated }))
+        .catch(() => onError("Could not upload this sound."));
+    };
+    reader.onerror = () => onError("The sound file could not be read.");
+    reader.readAsDataURL(file);
+  }
+
+  async function reset(event: SoundEvent) {
+    try {
+      const updated = await api.updateSoundSetting(event, { audioData: null });
+      onChange({ ...soundSettings, [event]: updated });
+    } catch { onError("Could not reset this sound."); }
+  }
+
+  return (
+    <div className="settings-section admin-sounds-section">
+      <h3>Sounds</h3>
+      <p className="admin-setting-description">Enable, disable or replace the sounds played for every member of this server.</p>
+      <div className="sound-settings-list">
+        {SOUND_EVENTS.map((event) => {
+          const setting = soundSettings[event];
+          const label = SOUND_EVENT_LABEL[event];
+          return (
+            <div className="sound-setting-row" key={event}>
+              <div><h4>{label.title}</h4><p>{label.description}</p></div>
+              <div className="sound-setting-actions">
+                <button type="button" aria-label={`Preview ${label.title}`} onClick={() => previewSound(event, setting.hasCustom)}><Icon name="volume" size={15} /></button>
+                <button type="button" className={`setting-switch ${setting.enabled ? "active" : ""}`} aria-pressed={setting.enabled} onClick={() => void toggle(event)}>{setting.enabled ? "On" : "Off"}</button>
+                <input
+                  ref={(el) => { fileInputRefs.current[event] = el; }}
+                  className="sr-only"
+                  type="file"
+                  accept="audio/mpeg,audio/ogg,audio/wav,audio/webm"
+                  onChange={(evt) => {
+                    const file = evt.target.files?.[0];
+                    evt.target.value = "";
+                    if (file) upload(event, file);
+                  }}
+                />
+                <button type="button" onClick={() => fileInputRefs.current[event]?.click()}>Upload</button>
+                {setting.hasCustom ? <button type="button" className="danger-link" onClick={() => void reset(event)}>Reset</button> : null}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
