@@ -9,9 +9,12 @@ export type ServerEvent =
   | { type: "message.created"; message: Message }
   | { type: "message.updated"; message: Message }
   | { type: "message.deleted"; channelId: string; messageId: string }
+  | { type: "typing.updated"; channelId: string; userId: string; username: string; active: boolean }
   | { type: "channel.created"; channel: Channel }
   | { type: "channel.deleted"; channelId: string }
   | { type: "voice.sync"; channels: Record<string, VoiceParticipant[]> }
   | { type: "voice.joined"; channelId: string; participant: VoiceParticipant }
   | { type: "voice.left"; channelId: string; userId: string }
   | { type: "pong" };
+
+export type ClientEvent = { type: "ping" } | { type: "typing.update"; channelId: string; active: boolean };

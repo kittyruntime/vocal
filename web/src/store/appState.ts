@@ -8,6 +8,8 @@ export type AppState = {
   selectedChannelId: string | null;
   messagesByChannel: Record<string, Message[]>;
   unreadChannelIds: string[];
+  unreadCounts: Record<string, number>;
+  mentionChannelIds: string[];
   onlineUserIds: string[];
   voiceOccupancy: Record<string, VoiceParticipant[]>;
   voiceSpeakingUserIds: string[];
@@ -20,6 +22,8 @@ export const initialAppState: AppState = {
   selectedChannelId: null,
   messagesByChannel: {},
   unreadChannelIds: [],
+  unreadCounts: {},
+  mentionChannelIds: [],
   onlineUserIds: [],
   voiceOccupancy: {},
   voiceSpeakingUserIds: [],
@@ -34,7 +38,7 @@ export type AppAction =
   | { type: "channel/selected"; channelId: string }
   | { type: "messages/loaded"; channelId: string; messages: Message[] }
   | { type: "messages/prepended"; channelId: string; messages: Message[] }
-  | { type: "message/received"; message: Message }
+  | { type: "message/received"; message: Message; markUnread?: boolean; mention?: boolean }
   | { type: "message/updated"; message: Message }
   | { type: "message/deleted"; channelId: string; messageId: string }
   | { type: "presence/sync"; userIds: string[] }
@@ -69,10 +73,14 @@ export function appReducer(state: AppState, action: AppAction): AppState {
       return { ...state, channels, selectedChannelId, unreadChannelIds: state.unreadChannelIds.filter((id) => id !== action.channelId) };
     }
     case "channel/selected":
+      const unreadCounts = { ...state.unreadCounts };
+      delete unreadCounts[action.channelId];
       return {
         ...state,
         selectedChannelId: action.channelId,
         unreadChannelIds: state.unreadChannelIds.filter((id) => id !== action.channelId),
+        unreadCounts,
+        mentionChannelIds: state.mentionChannelIds.filter((id) => id !== action.channelId),
       };
     case "messages/loaded":
       return {
@@ -89,13 +97,15 @@ export function appReducer(state: AppState, action: AppAction): AppState {
     case "message/received": {
       const { channelId } = action.message;
       const existing = state.messagesByChannel[channelId] ?? [];
-      const shouldMarkUnread = action.message.userId !== state.currentUser?.id && channelId !== state.selectedChannelId;
+      const shouldMarkUnread = action.markUnread !== false && action.message.userId !== state.currentUser?.id && channelId !== state.selectedChannelId;
       return {
         ...state,
         messagesByChannel: { ...state.messagesByChannel, [channelId]: [...existing, action.message] },
         unreadChannelIds: shouldMarkUnread && !state.unreadChannelIds.includes(channelId)
           ? [...state.unreadChannelIds, channelId]
           : state.unreadChannelIds,
+        unreadCounts: shouldMarkUnread ? { ...state.unreadCounts, [channelId]: (state.unreadCounts[channelId] ?? 0) + 1 } : state.unreadCounts,
+        mentionChannelIds: shouldMarkUnread && action.mention && !state.mentionChannelIds.includes(channelId) ? [...state.mentionChannelIds, channelId] : state.mentionChannelIds,
       };
     }
     case "message/updated": {

@@ -25,6 +25,10 @@ export function ChatView({
   onOpenSidebar,
   onViewProfile,
   currentUser,
+  typingUsernames = [],
+  onTypingChange,
+  notificationLevel = "all",
+  onNotificationLevelChange,
 }: {
   channel: Channel;
   maxMessageLength?: number;
@@ -34,6 +38,10 @@ export function ChatView({
   onOpenSidebar?(): void;
   onViewProfile?(userId: string): void;
   currentUser?: CurrentUser;
+  typingUsernames?: string[];
+  onTypingChange?(active: boolean): void;
+  notificationLevel?: "all" | "mentions" | "none";
+  onNotificationLevelChange?(level: "all" | "mentions" | "none"): void;
 }) {
   const { showToast } = useToast();
   const [draft, setDraft] = useState("");
@@ -52,6 +60,7 @@ export function ChatView({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const emotesRef = useRef<HTMLDivElement>(null);
   const dragDepthRef = useRef(0);
+  const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Tells the scroll-restoration effect (below) why `messages` just changed, so it knows
   // whether to jump to the bottom, preserve the reading position, or leave things alone.
   const pendingScrollActionRef = useRef<"load" | "prepend" | null>(null);
@@ -77,6 +86,18 @@ export function ChatView({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [channel.id]);
+
+  useEffect(() => () => {
+    if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
+    onTypingChange?.(false);
+  }, [channel.id, onTypingChange]);
+
+  function updateDraft(value: string) {
+    setDraft(value);
+    onTypingChange?.(value.length > 0);
+    if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
+    typingTimerRef.current = setTimeout(() => onTypingChange?.(false), 1800);
+  }
 
   useEffect(() => {
     if (!emotesOpen) return;
@@ -198,6 +219,7 @@ export function ChatView({
       setDraft("");
       setFiles([]);
       setReplyTo(null);
+      onTypingChange?.(false);
     } catch {
       showToast("The message could not be sent");
     } finally {
@@ -255,6 +277,7 @@ export function ChatView({
           <Icon name="menu" size={20} />
         </button>
         <span className="header-channel-icon"><Icon name="hash" size={22} /></span> {channel.name}
+        <button type="button" className="chat-notification-button" aria-label={`Notifications: ${notificationLevel}`} title={`Notifications: ${notificationLevel}`} onClick={() => onNotificationLevelChange?.(notificationLevel === "all" ? "mentions" : notificationLevel === "mentions" ? "none" : "all")}><Icon name={notificationLevel === "all" ? "bellRing" : notificationLevel === "mentions" ? "bell" : "bellOff"} size={18} /></button>
       </header>
       <div
         className="chat-messages"
@@ -279,7 +302,7 @@ export function ChatView({
                 <button type="button" className="chat-author" onClick={() => onViewProfile?.(message.userId)}>{message.username}</button>
                 <time dateTime={message.createdAt}>{formatMessageTime(message.createdAt)}</time>{message.editedAt ? <span className="message-edited">(edited)</span> : null}
               </div>
-              {editingId === message.id ? <form className="message-edit-form" onSubmit={(event) => { event.preventDefault(); void saveEdit(message.id); }}><input aria-label="Edit message" value={editDraft} maxLength={maxMessageLength} autoFocus onChange={(event) => setEditDraft(event.target.value)} /><div><button type="button" onClick={() => setEditingId(null)}>Cancel</button><button type="submit">Save</button></div></form> : <div className="chat-content">{message.content}</div>}
+              {editingId === message.id ? <form className="message-edit-form" onSubmit={(event) => { event.preventDefault(); void saveEdit(message.id); }}><input aria-label="Edit message" value={editDraft} maxLength={maxMessageLength} autoFocus onChange={(event) => setEditDraft(event.target.value)} /><div><button type="button" onClick={() => setEditingId(null)}>Cancel</button><button type="submit">Save</button></div></form> : <MessageContent content={message.content} />}
               {(message.attachments?.length ?? 0) > 0 ? <div className="message-attachments">
                 {message.attachments!.map((attachment) => attachment.mimeType.startsWith("image/") ? (
                   <a key={attachment.id} className="message-image" href={attachment.url} target="_blank" rel="noreferrer">
@@ -316,7 +339,7 @@ export function ChatView({
             placeholder={`Send a message in #${channel.name}`}
             value={draft}
             maxLength={maxMessageLength}
-            onChange={(e) => setDraft(e.target.value)}
+            onChange={(e) => updateDraft(e.target.value)}
           />
           {draft.length >= maxMessageLength * .8 ? <span className="composer-count" aria-label={`${draft.length} of ${maxMessageLength} characters`}>{draft.length}/{maxMessageLength}</span> : null}
           <div className="composer-emotes" ref={emotesRef}>
@@ -331,8 +354,21 @@ export function ChatView({
           <Icon name="send" size={18} /><span className="sr-only">Send</span>
         </button>
       </form>
+      <div className="typing-indicator" aria-live="polite">{formatTypingUsers(typingUsernames)}</div>
     </div>
   );
+}
+
+function MessageContent({ content }: { content: string }) {
+  const parts = content.split(/(@everyone|@[\p{L}\p{N}_.-]+)/gu);
+  return <div className="chat-content">{parts.map((part, index) => part.startsWith("@") ? <mark className="message-mention" key={index}>{part}</mark> : part)}</div>;
+}
+
+function formatTypingUsers(usernames: string[]): string {
+  if (usernames.length === 0) return "";
+  if (usernames.length === 1) return `${usernames[0]} is typing…`;
+  if (usernames.length === 2) return `${usernames[0]} and ${usernames[1]} are typing…`;
+  return `${usernames.length} people are typing…`;
 }
 
 function formatFileSize(bytes: number): string {

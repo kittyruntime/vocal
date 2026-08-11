@@ -5,6 +5,7 @@ import type { Capability } from "../capabilities.js";
 import type { WsHub } from "./hub.js";
 import type { VoicePresence } from "../voice/presence.js";
 import type { VoiceParticipantPayload } from "./protocol.js";
+import { channelRequiredCapability } from "../channels/lookup.js";
 
 function parseCookie(header: string | undefined, name: string): string | undefined {
   if (!header) return undefined;
@@ -81,7 +82,7 @@ export function registerWsRoute(
     socket.send(JSON.stringify({ type: "presence.sync", userIds: hub.onlineUserIds() }));
     socket.send(JSON.stringify({ type: "voice.sync", channels }));
 
-    socket.on("message", (raw: Buffer) => {
+    socket.on("message", async (raw: Buffer) => {
       let event: unknown;
       try {
         event = JSON.parse(raw.toString());
@@ -94,6 +95,14 @@ export function registerWsRoute(
         (event as { type?: unknown }).type === "ping"
       ) {
         socket.send(JSON.stringify({ type: "pong" }));
+        return;
+      }
+      if (typeof event === "object" && event !== null && (event as { type?: unknown }).type === "typing.update") {
+        const value = event as { channelId?: unknown; active?: unknown };
+        if (typeof value.channelId !== "string" || typeof value.active !== "boolean") return;
+        const requiredCapability = await channelRequiredCapability(pool, value.channelId);
+        if (requiredCapability === undefined || (requiredCapability && !user.capabilities.includes(requiredCapability))) return;
+        hub.broadcastToCapability(requiredCapability, { type: "typing.updated", channelId: value.channelId, userId: user.id, username: user.username, active: value.active });
       }
     });
 

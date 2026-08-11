@@ -1,4 +1,7 @@
 import {
+  Bell,
+  BellOff,
+  BellRing,
   Camera,
   CameraOff,
   File,
@@ -28,6 +31,9 @@ import {
 } from "lucide-react";
 
 type IconName =
+  | "bell"
+  | "bellOff"
+  | "bellRing"
   | "camera"
   | "cameraOff"
   | "file"
@@ -55,6 +61,9 @@ type IconName =
   | "close";
 
 const icons: Record<IconName, LucideIcon> = {
+  bell: Bell,
+  bellOff: BellOff,
+  bellRing: BellRing,
   camera: Camera,
   cameraOff: CameraOff,
   file: File,

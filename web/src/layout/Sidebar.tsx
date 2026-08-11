@@ -21,6 +21,8 @@ export function Sidebar({
   voiceOccupancy,
   voiceSpeakingUserIds,
   unreadChannelIds,
+  unreadCounts,
+  mentionChannelIds,
   currentUser,
   onSelectChannel,
   onChannelCreated,
@@ -34,6 +36,8 @@ export function Sidebar({
   voiceOccupancy: Record<string, VoiceParticipant[]>;
   voiceSpeakingUserIds?: string[];
   unreadChannelIds?: string[];
+  unreadCounts?: Record<string, number>;
+  mentionChannelIds?: string[];
   currentUser: CurrentUser;
   onSelectChannel(channelId: string): void;
   onChannelCreated(channel: Channel): void;
@@ -68,6 +72,8 @@ export function Sidebar({
         currentUserId={currentUser.id}
         selectedChannelId={selectedChannelId}
         unreadChannelIds={unreadChannelIds}
+        unreadCounts={unreadCounts}
+        mentionChannelIds={mentionChannelIds}
         onSelectChannel={onSelectChannel}
         onEditChannel={canManageChannels ? setEditingChannelId : undefined}
         onViewProfile={onViewProfile}
@@ -116,6 +122,8 @@ function ChannelGroup({
   currentUserId,
   selectedChannelId,
   unreadChannelIds,
+  unreadCounts,
+  mentionChannelIds,
   onSelectChannel,
   onEditChannel,
   onViewProfile,
@@ -127,6 +135,8 @@ function ChannelGroup({
   currentUserId: string;
   selectedChannelId: string | null;
   unreadChannelIds?: string[];
+  unreadCounts?: Record<string, number>;
+  mentionChannelIds?: string[];
   onSelectChannel(channelId: string): void;
   onEditChannel?(channelId: string): void;
   onViewProfile?(userId: string): void;
@@ -139,6 +149,8 @@ function ChannelGroup({
         {channels.map((channel) => {
           const occupants = voiceOccupancy[channel.id] ?? [];
           const unread = channel.type === "text" && (unreadChannelIds?.includes(channel.id) ?? false);
+          const unreadCount = unreadCounts?.[channel.id] ?? 0;
+          const mentioned = mentionChannelIds?.includes(channel.id) ?? false;
           return <li key={channel.id}>
             <div className="channel-row">
               <button
@@ -149,7 +161,7 @@ function ChannelGroup({
               >
                 <span className="channel-icon" aria-hidden="true"><Icon name={channel.type === "voice" ? "volume" : "hash"} /></span>
                 <span className="channel-name">{channel.name}</span>
-                {unread ? <span className="channel-unread-dot" aria-hidden="true" /> : null}
+                {unread ? <><span className="channel-unread-dot" aria-hidden="true" /><span className={`channel-unread-badge ${mentioned ? "is-mention" : ""}`} aria-label={`${unreadCount} unread messages`}>{unreadCount > 99 ? "99+" : unreadCount}</span></> : null}
               </button>
               {onEditChannel ? (
                 <button

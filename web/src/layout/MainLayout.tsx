@@ -25,7 +25,14 @@ export function MainLayout({ currentUser }: { currentUser: CurrentUser }) {
   const [profileOpen, setProfileOpen] = useState(false);
   const [viewedProfileId, setViewedProfileId] = useState<string | null>(null);
   const [chatSettings, setChatSettings] = useState<ChatSettings>({ maxImageSizeMb: 5, maxFileSizeMb: 10, maxMessageLength: 4000 });
+  const [notificationLevels, setNotificationLevels] = useState<Record<string, "all" | "mentions" | "none">>(() => {
+    try { return JSON.parse(localStorage.getItem("vocal.notification-levels") ?? "{}"); } catch { return {}; }
+  });
+  const notificationLevelsRef = useRef(notificationLevels);
   const joinedVoiceChannelIdRef = useRef<string | null>(null);
+  const socketRef = useRef<ReturnType<typeof createSocketClient> | null>(null);
+  const typingTimersRef = useRef(new Map<string, ReturnType<typeof setTimeout>>());
+  const [typingByChannel, setTypingByChannel] = useState<Record<string, Record<string, string>>>({});
 
   useEffect(() => {
     if (!mobileSidebarOpen) return;
@@ -60,7 +67,9 @@ export function MainLayout({ currentUser }: { currentUser: CurrentUser }) {
             dispatch({ type: "presence/offline", userId: event.userId });
             break;
           case "message.created":
-            dispatch({ type: "message/received", message: event.message });
+            const mentioned = event.message.content.includes("@everyone") || event.message.content.toLocaleLowerCase().includes(`@${currentUser.username.toLocaleLowerCase()}`);
+            const notificationLevel = notificationLevelsRef.current[event.message.channelId] ?? "all";
+            dispatch({ type: "message/received", message: event.message, markUnread: notificationLevel === "all" || (notificationLevel === "mentions" && mentioned), mention: mentioned });
             if (event.message.userId !== currentUser.id) playAppSound("message");
             break;
           case "message.updated":
@@ -69,6 +78,22 @@ export function MainLayout({ currentUser }: { currentUser: CurrentUser }) {
           case "message.deleted":
             dispatch({ type: "message/deleted", channelId: event.channelId, messageId: event.messageId });
             break;
+          case "typing.updated": {
+            if (event.userId === currentUser.id) break;
+            const key = `${event.channelId}:${event.userId}`;
+            const previous = typingTimersRef.current.get(key);
+            if (previous) clearTimeout(previous);
+            setTypingByChannel((value) => {
+              const channel = { ...(value[event.channelId] ?? {}) };
+              if (event.active) channel[event.userId] = event.username;
+              else delete channel[event.userId];
+              return { ...value, [event.channelId]: channel };
+            });
+            if (event.active) typingTimersRef.current.set(key, setTimeout(() => setTypingByChannel((value) => {
+              const channel = { ...(value[event.channelId] ?? {}) }; delete channel[event.userId]; return { ...value, [event.channelId]: channel };
+            }), 3500));
+            break;
+          }
           case "channel.created":
             dispatch({ type: "channel/added", channel: event.channel });
             break;
@@ -100,7 +125,8 @@ export function MainLayout({ currentUser }: { currentUser: CurrentUser }) {
         dispatch({ type: "connection/status", status });
       },
     });
-    return () => socket.close();
+    socketRef.current = socket;
+    return () => { socketRef.current = null; socket.close(); for (const timer of typingTimersRef.current.values()) clearTimeout(timer); };
   }, []);
 
   const selectChannel = useCallback((channelId: string) => {
@@ -130,6 +156,8 @@ export function MainLayout({ currentUser }: { currentUser: CurrentUser }) {
             voiceOccupancy={state.voiceOccupancy}
             voiceSpeakingUserIds={state.voiceSpeakingUserIds}
             unreadChannelIds={state.unreadChannelIds}
+            unreadCounts={state.unreadCounts}
+            mentionChannelIds={state.mentionChannelIds}
             onViewProfile={setViewedProfileId}
             currentUser={currentUser}
             onSelectChannel={selectChannel}
@@ -154,6 +182,12 @@ export function MainLayout({ currentUser }: { currentUser: CurrentUser }) {
               onOpenSidebar={() => setMobileSidebarOpen(true)}
               onViewProfile={setViewedProfileId}
               currentUser={currentUser}
+              typingUsernames={Object.values(typingByChannel[selectedChannel.id] ?? {})}
+              onTypingChange={(active) => socketRef.current?.send({ type: "typing.update", channelId: selectedChannel.id, active })}
+              notificationLevel={notificationLevels[selectedChannel.id] ?? "all"}
+              onNotificationLevelChange={(level) => setNotificationLevels((value) => {
+                const next = { ...value, [selectedChannel.id]: level }; notificationLevelsRef.current = next; localStorage.setItem("vocal.notification-levels", JSON.stringify(next)); return next;
+              })}
             />
           ) : selectedChannel?.type !== "voice" ? (
             <div className="no-channel">
