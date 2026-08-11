@@ -88,6 +88,34 @@ describe("sound settings", () => {
     expect(res.statusCode).toBe(404);
   });
 
+  it("serves an ETag and honors If-None-Match with a 304", async () => {
+    const audioData = `data:audio/mpeg;base64,${Buffer.from("fake mp3 bytes").toString("base64")}`;
+    await app.inject({ method: "PATCH", url: "/api/admin/sounds/message", headers: { cookie: adminCookie }, payload: { audioData } });
+
+    const first = await app.inject({ method: "GET", url: "/api/sounds/message/file", headers: { cookie: adminCookie } });
+    expect(first.statusCode).toBe(200);
+    const etag = first.headers["etag"];
+    expect(etag).toBeTruthy();
+
+    const revalidated = await app.inject({ method: "GET", url: "/api/sounds/message/file", headers: { cookie: adminCookie, "if-none-match": etag as string } });
+    expect(revalidated.statusCode).toBe(304);
+    expect(revalidated.rawPayload.toString()).toBe("");
+
+    const stale = await app.inject({ method: "GET", url: "/api/sounds/message/file", headers: { cookie: adminCookie, "if-none-match": '"stale-etag"' } });
+    expect(stale.statusCode).toBe(200);
+    expect(stale.rawPayload.toString()).toBe("fake mp3 bytes");
+  });
+
+  it("uploads and serves back a non-mpeg custom sound", async () => {
+    const audioData = `data:audio/ogg;base64,${Buffer.from("fake ogg bytes").toString("base64")}`;
+    const patch = await app.inject({ method: "PATCH", url: "/api/admin/sounds/message", headers: { cookie: adminCookie }, payload: { audioData } });
+    expect(patch.json()).toEqual({ enabled: true, hasCustom: true });
+    const file = await app.inject({ method: "GET", url: "/api/sounds/message/file", headers: { cookie: adminCookie } });
+    expect(file.statusCode).toBe(200);
+    expect(file.headers["content-type"]).toBe("audio/ogg");
+    expect(file.rawPayload.toString()).toBe("fake ogg bytes");
+  });
+
   it("returns default volumes for a fresh user", async () => {
     const res = await app.inject({ method: "GET", url: "/api/me/sound-volumes", headers: { cookie: adminCookie } });
     expect(res.json()).toEqual({ message: 55, userJoin: 55, userLeave: 55, muteToggle: 55, forceMuted: 55 });

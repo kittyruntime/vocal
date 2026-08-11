@@ -157,6 +157,49 @@ describe("AdminPanel sounds", () => {
     await waitFor(() => expect(api.updateSoundSetting).toHaveBeenCalledWith("message", { enabled: false }));
   });
 
+  it("uploads a valid audio file and sends it as a base64 data URL", async () => {
+    vi.mocked(api.updateSoundSetting).mockReset();
+    vi.mocked(api.updateSoundSetting).mockResolvedValue({ enabled: true, hasCustom: true });
+    renderPanel([], false);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Sounds" }));
+    const row = (await screen.findByText("Message received")).closest(".sound-setting-row")!;
+    const fileInput = row.querySelector('input[type="file"]') as HTMLInputElement;
+    const file = new File([new Uint8Array([1, 2, 3])], "test.mp3", { type: "audio/mpeg" });
+    await user.upload(fileInput, file);
+    await waitFor(() => expect(api.updateSoundSetting).toHaveBeenCalledWith("message", { audioData: expect.stringMatching(/^data:audio\/mpeg;base64,/) }));
+  });
+
+  it("rejects a file with a disallowed MIME type without calling the API", async () => {
+    vi.mocked(api.updateSoundSetting).mockReset();
+    renderPanel([], false);
+    // applyAccept: false — the input's accept attribute is only an OS file-picker
+    // hint, not enforcement; disabling userEvent's default filtering lets a
+    // mismatched file reach the change handler so we can exercise the
+    // component's own MIME regex check.
+    const user = userEvent.setup({ applyAccept: false });
+    await user.click(screen.getByRole("button", { name: "Sounds" }));
+    const row = (await screen.findByText("Message received")).closest(".sound-setting-row")!;
+    const fileInput = row.querySelector('input[type="file"]') as HTMLInputElement;
+    const file = new File([new Uint8Array([1, 2, 3])], "test.txt", { type: "text/plain" });
+    await user.upload(fileInput, file);
+    expect(await screen.findByText("Choose an MP3, OGG, WAV or WebM audio file.")).toBeInTheDocument();
+    expect(api.updateSoundSetting).not.toHaveBeenCalled();
+  });
+
+  it("rejects an oversized file without calling the API", async () => {
+    vi.mocked(api.updateSoundSetting).mockReset();
+    renderPanel([], false);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Sounds" }));
+    const row = (await screen.findByText("Message received")).closest(".sound-setting-row")!;
+    const fileInput = row.querySelector('input[type="file"]') as HTMLInputElement;
+    const file = new File([new Uint8Array(5 * 1024 * 1024 + 1)], "big.mp3", { type: "audio/mpeg" });
+    await user.upload(fileInput, file);
+    expect(await screen.findByText("The sound file must be smaller than 5 MB.")).toBeInTheDocument();
+    expect(api.updateSoundSetting).not.toHaveBeenCalled();
+  });
+
   it("resets a sound to default once a custom upload exists", async () => {
     vi.mocked(api.updateSoundSetting).mockResolvedValue({ enabled: true, hasCustom: false });
     // Passed through renderPanel (rather than set via a prior mockResolvedValue

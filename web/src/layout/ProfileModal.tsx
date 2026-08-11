@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "r
 import type { CurrentUser, SoundEvent, SoundSettings, SoundVolumes } from "../api/client";
 import { SOUND_EVENTS } from "../api/client";
 import * as api from "../api/client";
-import { previewSound } from "../audio/sounds";
+import { configureSounds, previewSound } from "../audio/sounds";
 import { Icon } from "../ui/Icon";
 
 const MAX_AVATAR_BYTES = 512 * 1024;
@@ -45,8 +45,11 @@ export function ProfileModal({ currentUser, onClose, onSaved }: {
 
   async function saveVolume(event: SoundEvent, volume: number) {
     setSoundVolumes((value) => ({ ...value, [event]: volume }));
-    try { setSoundVolumes(await api.updateMySoundVolume(event, volume)); }
-    catch { /* keep the optimistic local value; a transient failure isn't worth surfacing here */ }
+    try {
+      const freshVolumes = await api.updateMySoundVolume(event, volume);
+      setSoundVolumes(freshVolumes);
+      configureSounds(soundSettings, freshVolumes);
+    } catch { /* keep the optimistic local value; a transient failure isn't worth surfacing here */ }
   }
 
   useEffect(() => {

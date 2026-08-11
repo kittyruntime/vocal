@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import * as api from "../api/client";
+import * as sounds from "../audio/sounds";
 import { ProfileModal } from "./ProfileModal";
 
 vi.mock("../api/client", async () => ({
@@ -10,6 +11,11 @@ vi.mock("../api/client", async () => ({
   getSoundSettings: vi.fn(),
   getMySoundVolumes: vi.fn(),
   updateMySoundVolume: vi.fn(),
+}));
+
+vi.mock("../audio/sounds", async () => ({
+  ...(await vi.importActual<typeof import("../audio/sounds")>("../audio/sounds")),
+  configureSounds: vi.fn(),
 }));
 
 beforeEach(() => {
@@ -61,5 +67,24 @@ describe("ProfileModal", () => {
     fireEvent.change(slider, { target: { value: "80" } });
     fireEvent.mouseUp(slider);
     await waitFor(() => expect(api.updateMySoundVolume).toHaveBeenCalledWith("message", 80));
+  });
+
+  it("applies a saved volume to the live sound engine immediately, without a reload", async () => {
+    const freshVolumes = { message: 80, userJoin: 55, userLeave: 55, muteToggle: 55, forceMuted: 55 };
+    vi.mocked(api.updateMySoundVolume).mockResolvedValue(freshVolumes);
+    render(<ProfileModal currentUser={{ id: "u1", username: "theo", capabilities: [] }} onSaved={vi.fn()} onClose={vi.fn()} />);
+    const slider = await screen.findByLabelText("Message received volume");
+    fireEvent.change(slider, { target: { value: "80" } });
+    fireEvent.mouseUp(slider);
+    await waitFor(() => expect(sounds.configureSounds).toHaveBeenCalledWith(
+      {
+        message: { enabled: true, hasCustom: false },
+        userJoin: { enabled: true, hasCustom: false },
+        userLeave: { enabled: true, hasCustom: false },
+        muteToggle: { enabled: true, hasCustom: false },
+        forceMuted: { enabled: true, hasCustom: false },
+      },
+      freshVolumes,
+    ));
   });
 });
