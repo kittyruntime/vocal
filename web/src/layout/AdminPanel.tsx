@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import type { AdminUser, Capability, CurrentUser, Role, ServerSettings } from "../api/client";
+import type { AdminUser, Capability, CurrentUser, Invite, Role, ServerSettings } from "../api/client";
 import { CAPABILITIES } from "../api/client";
 import * as api from "../api/client";
 import { Icon } from "../ui/Icon";
@@ -22,7 +22,7 @@ export function AdminPanel({ currentUser, onClose }: {
   const [error, setError] = useState("");
   const canManageServer = currentUser.capabilities.includes("manage_server");
   const canModerate = currentUser.capabilities.includes("moderate");
-  const [activeTab, setActiveTab] = useState<"members" | "general" | "roles">(canManageServer ? "general" : "members");
+  const [activeTab, setActiveTab] = useState<"members" | "general" | "roles" | "invites">(canManageServer ? "general" : "members");
   const [memberSearch, setMemberSearch] = useState("");
   const [memberPage, setMemberPage] = useState(1);
   const filteredUsers = useMemo(() => {
@@ -114,6 +114,7 @@ export function AdminPanel({ currentUser, onClose }: {
         <nav className="settings-tabs" aria-label="Server settings sections">
           {canManageServer ? <button type="button" className={activeTab === "general" ? "active" : ""} aria-pressed={activeTab === "general"} onClick={() => setActiveTab("general")}><Icon name="settings" size={17} /> General</button> : null}
           {canManageServer ? <button type="button" className={activeTab === "roles" ? "active" : ""} aria-pressed={activeTab === "roles"} onClick={() => setActiveTab("roles")}><Icon name="users" size={17} /> Roles <span className="settings-tab-count">{roles.length}</span></button> : null}
+          {canManageServer ? <button type="button" className={activeTab === "invites" ? "active" : ""} aria-pressed={activeTab === "invites"} onClick={() => setActiveTab("invites")}><Icon name="plus" size={17} /> Invitations</button> : null}
           <button type="button" className={activeTab === "members" ? "active" : ""} aria-pressed={activeTab === "members"} onClick={() => setActiveTab("members")}><Icon name="users" size={17} /> Members <span className="settings-tab-count">{users.length}</span></button>
         </nav>
         <div className="voice-settings-content admin-settings-content">
@@ -139,6 +140,7 @@ export function AdminPanel({ currentUser, onClose }: {
           </div>
           <p className="admin-hint">Channel-specific access and voice quality remain under the <Icon name="settings" size={13} /> icon beside each channel.</p></> : null}
           {activeTab === "roles" && canManageServer ? <RoleManager roles={roles} onChange={setRoles} onError={setError} /> : null}
+          {activeTab === "invites" && canManageServer ? <InviteManager onError={setError} /> : null}
           {activeTab === "members" ? <div className="settings-section admin-members-section">
             <div className="admin-members-heading"><div><h3>Members</h3><p>{filteredUsers.length} {filteredUsers.length === 1 ? "member" : "members"}</p></div><input type="search" aria-label="Search members" placeholder="Search members" value={memberSearch} onChange={(event) => setMemberSearch(event.target.value)} /></div>
             <div className="admin-user-list">
@@ -175,6 +177,14 @@ export function AdminPanel({ currentUser, onClose }: {
       </section>
     </div>
   );
+}
+
+function InviteManager({ onError }: { onError(message: string): void }) {
+  const [invites, setInvites] = useState<Invite[]>([]); const [expiresInHours, setExpiresInHours] = useState(168); const [maxUses, setMaxUses] = useState(1); const [createdUrl, setCreatedUrl] = useState("");
+  useEffect(() => { void api.listInvites().then(setInvites).catch(() => onError("Could not load invitations.")); }, [onError]);
+  async function create(event: FormEvent) { event.preventDefault(); try { const invite = await api.createInvite({ expiresInHours, maxUses }); setInvites((values) => [invite, ...values]); setCreatedUrl(`${window.location.origin}/?invite=${invite.token}`); } catch { onError("Could not create an invitation."); } }
+  async function revoke(inviteId: string) { try { await api.revokeInvite(inviteId); setInvites((values) => values.filter((invite) => invite.id !== inviteId)); } catch { onError("Could not revoke this invitation."); } }
+  return <div className="settings-section admin-invites-section"><div className="admin-roles-heading"><div><h3>Invitations</h3><p>Create limited links and revoke them whenever needed.</p></div></div><form className="invite-create-form" onSubmit={create}><label>Expires<select value={expiresInHours} onChange={(event) => setExpiresInHours(Number(event.target.value))}><option value={1}>1 hour</option><option value={24}>1 day</option><option value={168}>7 days</option><option value={720}>30 days</option></select></label><label>Maximum uses<input type="number" min={1} max={100} value={maxUses} onChange={(event) => setMaxUses(Number(event.target.value))} /></label><button type="submit">Create link</button></form>{createdUrl ? <div className="invite-created"><input aria-label="New invitation link" readOnly value={createdUrl} /><button type="button" onClick={() => void navigator.clipboard?.writeText(createdUrl)}>Copy</button></div> : null}<div className="invite-list">{invites.map((invite) => { const expired = new Date(invite.expiresAt).getTime() <= Date.now(); return <div key={invite.id}><span><strong>{expired ? "Expired" : `${invite.useCount}/${invite.maxUses} uses`}</strong><small>Expires {new Date(invite.expiresAt).toLocaleString()}</small></span><button type="button" onClick={() => void revoke(invite.id)}>Revoke</button></div>; })}{invites.length === 0 ? <p className="admin-members-empty">No active invitation.</p> : null}</div></div>;
 }
 
 function RoleManager({ roles, onChange, onError }: { roles: Role[]; onChange(roles: Role[]): void; onError(message: string): void }) {

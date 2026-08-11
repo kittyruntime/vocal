@@ -82,4 +82,17 @@ describe("invites", () => {
     expect(res.statusCode).toBe(400);
     expect(res.json()).toEqual({ error: "invalid invite id" });
   });
+
+  it("supports configurable expiration and multiple uses", async () => {
+    const created = await app.inject({ method: "POST", url: "/api/invites", headers: { cookie: adminCookie }, payload: { expiresInHours: 1, maxUses: 2 } });
+    expect(created.json()).toMatchObject({ maxUses: 2, useCount: 0 });
+    for (const username of ["alice", "bob"]) {
+      const registered = await app.inject({ method: "POST", url: "/api/auth/register", payload: { inviteToken: created.json().token, username, password: "hunter2hunter2" } });
+      expect(registered.statusCode).toBe(201);
+    }
+    const exhausted = await app.inject({ method: "POST", url: "/api/auth/register", payload: { inviteToken: created.json().token, username: "charlie", password: "hunter2hunter2" } });
+    expect(exhausted.statusCode).toBe(403);
+    const listed = await app.inject({ method: "GET", url: "/api/invites", headers: { cookie: adminCookie } });
+    expect(listed.json()[0]).toMatchObject({ maxUses: 2, useCount: 2 });
+  });
 });
