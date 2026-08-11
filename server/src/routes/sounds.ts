@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import type { FastifyInstance } from "fastify";
 import type pg from "pg";
 import { z } from "zod";
@@ -47,9 +48,12 @@ export function registerSoundRoutes(app: FastifyInstance, pool: pg.Pool): void {
     const encoded = result.rows[0]?.audio_data;
     const match = encoded?.match(/^data:(audio\/(?:mpeg|ogg|wav|webm));base64,(.+)$/);
     if (!match) return reply.code(404).send({ error: "sound not found" });
+    const etag = `"${createHash("sha256").update(match[2]).digest("hex")}"`;
+    if (req.headers["if-none-match"] === etag) return reply.code(304).send();
     return reply
       .type(match[1])
-      .header("Cache-Control", "private, no-cache")
+      .header("Cache-Control", "private, max-age=86400")
+      .header("ETag", etag)
       .send(Buffer.from(match[2], "base64"));
   });
 
