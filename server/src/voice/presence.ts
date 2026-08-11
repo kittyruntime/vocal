@@ -3,6 +3,7 @@ import type { VoiceParticipantPayload } from "../ws/protocol.js";
 export interface VoicePresence {
   join(channelId: string, participant: VoiceParticipantPayload): void;
   leave(channelId: string, userId: string): void;
+  update(channelId: string, userId: string, status: { microphoneMuted: boolean; deafened: boolean }): VoiceParticipantPayload | null;
   occupants(channelId: string): VoiceParticipantPayload[];
   allOccupancy(): Record<string, VoiceParticipantPayload[]>;
 }
@@ -24,6 +25,14 @@ export function createVoicePresence(): VoicePresence {
       if (!users) return;
       users.delete(userId);
       if (users.size === 0) byChannel.delete(channelId);
+    },
+    update(channelId, userId, status) {
+      const users = byChannel.get(channelId);
+      const participant = users?.get(userId);
+      if (!participant) return null;
+      const updated = { ...participant, ...status };
+      users!.set(userId, updated);
+      return updated;
     },
     occupants(channelId) {
       return [...(byChannel.get(channelId)?.values() ?? [])];

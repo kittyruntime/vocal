@@ -8,11 +8,13 @@ import {
   ChevronDown,
   Hash,
   Headphones,
+  HeadphoneOff,
   LogOut,
   Maximize2,
   Menu,
   MessageSquareReply,
   Mic,
+  MicOff,
   Minimize2,
   MonitorUp,
   MonitorOff,
@@ -41,11 +43,13 @@ type IconName =
   | "chevron"
   | "hash"
   | "headphones"
+  | "headphonesOff"
   | "logout"
   | "maximize"
   | "menu"
   | "reply"
   | "microphone"
+  | "microphoneOff"
   | "minimize"
   | "monitor"
   | "monitorOff"
@@ -72,11 +76,13 @@ const icons: Record<IconName, LucideIcon> = {
   chevron: ChevronDown,
   hash: Hash,
   headphones: Headphones,
+  headphonesOff: HeadphoneOff,
   logout: LogOut,
   maximize: Maximize2,
   menu: Menu,
   reply: MessageSquareReply,
   microphone: Mic,
+  microphoneOff: MicOff,
   minimize: Minimize2,
   monitor: MonitorUp,
   monitorOff: MonitorOff,

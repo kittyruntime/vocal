@@ -104,6 +104,15 @@ describe("appReducer", () => {
     expect(left.voiceOccupancy).toEqual({});
   });
 
+  it("updates a voice occupant's media status without adding unknown occupants", () => {
+    const participant = { userId: "u1", username: "theo" };
+    const joined = appReducer(initialAppState, { type: "voice/joined", channelId: "c2", participant });
+    const updatedParticipant = { ...participant, microphoneMuted: true, deafened: true };
+    const updated = appReducer(joined, { type: "voice/updated", channelId: "c2", participant: updatedParticipant });
+    expect(updated.voiceOccupancy.c2).toEqual([updatedParticipant]);
+    expect(appReducer(updated, { type: "voice/updated", channelId: "c2", participant: { userId: "u2", username: "alice" } })).toBe(updated);
+  });
+
   it("connection/status updates the status", () => {
     const state = appReducer(initialAppState, { type: "connection/status", status: "open" });
     expect(state.connectionStatus).toBe("open");

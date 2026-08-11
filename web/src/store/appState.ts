@@ -47,6 +47,7 @@ export type AppAction =
   | { type: "voice/sync"; channels: Record<string, VoiceParticipant[]>; preserveChannelId?: string | null }
   | { type: "voice/channel-synced"; channelId: string; participants: VoiceParticipant[] }
   | { type: "voice/joined"; channelId: string; participant: VoiceParticipant }
+  | { type: "voice/updated"; channelId: string; participant: VoiceParticipant }
   | { type: "voice/left"; channelId: string; userId: string }
   | { type: "voice/speaking"; userIds: string[] }
   | { type: "connection/status"; status: ConnectionStatus };
@@ -147,6 +148,11 @@ export function appReducer(state: AppState, action: AppAction): AppState {
           [action.channelId]: [...occupants, action.participant],
         },
       };
+    }
+    case "voice/updated": {
+      const occupants = state.voiceOccupancy[action.channelId] ?? [];
+      if (!occupants.some((participant) => participant.userId === action.participant.userId)) return state;
+      return { ...state, voiceOccupancy: { ...state.voiceOccupancy, [action.channelId]: occupants.map((participant) => participant.userId === action.participant.userId ? action.participant : participant) } };
     }
     case "voice/left": {
       const occupants = (state.voiceOccupancy[action.channelId] ?? []).filter(

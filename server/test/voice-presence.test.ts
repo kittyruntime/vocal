@@ -44,4 +44,14 @@ describe("voice presence", () => {
     expect(() => presence.leave("c1", "u1")).not.toThrow();
     expect(presence.occupants("c1")).toEqual([]);
   });
+
+  it("updates media status only for an occupant of that channel", () => {
+    const presence = createVoicePresence();
+    presence.join("c1", { userId: "u1", username: "Theo" });
+    expect(presence.update("c1", "u1", { microphoneMuted: true, deafened: true })).toEqual({
+      userId: "u1", username: "Theo", microphoneMuted: true, deafened: true,
+    });
+    expect(presence.occupants("c1")[0]).toMatchObject({ microphoneMuted: true, deafened: true });
+    expect(presence.update("c2", "u1", { microphoneMuted: false, deafened: false })).toBeNull();
+  });
 });

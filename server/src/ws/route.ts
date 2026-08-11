@@ -103,6 +103,15 @@ export function registerWsRoute(
         const requiredCapability = await channelRequiredCapability(pool, value.channelId);
         if (requiredCapability === undefined || (requiredCapability && !user.capabilities.includes(requiredCapability))) return;
         hub.broadcastToCapability(requiredCapability, { type: "typing.updated", channelId: value.channelId, userId: user.id, username: user.username, active: value.active });
+        return;
+      }
+      if (typeof event === "object" && event !== null && (event as { type?: unknown }).type === "voice.status") {
+        const value = event as { channelId?: unknown; microphoneMuted?: unknown; deafened?: unknown };
+        if (typeof value.channelId !== "string" || typeof value.microphoneMuted !== "boolean" || typeof value.deafened !== "boolean") return;
+        const requiredCapability = await channelRequiredCapability(pool, value.channelId);
+        if (requiredCapability === undefined || (requiredCapability && !user.capabilities.includes(requiredCapability))) return;
+        const participant = voicePresence.update(value.channelId, user.id, { microphoneMuted: value.microphoneMuted, deafened: value.deafened });
+        if (participant) hub.broadcastToCapability(requiredCapability, { type: "voice.updated", channelId: value.channelId, participant });
       }
     });
 

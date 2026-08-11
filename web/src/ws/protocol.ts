@@ -1,6 +1,12 @@
 import type { Channel, Message } from "../api/client";
 
-export type VoiceParticipant = { userId: string; username: string; avatarUrl?: string | null };
+export type VoiceParticipant = {
+  userId: string;
+  username: string;
+  avatarUrl?: string | null;
+  microphoneMuted?: boolean;
+  deafened?: boolean;
+};
 
 export type ServerEvent =
   | { type: "presence.sync"; userIds: string[] }
@@ -14,7 +20,8 @@ export type ServerEvent =
   | { type: "channel.deleted"; channelId: string }
   | { type: "voice.sync"; channels: Record<string, VoiceParticipant[]> }
   | { type: "voice.joined"; channelId: string; participant: VoiceParticipant }
+  | { type: "voice.updated"; channelId: string; participant: VoiceParticipant }
   | { type: "voice.left"; channelId: string; userId: string }
   | { type: "pong" };
 
-export type ClientEvent = { type: "ping" } | { type: "typing.update"; channelId: string; active: boolean };
+export type ClientEvent = { type: "ping" } | { type: "typing.update"; channelId: string; active: boolean } | { type: "voice.status"; channelId: string; microphoneMuted: boolean; deafened: boolean };

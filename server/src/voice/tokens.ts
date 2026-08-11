@@ -27,6 +27,7 @@ export async function mintVoiceToken(
     room: input.channelId,
     canPublish: input.canPublish,
     canSubscribe: true,
+    canUpdateOwnMetadata: true,
   });
   const token = await at.toJwt();
   return { token, url: config.url };

@@ -26,7 +26,7 @@ function renderSidebar(user: CurrentUser, onSelect = vi.fn(), onCreated = vi.fn(
         channels={channels}
         selectedChannelId="c1"
         onlineUserIds={["u1"]}
-        voiceOccupancy={{ c2: [{ userId: "u1", username: "theo" }, { userId: "u2", username: "alice" }] }}
+        voiceOccupancy={{ c2: [{ userId: "u1", username: "theo", microphoneMuted: true }, { userId: "u2", username: "alice", deafened: true }] }}
         unreadChannelIds={unreadChannelIds}
         currentUser={user}
         onSelectChannel={onSelect}
@@ -47,6 +47,8 @@ describe("Sidebar", () => {
     expect(screen.getByText("1 online")).toBeInTheDocument();
     expect(screen.getByText("theo (you)")).toBeInTheDocument();
     expect(screen.getByText("alice")).toBeInTheDocument();
+    expect(screen.getByLabelText("theo: microphone muted")).toBeInTheDocument();
+    expect(screen.getByLabelText("alice: microphone on, sound muted")).toBeInTheDocument();
   });
 
   it("calls onSelectChannel when a channel is clicked", async () => {
