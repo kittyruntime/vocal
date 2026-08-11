@@ -1,17 +1,19 @@
 import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
-import type { CurrentUser, SoundEvent, SoundSettings, SoundVolumes } from "../api/client";
+import type { CurrentUser, SoundEvent, SoundSettings, SoundVolumes, UserSoundSettings } from "../api/client";
 import { SOUND_EVENTS } from "../api/client";
 import * as api from "../api/client";
 import { configureSounds, previewSound } from "../audio/sounds";
 import { Icon } from "../ui/Icon";
 
 const MAX_AVATAR_BYTES = 512 * 1024;
+const MAX_SOUND_BYTES = 5 * 1024 * 1024;
 const SOUND_EVENT_LABEL: Record<SoundEvent, string> = {
   message: "Message received",
   userJoin: "Voice join",
   userLeave: "Voice leave",
   muteToggle: "Microphone mute/unmute",
   forceMuted: "Force-muted by a moderator",
+  screenShare: "Screen sharing",
 };
 const DEFAULT_SOUND_SETTINGS: SoundSettings = Object.fromEntries(
   SOUND_EVENTS.map((event) => [event, { enabled: true, hasCustom: false }]),
@@ -19,6 +21,9 @@ const DEFAULT_SOUND_SETTINGS: SoundSettings = Object.fromEntries(
 const DEFAULT_SOUND_VOLUMES: SoundVolumes = Object.fromEntries(
   SOUND_EVENTS.map((event) => [event, 55]),
 ) as SoundVolumes;
+const DEFAULT_USER_SOUND_SETTINGS: UserSoundSettings = Object.fromEntries(
+  SOUND_EVENTS.map((event) => [event, { hasCustom: false }]),
+) as UserSoundSettings;
 
 export function ProfileModal({ currentUser, onClose, onSaved }: {
   currentUser: CurrentUser;
@@ -36,10 +41,12 @@ export function ProfileModal({ currentUser, onClose, onSaved }: {
   const bannerInputRef = useRef<HTMLInputElement>(null);
   const [soundSettings, setSoundSettings] = useState<SoundSettings>(DEFAULT_SOUND_SETTINGS);
   const [soundVolumes, setSoundVolumes] = useState<SoundVolumes>(DEFAULT_SOUND_VOLUMES);
+  const [userSoundSettings, setUserSoundSettings] = useState<UserSoundSettings>(DEFAULT_USER_SOUND_SETTINGS);
+  const soundInputRefs = useRef<Partial<Record<SoundEvent, HTMLInputElement | null>>>({});
 
   useEffect(() => {
-    void Promise.all([api.getSoundSettings(), api.getMySoundVolumes()])
-      .then(([nextSettings, nextVolumes]) => { setSoundSettings(nextSettings); setSoundVolumes(nextVolumes); })
+    void Promise.all([api.getSoundSettings(), api.getMySoundVolumes(), api.getMySoundSettings()])
+      .then(([nextSettings, nextVolumes, nextUserSettings]) => { setSoundSettings(nextSettings); setSoundVolumes(nextVolumes); setUserSoundSettings(nextUserSettings); })
       .catch(() => {});
   }, []);
 
@@ -48,8 +55,35 @@ export function ProfileModal({ currentUser, onClose, onSaved }: {
     try {
       const freshVolumes = await api.updateMySoundVolume(event, volume);
       setSoundVolumes(freshVolumes);
-      configureSounds(soundSettings, freshVolumes);
+      configureSounds(soundSettings, freshVolumes, userSoundSettings);
     } catch { /* keep the optimistic local value; a transient failure isn't worth surfacing here */ }
+  }
+
+  function uploadSound(event: SoundEvent, file: File) {
+    if (!/^audio\/(mpeg|ogg|wav|webm)$/.test(file.type)) return setError("Choose an MP3, OGG, WAV or WebM audio file.");
+    if (file.size > MAX_SOUND_BYTES) return setError("The sound file must be smaller than 5 MB.");
+    const reader = new FileReader();
+    reader.onload = () => {
+      const audioData = typeof reader.result === "string" ? reader.result : null;
+      if (!audioData) return;
+      void api.updateMySoundSetting(event, audioData).then((setting) => {
+        const next = { ...userSoundSettings, [event]: setting };
+        setUserSoundSettings(next);
+        configureSounds(soundSettings, soundVolumes, next);
+        setError("");
+      }).catch(() => setError("The personal sound could not be uploaded."));
+    };
+    reader.onerror = () => setError("The sound file could not be read.");
+    reader.readAsDataURL(file);
+  }
+
+  async function resetSound(event: SoundEvent) {
+    try {
+      const setting = await api.updateMySoundSetting(event, null);
+      const next = { ...userSoundSettings, [event]: setting };
+      setUserSoundSettings(next);
+      configureSounds(soundSettings, soundVolumes, next);
+    } catch { setError("The personal sound could not be reset."); }
   }
 
   useEffect(() => {
@@ -149,7 +183,7 @@ export function ProfileModal({ currentUser, onClose, onSaved }: {
           </div>
           <div className="settings-section sound-volume-section">
             <h3>Notification sounds</h3>
-            <p className="admin-setting-description">Adjust how loud each sound plays for you. The server admin controls which sounds are enabled.</p>
+            <p className="admin-setting-description">Choose your own sound and volume for every event. Server settings remain the fallback and control which sounds are enabled.</p>
             <div className="sound-volume-list">
               {SOUND_EVENTS.map((event) => (
                 <div className="sound-volume-row" key={event}>
@@ -166,7 +200,10 @@ export function ProfileModal({ currentUser, onClose, onSaved }: {
                       onMouseUp={(evt) => void saveVolume(event, Number((evt.target as HTMLInputElement).value))}
                       onKeyUp={(evt) => void saveVolume(event, Number((evt.target as HTMLInputElement).value))}
                     />
-                    <button type="button" aria-label={`Preview ${SOUND_EVENT_LABEL[event]}`} onClick={() => previewSound(event, soundSettings[event].hasCustom, soundVolumes[event])}><Icon name="volume" size={15} /></button>
+                    <button type="button" aria-label={`Preview ${SOUND_EVENT_LABEL[event]}`} onClick={() => previewSound(event, soundSettings[event].hasCustom, soundVolumes[event], userSoundSettings[event].hasCustom)}><Icon name="volume" size={15} /></button>
+                    <input aria-label={`${SOUND_EVENT_LABEL[event]} sound file`} ref={(element) => { soundInputRefs.current[event] = element; }} className="sr-only" type="file" accept="audio/mpeg,audio/ogg,audio/wav,audio/webm" onChange={(evt) => { const file = evt.target.files?.[0]; evt.target.value = ""; if (file) uploadSound(event, file); }} />
+                    <button type="button" aria-label={`Upload ${SOUND_EVENT_LABEL[event]}`} onClick={() => soundInputRefs.current[event]?.click()}><Icon name="upload" size={15} /></button>
+                    {userSoundSettings[event].hasCustom ? <button type="button" aria-label={`Reset ${SOUND_EVENT_LABEL[event]}`} onClick={() => void resetSound(event)}><Icon name="trash" size={15} /></button> : null}
                   </div>
                 </div>
               ))}

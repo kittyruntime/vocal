@@ -235,6 +235,8 @@ describe("VoiceView", () => {
 
     await user.click(screen.getByRole("button", { name: "Share screen" }));
     expect(setScreenShareEnabled).toHaveBeenCalledWith(true, expect.any(Object), expect.any(Object));
+    expect(setScreenShareEnabled).toHaveBeenCalledWith(true, expect.objectContaining({ audio: true }), expect.any(Object));
+    expect(playAppSound).toHaveBeenCalledWith("screenShare");
     expect(screen.getByRole("button", { name: "Stop sharing" })).toBeInTheDocument();
   });
 
@@ -400,6 +402,7 @@ describe("VoiceView", () => {
     setScreenShareEnabled.mockRejectedValueOnce(Object.assign(new Error("cancel"), { name: "NotAllowedError" }));
     await user.click(screen.getByRole("button", { name: "Share screen" }));
     await screen.findByText("Screen share cancelled.");
+    expect(playAppSound).not.toHaveBeenCalledWith("screenShare");
   });
 
   it("configures push-to-talk from voice settings", async () => {
