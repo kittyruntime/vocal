@@ -36,6 +36,7 @@ import { shouldOpenVoiceGate, VoiceGateProcessor } from "./VoiceGateProcessor";
 type VoiceStatus = "idle" | "connecting" | "connected" | "reconnecting";
 type NetworkQuality = "good" | "poor" | "lost";
 type NetworkStats = { rttMs: number | null; packetLossPercent: number | null };
+type ScreenAudioParticipant = { identity: string; name: string; trackSid: string };
 type MediaKind = "microphone" | "camera" | "screen";
 type DeviceSelections = Partial<Record<MediaDeviceKind, string>>;
 type CallParticipant = {
@@ -60,6 +61,13 @@ const DEAFENED_ATTRIBUTE = "vocal.deafened";
 
 function loadLiveKit() {
   return import("livekit-client");
+}
+
+function supportsScreenShareAudio(): boolean {
+  // Firefox currently exposes getDisplayMedia but does not provide source/system
+  // audio tracks. Asking LiveKit to publish audio can make the whole operation
+  // fail instead of returning the usable video track.
+  return !/Firefox\//i.test(navigator.userAgent);
 }
 
 function isQuality(value: unknown): value is MediaQuality {
@@ -277,11 +285,14 @@ export function VoiceView({
   const [pinnedTileId, setPinnedTileId] = useState<string | null>(null);
   const [hideAudioOnly, setHideAudioOnly] = useState(true);
   const [videoParticipantIds, setVideoParticipantIds] = useState<Set<string>>(() => new Set());
+  const [screenAudioParticipants, setScreenAudioParticipants] = useState<ScreenAudioParticipant[]>([]);
+  const [screenAudioVolumes, setScreenAudioVolumes] = useState<Record<string, number>>({});
   const [connectionQuality, setConnectionQuality] = useState<NetworkQuality | null>(null);
   const [networkStats, setNetworkStats] = useState<NetworkStats>({ rttMs: null, packetLossPercent: null });
   const roomRef = useRef<Room | null>(null);
   const voiceViewRef = useRef<HTMLElement>(null);
   const audioRef = useRef<HTMLDivElement>(null);
+  const screenAudioVolumesRef = useRef<Record<string, number>>({});
   const refreshParticipantsRef = useRef<((localState?: { microphoneMuted?: boolean; deafened?: boolean }) => void) | null>(null);
   const remoteVideoRef = useRef<HTMLDivElement>(null);
   const localCameraRef = useRef<HTMLDivElement>(null);
@@ -369,6 +380,16 @@ export function VoiceView({
     remoteVideoRef.current?.replaceChildren();
     localCameraRef.current?.replaceChildren();
     localScreenRef.current?.replaceChildren();
+    setScreenAudioParticipants([]);
+  }
+
+  function setScreenAudioVolume(participantId: string, volume: number) {
+    const next = { ...screenAudioVolumesRef.current, [participantId]: volume };
+    screenAudioVolumesRef.current = next;
+    setScreenAudioVolumes(next);
+    for (const element of audioRef.current?.querySelectorAll<HTMLMediaElement>('audio[data-source="screen-share-audio"]') ?? []) {
+      if (element.dataset.participantId === participantId) element.volume = volume / 100;
+    }
   }
 
   // Shared by every path that ends a room connection (voluntary leave,
@@ -495,9 +516,18 @@ export function VoiceView({
     ) => {
       if (track.kind === Track.Kind.Audio) {
         if (audioRef.current?.querySelector(`[data-track-sid="${track.sid}"]`)) return;
+        const trackSid = track.sid ?? publication.trackSid ?? `${participant.identity}:screen-audio`;
         const element = track.attach();
-        element.dataset.trackSid = track.sid;
+        element.dataset.trackSid = trackSid;
+        element.dataset.participantId = participant.identity;
         element.muted = deafenedRef.current;
+        if (publication.source === Track.Source.ScreenShareAudio) {
+          element.dataset.source = "screen-share-audio";
+          element.volume = (screenAudioVolumesRef.current[participant.identity] ?? 100) / 100;
+          setScreenAudioParticipants((participants) => participants.some((entry) => entry.trackSid === trackSid)
+            ? participants
+            : [...participants, { identity: participant.identity, name: participant.name || participant.identity, trackSid }]);
+        }
         audioRef.current?.append(element);
         return;
       }
@@ -537,6 +567,10 @@ export function VoiceView({
         if ((child as HTMLElement).dataset.trackSid === track.sid) child.remove();
       }
       setPinnedTileId((value) => value === track.sid ? null : value);
+      if (publication.source === Track.Source.ScreenShareAudio) {
+        const trackSid = track.sid ?? publication.trackSid;
+        setScreenAudioParticipants((participants) => participants.filter((entry) => entry.trackSid !== trackSid));
+      }
       if (track.kind === Track.Kind.Video) syncRemoteVideoCounts();
     });
     room.on(RoomEvent.LocalTrackUnpublished, (publication: LocalTrackPublication) => {
@@ -844,7 +878,11 @@ export function VoiceView({
     const previousTrack = room.localParticipant.getTrackPublication(Track.Source.ScreenShare)?.track;
     try {
       const profile = screenProfiles[settings.screenQuality];
-      const publication = await room.localParticipant.setScreenShareEnabled(enabled, profile.capture, profile.publish);
+      const audioSupported = supportsScreenShareAudio();
+      const captureOptions = enabled
+        ? { ...profile.capture, audio: audioSupported, ...(audioSupported ? { systemAudio: "include" as const } : {}) }
+        : profile.capture;
+      const publication = await room.localParticipant.setScreenShareEnabled(enabled, captureOptions, profile.publish);
       localScreenRef.current?.replaceChildren();
       if (enabled && publication?.track) {
         const element = publication.track.attach();
@@ -861,6 +899,7 @@ export function VoiceView({
       }
       setScreenShareEnabled(enabled);
       playAppSound("screenShare");
+      if (enabled && !audioSupported) showToast("Firefox does not support sharing tab or system audio. Sharing video only.");
       if (!enabled) setPinnedTileId((value) => value === "local-screen" ? null : value);
     } catch (error) {
       showToast(describeMediaError(MediaDeviceFailure, error, "screen"));
@@ -1001,6 +1040,14 @@ export function VoiceView({
           <div ref={remoteVideoRef} className="remote-videos" />
         </div>
         {hasVideo && !hideAudioOnly && audioOnlyParticipants.length > 0 ? <div className="voice-audio-strip">{audioOnlyParticipants.map((participant) => <button type="button" key={participant.identity} onClick={() => onViewProfile?.(participant.identity)}><span className={`member-avatar ${activeSpeakerIds.has(participant.identity) ? "is-speaking" : ""}`}>{participant.avatarUrl ? <img src={participant.avatarUrl} alt="" /> : participant.name[0].toUpperCase()}</span><span>{participant.name}{participant.local ? " (you)" : ""}</span><span className="voice-media-status" aria-label={`${participant.name}: ${participant.microphoneMuted ? "microphone muted" : "microphone on"}${participant.deafened ? ", sound muted" : ""}`}>{participant.microphoneMuted ? <Icon name="microphoneOff" size={14} /> : null}{participant.deafened ? <Icon name="headphonesOff" size={14} /> : null}</span></button>)}</div> : null}
+        {screenAudioParticipants.length > 0 ? (
+          <div className="screen-audio-mixer" aria-label="Screen share audio controls">
+            {screenAudioParticipants.map((participant) => {
+              const volume = screenAudioVolumes[participant.identity] ?? 100;
+              return <label key={participant.trackSid}><span><Icon name="volume" size={15} /> {participant.name}</span><input type="range" min={0} max={100} step={5} value={volume} aria-label={`${participant.name} screen share volume`} onChange={(event) => setScreenAudioVolume(participant.identity, Number(event.target.value))} /><small>{volume}%</small></label>;
+            })}
+          </div>
+        ) : null}
         {status === "idle" ? (
           <button type="button" className="voice-primary" onClick={() => void joinRoom()}>
             Join
