@@ -13,8 +13,8 @@ This file is the hand-off point for the current product pass. Update it after ev
 - [x] Global search across messages, attachments, channels and members
 - [x] Configurable, revocable invitation links
 - [x] Voice layouts: pinning, speaker/grid modes, hidden audio-only participants and ordering
-- [ ] Call network diagnostics and automatic quality adaptation — **in progress**
-- [ ] Server-side member pagination, long-list virtualization and LiveKit bundle optimization
+- [x] Call network diagnostics and automatic quality adaptation
+- [ ] Server-side member pagination, long-list virtualization and LiveKit bundle optimization — **next**
 - [ ] Final integration, responsive and deployment verification
 
 ## Delivery notes
@@ -31,37 +31,27 @@ This file is the hand-off point for the current product pass. Update it after ev
 - `search`: permission-aware global search for encrypted messages, attachment names, channels and members, with a responsive command-style modal.
 - `invites`: configurable expiry and use limits, active-link inventory, copy flow, revocation and concurrency-safe consumption.
 - `voice-layouts`: grid/focus modes, click-to-pin media, screen/speaker ordering and an optional audio-only participant strip.
+- `network-diagnostics`: local `ConnectionQuality` tracked via `RoomEvent.ConnectionQualityChanged` and shown as a compact Good/Poor/Lost badge in the voice header (tooltip shows RTT/packet-loss when the browser exposes `remote-inbound-rtp`/`candidate-pair` stats, sampled every 2.5s via `getRTCStatsReport()`); remote video is auto-downgraded to `VideoQuality.LOW` on poor/lost quality and restored to `HIGH` only after 3 consecutive good samples (hysteresis, avoids thrashing), including for tracks subscribed while already downgraded. Also removed automatic voice-channel joining (explicit user request): selecting a voice channel — including switching directly from one voice channel to another while already connected — never auto-connects anymore; it only leaves the previous channel cleanly and always requires an explicit "Join" click. The old `autoJoinedChannelRef` auto-join effect was deleted rather than disabled.
 
 ## Handoff for Claude
 
-Branch state: `main` is clean and synchronized with `origin/main` at `48404c9`.
+Branch state: `main` is clean and synchronized with `origin/main` at `28ea740`.
 
 Last verified test baseline:
 
 - server: 14 files, 99 tests passing;
-- web: 18 files, 127 tests passing;
+- web: 18 files, 132 tests passing;
 - server and web TypeScript checks passing;
 - production web build passing (the existing LiveKit chunk-size warning remains).
 
-Next lot: **call network diagnostics and automatic quality adaptation**. No code for this lot has been written yet. The relevant implementation is concentrated in `web/src/voice/VoiceView.tsx`.
+Next lot: **server-side member pagination, long-list virtualization and LiveKit bundle optimization**. No code for this lot has been written yet.
 
-Useful LiveKit 2.21 APIs already confirmed in the installed dependency:
+Known context for the next lot:
 
-- `RoomEvent.ConnectionQualityChanged` reports `ConnectionQuality` plus the participant;
-- `RemoteTrackPublication.setVideoQuality(VideoQuality)` can lower or restore subscribed remote video quality;
-- remote audio/video tracks expose receiver stats internally through `getStats()` implementations;
-- local tracks expose sender statistics;
-- the room already uses `adaptiveStream: true` and `dynacast: true`.
+- Member/user lists (admin panel, search results, mention autocomplete, etc.) are currently paginated client-side only — worth auditing which server routes return unbounded lists today before adding server-side pagination.
+- Long lists most likely to need virtualization: the admin member list and the chat message list (`web/src/layout/ChatView.tsx` or wherever it now lives) once channels have real message history.
+- `VoiceView` is lazy-loaded already (see the `dist/assets/VoiceView-*.js` chunk in the build output) but is the single largest chunk (~517 kB / ~134 kB gzip) — look at splitting `livekit-client` itself or code-splitting the settings modal / layout-mode UI out of the main chunk.
 
-Suggested implementation:
+Remaining lots after that:
 
-1. Track local connection quality and show a compact Good/Poor/Lost badge in the voice header.
-2. Sample WebRTC candidate-pair and inbound RTP stats every 2–3 seconds while connected; display RTT and packet loss only when the browser exposes them.
-3. When quality becomes poor, call `setVideoQuality(VideoQuality.LOW)` on remote video publications; restore `HIGH` after several consecutive good samples to avoid oscillation.
-4. Clear timers and metrics through the existing `resetCallState()`/room cleanup paths.
-5. Add focused `VoiceView` tests for the quality event and automatic downgrade before committing this lot.
-
-Remaining lots after network diagnostics:
-
-1. Server-side member pagination, long-list/message virtualization, and further LiveKit code splitting.
-2. Full integration pass: responsive behavior, migrations on an existing database, complete tests/build, and deployment documentation verification.
+1. Full integration pass: responsive behavior, migrations on an existing database, complete tests/build, and deployment documentation verification.
