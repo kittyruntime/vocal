@@ -1,6 +1,6 @@
 import type { ComponentProps } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ToastProvider } from "../toast/ToastContext";
 import { VoiceView } from "./VoiceView";
@@ -50,7 +50,7 @@ vi.mock("livekit-client", () => ({
   VideoQuality: { LOW: 0, MEDIUM: 1, HIGH: 2 },
   Track: {
     Kind: { Audio: "audio", Video: "video" },
-    Source: { Camera: "camera", ScreenShare: "screen_share", Microphone: "microphone" },
+    Source: { Camera: "camera", ScreenShare: "screen_share", ScreenShareAudio: "screen_share_audio", Microphone: "microphone" },
   },
   createAudioAnalyser: vi.fn(),
   MediaDeviceFailure: Object.assign(
@@ -280,6 +280,31 @@ describe("VoiceView", () => {
     expect(await screen.findByRole("button", { name: "Enter fullscreen" })).toBeInTheDocument();
   });
 
+  it("plays remote screen-share audio and exposes a per-stream volume control", async () => {
+    await renderView();
+    const audio = document.createElement("audio");
+    const remoteTrack = {
+      kind: "audio",
+      sid: "screen-audio-1",
+      attach: vi.fn(() => audio),
+      detach: vi.fn(() => [audio]),
+    };
+    const publication = { source: "screen_share_audio" };
+    const participant = { identity: "u2", name: "alice" };
+
+    act(() => roomHandlers.get("trackSubscribed")?.(remoteTrack, publication, participant));
+    const slider = await screen.findByLabelText("alice screen share volume");
+    expect(audio.muted).toBe(false);
+    expect(audio.volume).toBe(1);
+
+    fireEvent.change(slider, { target: { value: "35" } });
+    expect(audio.volume).toBe(0.35);
+    expect(screen.getByText("35%")).toBeInTheDocument();
+
+    act(() => roomHandlers.get("trackUnsubscribed")?.(remoteTrack, publication));
+    expect(screen.queryByLabelText("alice screen share volume")).not.toBeInTheDocument();
+  });
+
   it("publishes screen sharing in 1080p60 game mode", async () => {
     await renderView();
     const user = userEvent.setup();
@@ -293,6 +318,18 @@ describe("VoiceView", () => {
       expect.objectContaining({ resolution: expect.objectContaining({ width: 1920, height: 1080, frameRate: 60 }) }),
       expect.objectContaining({ screenShareEncoding: expect.objectContaining({ maxFramerate: 60 }) }),
     );
+  });
+
+  it("falls back to video-only screen sharing on Firefox", async () => {
+    vi.spyOn(window.navigator, "userAgent", "get").mockReturnValue("Mozilla/5.0 Firefox/142.0");
+    await renderView();
+    await userEvent.setup().click(await screen.findByRole("button", { name: "Share screen" }));
+    expect(setScreenShareEnabled).toHaveBeenLastCalledWith(
+      true,
+      expect.objectContaining({ audio: false }),
+      expect.any(Object),
+    );
+    expect(await screen.findByText("Firefox does not support sharing tab or system audio. Sharing video only.")).toBeInTheDocument();
   });
 
   it("opens voice settings in a modal and closes it with Escape", async () => {
