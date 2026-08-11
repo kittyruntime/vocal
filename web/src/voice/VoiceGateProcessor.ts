@@ -1,4 +1,4 @@
-import { Track, type AudioProcessorOptions, type TrackProcessor } from "livekit-client";
+import type { Track, AudioProcessorOptions, TrackProcessor } from "livekit-client";
 
 export const VOICE_GATE_HOLD_MS = 280;
 export function shouldOpenVoiceGate(level: number, threshold: number, now: number, lastActivity: number): boolean {

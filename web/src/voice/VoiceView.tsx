@@ -1,20 +1,29 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
-import {
+// Deliberately type-only: livekit-client is a large SDK (~500 kB), and
+// VoiceView is already its own lazy-loaded chunk (see MainLayout.tsx) that
+// loads as soon as a voice channel is *viewed*. Since joining is never
+// automatic (see joinRoom below), there's no reason to pay for the SDK
+// itself before the user actually clicks "Join" -- every runtime usage of
+// these bindings goes through a dynamic `import("livekit-client")` instead
+// (see loadLiveKit), scoped to the functions that only ever run once a room
+// exists. Type-only imports are erased at compile time, so this costs
+// nothing and doesn't conflict with the same names being used as local
+// values (different namespaces) inside those functions.
+import type {
   ConnectionError,
   ConnectionErrorReason,
   ConnectionQuality,
+  LocalAudioTrack,
+  LocalTrackPublication,
   MediaDeviceFailure,
+  Participant,
+  RemoteParticipant,
+  RemoteTrack,
+  RemoteTrackPublication,
   Room,
   RoomEvent,
   Track,
   VideoQuality,
-  createAudioAnalyser,
-  type LocalAudioTrack,
-  type LocalTrackPublication,
-  type Participant,
-  type RemoteParticipant,
-  type RemoteTrack,
-  type RemoteTrackPublication,
 } from "livekit-client";
 import type { Channel, CurrentUser } from "../api/client";
 import * as api from "../api/client";
@@ -39,6 +48,10 @@ type VoiceSettings = {
 };
 
 const SETTINGS_KEY = "vocal.voice-settings.v1";
+
+function loadLiveKit() {
+  return import("livekit-client");
+}
 
 function isQuality(value: unknown): value is MediaQuality {
   return value === "low" || value === "standard" || value === "high";
@@ -67,17 +80,23 @@ function loadSettings(): VoiceSettings {
   }
 }
 
-const MEDIA_ERROR_MESSAGES: Record<MediaKind, Partial<Record<MediaDeviceFailure, string>> & { default: string }> = {
+// Keyed by the string literal values of the real MediaDeviceFailure enum
+// (verified against livekit-client's own type declarations: PermissionDenied
+// / NotFound / DeviceInUse / Other are stable string enum members) rather
+// than the enum import itself, so this table can be built at module load
+// without pulling in livekit-client -- only `MediaDeviceFailure.getFailure`,
+// the actual classification logic, needs the loaded SDK (see describeMediaError).
+const MEDIA_ERROR_MESSAGES: Record<MediaKind, Partial<Record<"PermissionDenied" | "NotFound" | "DeviceInUse" | "Other", string>> & { default: string }> = {
   microphone: {
-    [MediaDeviceFailure.PermissionDenied]: "Microphone permission denied. Check your browser settings.",
-    [MediaDeviceFailure.NotFound]: "No microphone detected on this device.",
-    [MediaDeviceFailure.DeviceInUse]: "The microphone is already in use by another application.",
+    PermissionDenied: "Microphone permission denied. Check your browser settings.",
+    NotFound: "No microphone detected on this device.",
+    DeviceInUse: "The microphone is already in use by another application.",
     default: "Could not enable the microphone.",
   },
   camera: {
-    [MediaDeviceFailure.PermissionDenied]: "Camera permission denied. Check your browser settings.",
-    [MediaDeviceFailure.NotFound]: "No camera detected on this device.",
-    [MediaDeviceFailure.DeviceInUse]: "The camera is already in use by another application.",
+    PermissionDenied: "Camera permission denied. Check your browser settings.",
+    NotFound: "No camera detected on this device.",
+    DeviceInUse: "The camera is already in use by another application.",
     default: "Could not enable the camera.",
   },
   screen: {
@@ -86,35 +105,39 @@ const MEDIA_ERROR_MESSAGES: Record<MediaKind, Partial<Record<MediaDeviceFailure,
     // way to tell the two apart, and "cancelled" is by far the more common
     // real-world case for screen sharing (there is no separate persistent OS
     // prompt to actively deny).
-    [MediaDeviceFailure.PermissionDenied]: "Screen share cancelled.",
+    PermissionDenied: "Screen share cancelled.",
     default: "Could not share the screen.",
   },
 };
 
-function describeMediaError(error: unknown, kind: MediaKind): string {
-  const failure = MediaDeviceFailure.getFailure(error);
+function describeMediaError(mediaDeviceFailure: typeof MediaDeviceFailure, error: unknown, kind: MediaKind): string {
+  const failure = mediaDeviceFailure.getFailure(error);
   const messages = MEDIA_ERROR_MESSAGES[kind];
   return (failure && messages[failure]) || messages.default;
 }
 
-const UNREACHABLE_CONNECTION_REASONS = new Set([
-  ConnectionErrorReason.ServerUnreachable,
-  ConnectionErrorReason.WebSocket,
-  ConnectionErrorReason.Timeout,
-]);
-
-function describeJoinError(error: unknown): string {
+function describeJoinError(
+  connectionError: typeof ConnectionError,
+  connectionErrorReason: typeof ConnectionErrorReason,
+  mediaDeviceFailure: typeof MediaDeviceFailure,
+  error: unknown,
+): string {
   if (error instanceof api.ApiError) {
     return error.message === "not a voice channel"
       ? "This channel is not a voice channel"
       : `Voice connection refused: ${error.message}`;
   }
-  if (error instanceof ConnectionError) {
-    return UNREACHABLE_CONNECTION_REASONS.has(error.reason)
+  if (error instanceof connectionError) {
+    const unreachableReasons: ConnectionErrorReason[] = [
+      connectionErrorReason.ServerUnreachable,
+      connectionErrorReason.WebSocket,
+      connectionErrorReason.Timeout,
+    ];
+    return unreachableReasons.includes(error.reason)
       ? "Network connection failed. Check your connection and try again."
       : "Could not join the voice channel";
   }
-  return describeMediaError(error, "microphone");
+  return describeMediaError(mediaDeviceFailure, error, "microphone");
 }
 
 // How often to sample WebRTC stats for the RTT/packet-loss readout while
@@ -125,14 +148,14 @@ const STATS_SAMPLE_INTERVAL_MS = 2500;
 // flapping between poor/good doesn't thrash video quality back and forth.
 const GOOD_STREAK_TO_RESTORE_QUALITY = 3;
 
-function mapConnectionQuality(quality: ConnectionQuality): NetworkQuality | null {
+function mapConnectionQuality(connectionQuality: typeof ConnectionQuality, quality: ConnectionQuality): NetworkQuality | null {
   switch (quality) {
-    case ConnectionQuality.Excellent:
-    case ConnectionQuality.Good:
+    case connectionQuality.Excellent:
+    case connectionQuality.Good:
       return "good";
-    case ConnectionQuality.Poor:
+    case connectionQuality.Poor:
       return "poor";
-    case ConnectionQuality.Lost:
+    case connectionQuality.Lost:
       return "lost";
     default:
       return null;
@@ -281,7 +304,7 @@ export function VoiceView({
     setAudioLevel(0);
   }
 
-  function startMeter(track: LocalAudioTrack) {
+  function startMeter(createAudioAnalyser: typeof import("livekit-client").createAudioAnalyser, track: LocalAudioTrack) {
     stopMeter();
     try {
       const analyser = createAudioAnalyser(track, { cloneTrack: true, smoothingTimeConstant: 0.7 });
@@ -433,6 +456,18 @@ export function VoiceView({
     if (status !== "idle") return;
     setStatus("connecting");
     reconnectingRef.current = false;
+    let liveKit: Awaited<ReturnType<typeof loadLiveKit>>;
+    try {
+      liveKit = await loadLiveKit();
+    } catch {
+      setStatus("idle");
+      showToast("Could not load voice chat. Check your connection and try again.");
+      return;
+    }
+    const {
+      Room, RoomEvent, Track, VideoQuality, ConnectionQuality,
+      ConnectionError, ConnectionErrorReason, MediaDeviceFailure, createAudioAnalyser,
+    } = liveKit;
     const room = new Room({ adaptiveStream: true, dynacast: true });
     roomRef.current = room;
 
@@ -509,7 +544,7 @@ export function VoiceView({
     });
     room.on(RoomEvent.ConnectionQualityChanged, (quality: ConnectionQuality, participant: Participant) => {
       if (!participant.isLocal) return;
-      const mapped = mapConnectionQuality(quality);
+      const mapped = mapConnectionQuality(ConnectionQuality, quality);
       setConnectionQuality(mapped);
       if (mapped === "poor" || mapped === "lost") {
         goodQualityStreakRef.current = 0;
@@ -584,7 +619,7 @@ export function VoiceView({
       const microphone = await room.localParticipant.setMicrophoneEnabled(!settings.pushToTalk, audioProfile.capture, audioProfile.publish);
       setMicrophoneEnabled(!settings.pushToTalk);
       if (microphone?.audioTrack) {
-        startMeter(microphone.audioTrack);
+        startMeter(createAudioAnalyser, microphone.audioTrack);
         if (!settings.pushToTalk) await installVoiceGate(microphone.audioTrack);
       }
       setDevices(await Room.getLocalDevices(undefined, false));
@@ -597,7 +632,7 @@ export function VoiceView({
       setStatus("idle");
       setMicrophoneEnabled(false);
       stopMeter();
-      showToast(describeJoinError(error));
+      showToast(describeJoinError(ConnectionError, ConnectionErrorReason, MediaDeviceFailure, error));
     }
   }
 
@@ -643,7 +678,10 @@ export function VoiceView({
       const profile = audioProfiles[settings.audioQuality];
       void room.localParticipant.setMicrophoneEnabled(pressed, profile.capture, profile.publish).then(() => {
         setMicrophoneEnabled(pressed);
-      }).catch((error) => showToast(describeMediaError(error, "microphone")));
+      }).catch(async (error) => {
+        const { MediaDeviceFailure } = await loadLiveKit();
+        showToast(describeMediaError(MediaDeviceFailure, error, "microphone"));
+      });
     };
     const isTyping = (target: EventTarget | null) => {
       const element = target as HTMLElement | null;
@@ -680,7 +718,8 @@ export function VoiceView({
       await room.localParticipant.setMicrophoneEnabled(enabled, profile.capture, profile.publish);
       setMicrophoneEnabled(enabled);
     } catch (error) {
-      showToast(describeMediaError(error, "microphone"));
+      const { MediaDeviceFailure } = await loadLiveKit();
+      showToast(describeMediaError(MediaDeviceFailure, error, "microphone"));
     }
   }
 
@@ -696,6 +735,7 @@ export function VoiceView({
   async function toggleCamera() {
     const room = roomRef.current;
     if (!room || (status !== "connected" && status !== "reconnecting")) return;
+    const { Track, MediaDeviceFailure } = await loadLiveKit();
     const enabled = !cameraEnabled;
     const previousTrack = room.localParticipant.getTrackPublication(Track.Source.Camera)?.track;
     try {
@@ -718,13 +758,14 @@ export function VoiceView({
       setCameraEnabled(enabled);
       if (!enabled) setPinnedTileId((value) => value === "local-camera" ? null : value);
     } catch (error) {
-      showToast(describeMediaError(error, "camera"));
+      showToast(describeMediaError(MediaDeviceFailure, error, "camera"));
     }
   }
 
   async function toggleScreenShare() {
     const room = roomRef.current;
     if (!room || (status !== "connected" && status !== "reconnecting")) return;
+    const { Track, MediaDeviceFailure } = await loadLiveKit();
     const enabled = !screenShareEnabled;
     const previousTrack = room.localParticipant.getTrackPublication(Track.Source.ScreenShare)?.track;
     try {
@@ -747,7 +788,7 @@ export function VoiceView({
       setScreenShareEnabled(enabled);
       if (!enabled) setPinnedTileId((value) => value === "local-screen" ? null : value);
     } catch (error) {
-      showToast(describeMediaError(error, "screen"));
+      showToast(describeMediaError(MediaDeviceFailure, error, "screen"));
     }
   }
 
@@ -794,10 +835,12 @@ export function VoiceView({
     let cancelled = false;
     async function sample() {
       const room = roomRef.current;
-      const track = room?.localParticipant.getTrackPublication(Track.Source.Microphone)?.track
-        ?? room?.localParticipant.getTrackPublication(Track.Source.Camera)?.track
-        ?? room?.localParticipant.getTrackPublication(Track.Source.ScreenShare)?.track;
-      if (!track) return;
+      if (!room) return;
+      const { Track } = await loadLiveKit();
+      const track = room.localParticipant.getTrackPublication(Track.Source.Microphone)?.track
+        ?? room.localParticipant.getTrackPublication(Track.Source.Camera)?.track
+        ?? room.localParticipant.getTrackPublication(Track.Source.ScreenShare)?.track;
+      if (!track || cancelled) return;
       let report: RTCStatsReport | undefined;
       try {
         report = await track.getRTCStatsReport();
