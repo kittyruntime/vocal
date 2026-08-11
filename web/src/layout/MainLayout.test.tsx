@@ -12,6 +12,8 @@ vi.mock("../api/client", async () => {
     listChannels: vi.fn(),
     listMessages: vi.fn(),
     getChatSettings: vi.fn(),
+    getSoundSettings: vi.fn(),
+    getMySoundVolumes: vi.fn(),
     // MainLayout receives currentUser as a prop, but it still mounts inside AuthProvider
     // (to reach useAuth().signOut), whose own bootstrap effect calls getSetupStatus/getMe.
     // Mock those too so that effect doesn't fire real, unmocked fetches during this test.
@@ -52,6 +54,14 @@ beforeEach(() => {
   vi.mocked(api.listChannels).mockResolvedValue([generalChannel]);
   vi.mocked(api.listMessages).mockResolvedValue([]);
   vi.mocked(api.getChatSettings).mockResolvedValue({ maxImageSizeMb: 5, maxFileSizeMb: 10, maxMessageLength: 4000 });
+  vi.mocked(api.getSoundSettings).mockResolvedValue({
+    message: { enabled: true, hasCustom: false },
+    userJoin: { enabled: true, hasCustom: false },
+    userLeave: { enabled: true, hasCustom: false },
+    muteToggle: { enabled: true, hasCustom: false },
+    forceMuted: { enabled: true, hasCustom: false },
+  });
+  vi.mocked(api.getMySoundVolumes).mockResolvedValue({ message: 55, userJoin: 55, userLeave: 55, muteToggle: 55, forceMuted: 55 });
   vi.mocked(api.getSetupStatus).mockResolvedValue({ done: true });
   vi.mocked(api.getMe).mockResolvedValue(admin);
 });
@@ -97,6 +107,13 @@ describe("MainLayout", () => {
       message: { id: "m1", channelId: "c1", userId: "u1", username: "theo", content: "salut", createdAt: "2026-01-01T00:00:00Z" },
     });
     expect(await screen.findByText("salut")).toBeInTheDocument();
+  });
+
+  it("loads sound settings and the user's sound volumes on mount", async () => {
+    renderLayout();
+    await screen.findByRole("button", { name: "général" });
+    expect(api.getSoundSettings).toHaveBeenCalled();
+    expect(api.getMySoundVolumes).toHaveBeenCalled();
   });
 
 });
