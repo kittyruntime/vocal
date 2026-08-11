@@ -13,8 +13,21 @@ vi.mock("../api/client", async () => {
 const admin: CurrentUser = { id: "u1", username: "theo", capabilities: ["manage_channels", "manage_server", "moderate", "publish_voice"] };
 const alice: AdminUser = { id: "u2", username: "alice", capabilities: [], createdAt: "now", bannedAt: null, voiceMuted: false };
 
+// Mirrors the server's search + page/limit slicing so tests can exercise
+// pagination and search without caring which of the two drives a given
+// assertion.
+function mockListUsers(users: AdminUser[]) {
+  vi.mocked(api.listAdminUsers).mockImplementation(async (opts) => {
+    const search = opts?.search?.toLocaleLowerCase() ?? "";
+    const filtered = search ? users.filter((user) => user.username.toLocaleLowerCase().includes(search)) : users;
+    const page = opts?.page ?? 1;
+    const limit = opts?.limit ?? filtered.length;
+    return { users: filtered.slice((page - 1) * limit, page * limit), total: filtered.length };
+  });
+}
+
 function renderPanel(users: AdminUser[] = [alice], openMembers = true) {
-  vi.mocked(api.listAdminUsers).mockResolvedValue(users);
+  mockListUsers(users);
   vi.mocked(api.getAdminSettings).mockResolvedValue({ registrationOpen: true, maxImageSizeMb: 5, maxFileSizeMb: 10, maxMessageLength: 4000 });
   vi.mocked(api.listRoles).mockResolvedValue([]);
   const result = render(
@@ -43,6 +56,20 @@ describe("AdminPanel moderation", () => {
     await userEvent.setup().click(screen.getByRole("button", { name: "Next" }));
     expect(screen.getByText("member-9")).toBeInTheDocument();
     expect(screen.getByText("Page 2 of 2")).toBeInTheDocument();
+  });
+
+  it("searches members server-side, debounced, and resets back to page 1", async () => {
+    const members = Array.from({ length: 9 }, (_, index): AdminUser => ({ ...alice, id: `u${index + 2}`, username: `member-${index + 1}` }));
+    renderPanel(members);
+    await screen.findByText("member-8");
+    await userEvent.setup().click(screen.getByRole("button", { name: "Next" }));
+    await screen.findByText("member-9");
+
+    await userEvent.setup().type(screen.getByLabelText("Search members"), "member-9");
+    await waitFor(() => expect(api.listAdminUsers).toHaveBeenLastCalledWith({ search: "member-9", page: 1, limit: 8 }));
+    expect(await screen.findByText("member-9")).toBeInTheDocument();
+    expect(screen.queryByText("member-8")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Page \d of \d/)).not.toBeInTheDocument();
   });
 
   it("kicks a user after confirmation", async () => {

@@ -9,6 +9,11 @@ import type { VoiceAdminService } from "../voice/admin.js";
 
 const capabilitiesSchema = z.object({ capabilities: z.array(z.enum(CAPABILITIES)) });
 const idSchema = z.object({ id: z.uuid() });
+const listUsersQuerySchema = z.object({
+  search: z.string().trim().max(100).optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+});
 const settingsSchema = z.object({
   registrationOpen: z.boolean().optional(),
   maxImageSizeMb: z.number().int().min(1).max(50).optional(),
@@ -85,11 +90,20 @@ export function registerAdminRoutes(
     return { maxImageSizeMb: settings.maxImageSizeMb, maxFileSizeMb: settings.maxFileSizeMb, maxMessageLength: settings.maxMessageLength };
   });
 
-  app.get("/api/admin/users", { preHandler: [app.requireAuth, requireAnyCapability("manage_server", "moderate")] }, async () => {
-    const result = await pool.query<AdminUserRow>(
-      `${adminUserSelect} ORDER BY u.username`,
-    );
-    return result.rows.map(toAdminUser);
+  app.get("/api/admin/users", { preHandler: [app.requireAuth, requireAnyCapability("manage_server", "moderate")] }, async (req, reply) => {
+    const query = listUsersQuerySchema.safeParse(req.query);
+    if (!query.success) return reply.code(400).send({ error: "invalid query" });
+    const { search, page, limit } = query.data;
+    const filter = search ? "WHERE u.username ILIKE $1" : "";
+    const filterParams = search ? [`%${search}%`] : [];
+    const [result, count] = await Promise.all([
+      pool.query<AdminUserRow>(
+        `${adminUserSelect} ${filter} ORDER BY u.username LIMIT $${filterParams.length + 1} OFFSET $${filterParams.length + 2}`,
+        [...filterParams, limit, (page - 1) * limit],
+      ),
+      pool.query<{ count: string }>(`SELECT count(*) FROM users u ${filter}`, filterParams),
+    ]);
+    return { users: result.rows.map(toAdminUser), total: Number(count.rows[0].count) };
   });
 
   app.patch("/api/admin/users/:id", { preHandler: [app.requireAuth, requireCapability("manage_server")] }, async (req, reply) => {
