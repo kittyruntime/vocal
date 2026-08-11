@@ -882,7 +882,29 @@ export function VoiceView({
       const captureOptions = enabled
         ? { ...profile.capture, audio: audioSupported, ...(audioSupported ? { systemAudio: "include" as const } : {}) }
         : profile.capture;
-      const publication = await room.localParticipant.setScreenShareEnabled(enabled, captureOptions, profile.publish);
+      let publication;
+      if (enabled && audioSupported) {
+        const tracks = await room.localParticipant.createScreenTracks(captureOptions);
+        const videoTrack = tracks.find((track) => track.kind === Track.Kind.Video);
+        const audioTrack = tracks.find((track) => track.kind === Track.Kind.Audio);
+        if (!videoTrack) throw new Error("Screen capture did not provide a video track");
+        try {
+          publication = await room.localParticipant.publishTrack(videoTrack, profile.publish);
+        } catch (error) {
+          for (const track of tracks) track.stop();
+          throw error;
+        }
+        if (audioTrack) {
+          try {
+            await room.localParticipant.publishTrack(audioTrack, audioProfiles.high.publish);
+          } catch {
+            audioTrack.stop();
+            showToast("The screen is shared, but its audio could not be published.");
+          }
+        }
+      } else {
+        publication = await room.localParticipant.setScreenShareEnabled(enabled, captureOptions, profile.publish);
+      }
       localScreenRef.current?.replaceChildren();
       if (enabled && publication?.track) {
         const element = publication.track.attach();
