@@ -1,6 +1,17 @@
 import { useEffect, useId, useRef, type KeyboardEvent, type PointerEvent } from "react";
 import { FormField } from "./FormField";
 
+const VALUE_CHANGING_KEYS = new Set([
+  "ArrowUp",
+  "ArrowDown",
+  "ArrowLeft",
+  "ArrowRight",
+  "Home",
+  "End",
+  "PageUp",
+  "PageDown",
+]);
+
 export function RangeSlider({
   label,
   value,
@@ -27,7 +38,12 @@ export function RangeSlider({
     currentValueRef.current = value;
   }, [value]);
 
-  function commit(event: PointerEvent<HTMLInputElement> | KeyboardEvent<HTMLInputElement>) {
+  function commitOnPointerUp(event: PointerEvent<HTMLInputElement>) {
+    onCommit(currentValueRef.current);
+  }
+
+  function commitOnKeyUp(event: KeyboardEvent<HTMLInputElement>) {
+    if (!VALUE_CHANGING_KEYS.has(event.key)) return;
     onCommit(currentValueRef.current);
   }
 
@@ -46,8 +62,8 @@ export function RangeSlider({
           currentValueRef.current = nextValue;
           onChange(nextValue);
         }}
-        onPointerUp={commit}
-        onKeyUp={commit}
+        onPointerUp={commitOnPointerUp}
+        onKeyUp={commitOnKeyUp}
       />
     </FormField>
   );
