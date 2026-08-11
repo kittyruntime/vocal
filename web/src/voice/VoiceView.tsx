@@ -205,6 +205,10 @@ export function VoiceView({
   const [activeSpeakerIds, setActiveSpeakerIds] = useState<Set<string>>(() => new Set());
   const [callParticipants, setCallParticipants] = useState<CallParticipant[]>([]);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [layoutMode, setLayoutMode] = useState<"grid" | "focus">("grid");
+  const [pinnedTileId, setPinnedTileId] = useState<string | null>(null);
+  const [hideAudioOnly, setHideAudioOnly] = useState(true);
+  const [videoParticipantIds, setVideoParticipantIds] = useState<Set<string>>(() => new Set());
   const roomRef = useRef<Room | null>(null);
   const voiceViewRef = useRef<HTMLElement>(null);
   const audioRef = useRef<HTMLDivElement>(null);
@@ -283,6 +287,7 @@ export function VoiceView({
       for (const candidate of candidates) {
         const element = candidate as HTMLElement;
         element.classList.toggle("is-speaking", activeIds.has(element.dataset.participantId ?? ""));
+        element.style.order = activeIds.has(element.dataset.participantId ?? "") ? "-1" : element.classList.contains("screen-share") || element.classList.contains("local-screen") ? "-2" : "0";
       }
     }
   }
@@ -309,6 +314,8 @@ export function VoiceView({
     setRemoteScreenCount(0);
     setActiveSpeakerIds(new Set());
     setCallParticipants([]);
+    setPinnedTileId(null);
+    setVideoParticipantIds(new Set());
     activeSpeakersRef.current.clear();
     stopMeter();
     onSpeakingChange?.([]);
@@ -391,6 +398,7 @@ export function VoiceView({
       const tiles = [...(remoteVideoRef.current?.querySelectorAll<HTMLElement>(".video-tile") ?? [])];
       setRemoteVideoCount(tiles.length);
       setRemoteScreenCount(tiles.filter((tile) => tile.classList.contains("screen-share")).length);
+      setVideoParticipantIds(new Set(tiles.map((tile) => tile.dataset.participantId).filter((value): value is string => Boolean(value))));
     };
 
     const attachRemoteTrack = (
@@ -407,9 +415,12 @@ export function VoiceView({
       if (track.kind !== Track.Kind.Video) return;
       if (remoteVideoRef.current?.querySelector(`[data-track-sid="${track.sid}"]`)) return;
       const tile = document.createElement("figure");
+      const tileId = track.sid ?? publication.trackSid;
       tile.className = publication.source === Track.Source.ScreenShare ? "video-tile screen-share" : "video-tile";
       tile.dataset.trackSid = track.sid;
       tile.dataset.participantId = participant.identity;
+      tile.dataset.tileId = tileId;
+      tile.title = "Click to pin this tile";
       tile.classList.toggle("is-speaking", activeSpeakersRef.current.has(participant.identity));
       const element = track.attach();
       element.setAttribute("playsinline", "");
@@ -417,6 +428,7 @@ export function VoiceView({
       label.textContent = participant.name || participant.identity;
       tile.append(element, label);
       addFullscreenButton(tile);
+      tile.addEventListener("click", () => setPinnedTileId((value) => value === tileId ? null : tileId));
       remoteVideoRef.current?.append(tile);
       syncRemoteVideoCounts();
     };
@@ -432,6 +444,7 @@ export function VoiceView({
       for (const child of remoteVideoRef.current?.children ?? []) {
         if ((child as HTMLElement).dataset.trackSid === track.sid) child.remove();
       }
+      setPinnedTileId((value) => value === track.sid ? null : value);
       if (track.kind === Track.Kind.Video) syncRemoteVideoCounts();
     });
     room.on(RoomEvent.LocalTrackUnpublished, (publication: LocalTrackPublication) => {
@@ -633,11 +646,13 @@ export function VoiceView({
         label.className = "local-video-label";
         label.textContent = `${currentUser.username} (you)`;
         localCameraRef.current?.append(element, label);
+        localCameraRef.current!.dataset.tileId = "local-camera";
         if (localCameraRef.current) addFullscreenButton(localCameraRef.current);
       } else if (!enabled && previousTrack) {
         for (const element of previousTrack.detach()) element.remove();
       }
       setCameraEnabled(enabled);
+      if (!enabled) setPinnedTileId((value) => value === "local-camera" ? null : value);
     } catch (error) {
       showToast(describeMediaError(error, "camera"));
     }
@@ -660,11 +675,13 @@ export function VoiceView({
         label.className = "local-video-label";
         label.textContent = `${currentUser.username} · Screen`;
         localScreenRef.current?.append(element, label);
+        localScreenRef.current!.dataset.tileId = "local-screen";
         if (localScreenRef.current) addFullscreenButton(localScreenRef.current);
       } else if (!enabled && previousTrack) {
         for (const element of previousTrack.detach()) element.remove();
       }
       setScreenShareEnabled(enabled);
+      if (!enabled) setPinnedTileId((value) => value === "local-screen" ? null : value);
     } catch (error) {
       showToast(describeMediaError(error, "screen"));
     }
@@ -689,6 +706,17 @@ export function VoiceView({
     "--video-rows": videoRows,
   } as CSSProperties;
   const localSpeaking = microphoneEnabled && audioLevel >= settings.vadThreshold;
+  const audioOnlyParticipants = callParticipants.filter((participant) => !(participant.local ? cameraEnabled || screenShareEnabled : videoParticipantIds.has(participant.identity)));
+
+  useEffect(() => {
+    for (const tile of voiceViewRef.current?.querySelectorAll<HTMLElement>("[data-tile-id]") ?? []) tile.classList.toggle("is-pinned", tile.dataset.tileId === pinnedTileId);
+  }, [pinnedTileId, remoteVideoCount, cameraEnabled, screenShareEnabled]);
+
+  useEffect(() => {
+    if (layoutMode !== "focus" || pinnedTileId || !hasVideo) return;
+    const preferred = voiceViewRef.current?.querySelector<HTMLElement>(".screen-share[data-tile-id], .local-screen[data-tile-id]:not(:empty), .video-tile[data-tile-id], .local-video[data-tile-id]:not(:empty)");
+    if (preferred?.dataset.tileId) setPinnedTileId(preferred.dataset.tileId);
+  }, [layoutMode, pinnedTileId, hasVideo, remoteVideoCount, cameraEnabled, screenShareEnabled]);
 
   // Deliberately keyed on `status` too: switching directly from one voice
   // channel to another (channel.id changes while still connected) doesn't
@@ -717,6 +745,7 @@ export function VoiceView({
           <Icon name="menu" size={20} />
         </button>
         <span className="header-channel-icon"><Icon name="volume" size={21} /></span> {channel.name}
+        {(status === "connected" || status === "reconnecting") ? <div className="voice-layout-actions"><button type="button" className={layoutMode === "grid" ? "active" : ""} onClick={() => { setLayoutMode("grid"); setPinnedTileId(null); }}>Grid</button><button type="button" className={layoutMode === "focus" ? "active" : ""} onClick={() => setLayoutMode("focus")}>Focus</button>{hasVideo ? <button type="button" className={!hideAudioOnly ? "active" : ""} onClick={() => setHideAudioOnly((value) => !value)}>{hideAudioOnly ? "Show audio" : "Hide audio"}</button> : null}</div> : null}
       </header>
       <div className="voice-stage">
         {status === "idle" || status === "connecting" ? <div className="voice-hero">
@@ -744,11 +773,12 @@ export function VoiceView({
             })}
           </div>
         ) : null}
-        <div className={`video-grid ${hasScreenShare ? "has-screen-share" : ""} ${!hasVideo ? "is-empty" : ""}`} style={videoGridStyle} aria-label="Channel videos">
-          <div ref={localScreenRef} className={`local-video local-screen ${localSpeaking ? "is-speaking" : ""}`} data-participant-id={currentUser.id} />
-          <div ref={localCameraRef} className={`local-video ${localSpeaking ? "is-speaking" : ""}`} data-participant-id={currentUser.id} />
+        <div className={`video-grid layout-${layoutMode} ${pinnedTileId ? "has-pinned-tile" : ""} ${hasScreenShare ? "has-screen-share" : ""} ${!hasVideo ? "is-empty" : ""}`} style={videoGridStyle} aria-label="Channel videos">
+          <div ref={localScreenRef} className={`local-video local-screen ${pinnedTileId === "local-screen" ? "is-pinned" : ""} ${localSpeaking ? "is-speaking" : ""}`} data-participant-id={currentUser.id} onClick={() => screenShareEnabled && setPinnedTileId((value) => value === "local-screen" ? null : "local-screen")} />
+          <div ref={localCameraRef} className={`local-video ${pinnedTileId === "local-camera" ? "is-pinned" : ""} ${localSpeaking ? "is-speaking" : ""}`} data-participant-id={currentUser.id} onClick={() => cameraEnabled && setPinnedTileId((value) => value === "local-camera" ? null : "local-camera")} />
           <div ref={remoteVideoRef} className="remote-videos" />
         </div>
+        {hasVideo && !hideAudioOnly && audioOnlyParticipants.length > 0 ? <div className="voice-audio-strip">{audioOnlyParticipants.map((participant) => <button type="button" key={participant.identity} onClick={() => onViewProfile?.(participant.identity)}><span className={`member-avatar ${activeSpeakerIds.has(participant.identity) ? "is-speaking" : ""}`}>{participant.avatarUrl ? <img src={participant.avatarUrl} alt="" /> : participant.name[0].toUpperCase()}</span><span>{participant.name}{participant.local ? " (you)" : ""}</span></button>)}</div> : null}
         {status === "idle" ? (
           <button type="button" className="voice-primary" onClick={() => void joinRoom()}>
             Join
