@@ -1,6 +1,6 @@
 # Vocal roadmap
 
-Last updated: 2026-08-11
+Last updated: 2026-08-11 (admin-sound-settings)
 
 This file is the hand-off point for the current product pass. Update it after every stable, pushed lot.
 
@@ -18,6 +18,7 @@ This file is the hand-off point for the current product pass. Update it after ev
 - [x] LiveKit bundle deferred until Join click
 - [x] Chat message list bounded (cap, not full virtualization -- see notes below)
 - [x] Final integration: migration verification, deployment docs, responsive audit
+- [x] Admin-configurable notification sounds, two new sound events (mic mute/unmute, moderator force-mute) and per-user volume
 
 All planned lots for this product pass are now delivered. See "Next steps"
 under Handoff for what's left, none of it blocking.
@@ -41,6 +42,7 @@ under Handoff for what's left, none of it blocking.
 - `livekit-deferred-load`: `livekit-client`'s value imports in `VoiceView.tsx` (Room, RoomEvent, Track, ConnectionQuality, VideoQuality, MediaDeviceFailure, ConnectionError/Reason, createAudioAnalyser) switched to type-only imports plus a `loadLiveKit()` → `import("livekit-client")` helper called from `joinRoom()` and every other function that only runs once a room exists. Confirmed via the production build: `VoiceView` chunk dropped from ~517 kB to ~28 kB, with `livekit-client` now its own ~527 kB chunk that only loads on the "Join" click (not just from viewing a voice channel). Full `VoiceView.test.tsx` suite (30 tests) still passes -- `vi.mock("livekit-client")` covers dynamic imports the same as static ones.
 - `chat-message-cap`: `ChatView.tsx` now caps loaded messages at `MAX_LOADED_MESSAGES = 300` per channel instead of growing without bound. `loadMore()` (scroll-up pagination) stops fetching further history once the cap is hit, without ever discarding messages the user might be reading. Separately, once live WebSocket messages push the total over the cap while the user is near the bottom, the oldest messages are trimmed via the existing `onMessagesLoaded` callback. True windowed virtualization (`react-window`) was evaluated and explicitly rejected for this pass -- see the note under Handoff.
 - `final-integration`: added `README.md` (didn't exist before) covering local dev, the full server env-var reference, and a generic production deployment guide around the existing `deploy/*.Dockerfile`/`deploy/nginx.conf` -- both images rebuilt successfully against the current codebase, confirming they weren't stale. Verified `server/src/db/migrate.ts`'s full migration set (001 → 014) applies cleanly on top of realistic pre-existing data: seeded a database at the old `005_moderation.sql` schema with users of every legacy role and channels of every legacy `min_role`, ran the current `migrate()` against it, and confirmed every user/channel/message survived with role/min_role correctly backfilled into capabilities (admin → all 4, moderator → moderate+publish_voice, member → publish_voice; channel min_role → required_capability) and idempotent on re-run. Audited responsive coverage across the newer modals (search, profile, public profile, invite/role managers, emote picker, attachment grids) added since the earlier mobile-nav pass -- found already covered by existing `min(Npx, 100%)` sizing and the 520px/760px breakpoints; no gaps found, no changes made.
+- `admin-sound-settings`: server-wide, per-event sound control from the admin panel plus per-user volume from profile settings. New `server_sounds` table (5 events: `message`, `userJoin`, `userLeave`, and two new ones -- `muteToggle` for the local mic mute/unmute click, `forceMuted` for when a moderator revokes your `publish_voice` while you're connected, detected client-side via livekit-client's `RoomEvent.ParticipantPermissionsChanged`) holds an `enabled` flag and an optional custom-uploaded `audio_data` (data-URL, same storage pattern as avatar/banner) per event; `users.sound_volumes jsonb` holds each user's own 0-100 volume per event, defaulting to 55. New route file `server/src/routes/sounds.ts` (`GET /api/sounds`, `GET /api/sounds/:event/file`, `PATCH /api/admin/sounds/:event` -- `manage_server` only, with its own `bodyLimit: 8 * 1024 * 1024` route override since the server's global Fastify body limit is 2 MB and custom uploads run up to ~7 MB base64 -- and `GET`/`PATCH /api/me/sound-volumes`). `web/src/audio/sounds.ts` rewritten from a hardcoded 3-sound player into a small config-driven engine (`configureSounds`/`previewSound`/`playAppSound`) loaded once on `MainLayout` mount, exactly like `chat-settings` -- no realtime broadcast of admin changes, picked up on next page load by design. Admin panel gets a new "Sounds" tab (enable/disable, upload, preview, reset-to-default per event); the profile modal gets a new "Notification sounds" section with a volume slider (saves on release, not on every drag tick) and preview per event. Two placeholder default audio assets (`mute-toggle.mp3`, `force-muted.mp3`) synthesized with `ffmpeg`. Two real bugs were found and fixed during implementation (not left for a reviewer to catch): the route-level `bodyLimit` gap above, and two test-authoring bugs in the admin-panel test brief (an ambiguous `{name: "On"}` query matching all 5 rows, and a mock-setup call silently clobbered by the test helper's own default mock) -- fixed at the test-mechanics level only, no assertions or component code changed to route around them. Manually verified end-to-end against a live server on an isolated throwaway database (never the shared dev DB): setup, toggle, upload/serve/reset round-trip, and per-user volume update all confirmed working outside the test suite.
 
 ## Security fixes
 
@@ -48,15 +50,16 @@ under Handoff for what's left, none of it blocking.
 
 ## Handoff for Claude
 
-Branch state: `main` is clean and synchronized with `origin/main` at `c14a2ad`.
+Branch state: `admin-sound-settings` lot was built on `worktree-admin-sound-settings`, based off `main` at `1ae9f54` (10 commits ahead), pushed to `origin/worktree-admin-sound-settings`. `main` itself is still at `1ae9f54` -- this branch has not been merged. Decide merge/PR with the user before closing this out (see `superpowers:finishing-a-development-branch`).
 
-Last verified test baseline:
+Last verified test baseline (on `worktree-admin-sound-settings`):
 
-- server: 14 files, 101 tests passing;
-- web: 18 files, 137 tests passing;
+- server: 15 files, 112 tests passing;
+- web: 19 files, 149 tests passing;
 - server and web TypeScript checks passing;
-- production web build passing: `VoiceView` chunk ~28 kB, `livekit-client` split into its own ~527 kB chunk loaded only on Join (the remaining >500 kB chunk-size warning is that livekit-client chunk itself, which is expected -- see `livekit-deferred-load` above);
-- `deploy/server.Dockerfile` and `deploy/web.Dockerfile` both build successfully against the current tree.
+- production web build passing: `VoiceView` chunk ~28 kB (unchanged), `livekit-client` still its own ~527 kB chunk loaded only on Join (the remaining >500 kB chunk-size warning is that livekit-client chunk itself, which is expected -- see `livekit-deferred-load` above); web CSS bundle ~56 kB;
+- `pnpm -C server build` passing;
+- live end-to-end smoke test against a real running server (isolated throwaway database, not the shared dev DB) confirmed the full sound-settings flow outside the test suite -- see `admin-sound-settings` above.
 
 **Why chat messages use a cap instead of true virtualization** (don't re-attempt windowed rendering without reading this first): this test environment (jsdom) implements neither `Element.scrollTo`, `ResizeObserver`, nor a real layout engine (`getBoundingClientRect` always returns zeros). A virtualization library (evaluated: `react-window` v2, a very different and simpler API than v1) depends on all three to measure its container and rows. That means a windowed rewrite of `ChatView.tsx`'s message list could not be verified by any automated test here -- it would ship as a large rewrite of an always-on feature with no working safety net beyond "it typechecks." Asked the user directly; they chose the safer bound (see `chat-message-cap` above) over shipping that risk. If real virtualization is wanted later, it needs to happen where actual browser testing is possible (Playwright against a real browser engine, or manual verification), not here.
 
