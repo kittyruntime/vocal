@@ -27,7 +27,7 @@ beforeEach(() => {
 });
 
 function renderChat(messages: Message[] = [], onLoaded = vi.fn(), onPrepended = vi.fn()) {
-  render(
+  return render(
     <ToastProvider>
       <ChatView channel={channel} messages={messages} onMessagesLoaded={onLoaded} onMessagesPrepended={onPrepended} />
     </ToastProvider>,
@@ -272,5 +272,55 @@ describe("ChatView", () => {
     container.dispatchEvent(new Event("scroll", { bubbles: true }));
     await waitFor(() => expect(onPrepended).toHaveBeenCalledWith([msg("0", "plus vieux", "2025-12-31T00:00:00Z")]));
     expect(api.listMessages).toHaveBeenLastCalledWith("c1", { before: "2026-01-01T00:00:01Z", limit: 50 });
+  });
+
+  it("stops loading older history once the loaded cap is reached, without discarding anything", async () => {
+    vi.mocked(api.listMessages).mockResolvedValueOnce([]);
+    const capped = Array.from({ length: 300 }, (_, i) => msg(`m${i}`, `x${i}`, `2026-01-01T00:${String(i % 60).padStart(2, "0")}:00Z`));
+    const onPrepended = vi.fn();
+    renderChat(capped, vi.fn(), onPrepended);
+    const container = screen.getByRole("log");
+    Object.defineProperty(container, "scrollTop", { value: 10, configurable: true });
+    container.dispatchEvent(new Event("scroll", { bubbles: true }));
+    // Give any (incorrect) async loadMore a turn to run before asserting it didn't.
+    await Promise.resolve();
+    expect(onPrepended).not.toHaveBeenCalled();
+    // The one call is the channel's initial history fetch on mount, not loadMore.
+    expect(api.listMessages).toHaveBeenCalledTimes(1);
+  });
+
+  it("trims the oldest loaded messages once the cap is exceeded while near the bottom", async () => {
+    vi.mocked(api.listMessages).mockResolvedValueOnce([]);
+    const overCap = Array.from({ length: 301 }, (_, i) => msg(`m${i}`, `x${i}`, `2026-01-01T00:${String(i % 60).padStart(2, "0")}:00Z`));
+    const onLoaded = vi.fn();
+    renderChat(overCap, onLoaded, vi.fn());
+    // isNearBottomRef starts true (no scroll event dispatched yet), so the
+    // eviction effect should fire on mount.
+    await waitFor(() => expect(onLoaded).toHaveBeenCalledWith(overCap.slice(1)));
+  });
+
+  it("does not trim messages while the user is scrolled up reading history", async () => {
+    vi.mocked(api.listMessages).mockResolvedValueOnce([]);
+    const atCap = Array.from({ length: 300 }, (_, i) => msg(`m${i}`, `x${i}`, `2026-01-01T00:${String(i % 60).padStart(2, "0")}:00Z`));
+    const onLoaded = vi.fn();
+    const { rerender } = renderChat(atCap, onLoaded, vi.fn());
+
+    const container = screen.getByRole("log");
+    Object.defineProperty(container, "scrollHeight", { value: 5000, configurable: true });
+    Object.defineProperty(container, "clientHeight", { value: 500, configurable: true });
+    Object.defineProperty(container, "scrollTop", { value: 1000, configurable: true, writable: true }); // far from the bottom
+    container.dispatchEvent(new Event("scroll", { bubbles: true }));
+
+    const overCap = [...atCap, msg("new", "live message", "2026-01-01T01:00:00Z")];
+    rerender(
+      <ToastProvider>
+        <ChatView channel={channel} messages={overCap} onMessagesLoaded={onLoaded} onMessagesPrepended={vi.fn()} />
+      </ToastProvider>,
+    );
+
+    await Promise.resolve();
+    // The one call is the channel's initial history fetch on mount; eviction
+    // must not have fired a second call.
+    expect(onLoaded).toHaveBeenCalledTimes(1);
   });
 });
