@@ -68,7 +68,28 @@ describe("messages", () => {
     const downloaded = await app.inject({ method: "GET", url: attachment.url, headers: { cookie: adminCookie } });
     expect(downloaded.statusCode).toBe(200);
     expect(downloaded.headers["content-type"]).toContain("image/png");
+    expect(downloaded.headers["content-disposition"]).toContain("inline");
     expect(downloaded.rawPayload).toEqual(Buffer.from("fake-png"));
+  });
+
+  it("forces an SVG attachment to download instead of rendering inline, even though its declared MIME type starts with image/", async () => {
+    // image/svg+xml is an XML document that can carry <script>/event-handler
+    // content -- serving it inline on this app's own origin (as any other
+    // "image/*" MIME type is) would be a stored XSS via the client-supplied
+    // upload MIME type. It must always come back as a forced download.
+    const svg = "<svg onload=\"alert(document.cookie)\" xmlns=\"http://www.w3.org/2000/svg\"></svg>";
+    const upload = multipartBody({ content: "a trap" }, { name: "evil.svg", type: "image/svg+xml", content: Buffer.from(svg) });
+    const posted = await app.inject({
+      method: "POST", url: `/api/channels/${channelId}/messages`,
+      headers: { cookie: adminCookie, "content-type": upload.contentType }, payload: upload.payload,
+    });
+    const attachment = posted.json().attachments[0];
+
+    const downloaded = await app.inject({ method: "GET", url: attachment.url, headers: { cookie: adminCookie } });
+    expect(downloaded.statusCode).toBe(200);
+    expect(downloaded.headers["content-disposition"]).toContain("attachment");
+    expect(downloaded.headers["x-content-type-options"]).toBe("nosniff");
+    expect(downloaded.headers["content-security-policy"]).toContain("sandbox");
   });
 
   it("returns history most-recent-first and paginates with before", async () => {

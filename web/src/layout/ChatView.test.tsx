@@ -144,6 +144,26 @@ describe("ChatView", () => {
     expect(rendered.map((el) => el.textContent)).toEqual(["premier", "second"]);
   });
 
+  it("renders a raster image attachment inline but an SVG attachment as a plain file download", () => {
+    // The server always forces SVG attachments to download (see the
+    // INLINE_SAFE_MIME_TYPES allowlist in server/src/routes/messages.ts) --
+    // it's an XML document that can carry executable script, unlike a
+    // raster image. The client must not render it as an <img>, which would
+    // either show a broken image (since the response won't render inline)
+    // or, if it ever did render, could execute attacker-supplied script.
+    const withAttachments: Message = {
+      ...msg("1", "", "2026-01-01T00:00:01Z"),
+      attachments: [
+        { id: "a1", filename: "photo.png", mimeType: "image/png", size: 10, url: "/api/attachments/a1" },
+        { id: "a2", filename: "evil.svg", mimeType: "image/svg+xml", size: 20, url: "/api/attachments/a2" },
+      ],
+    };
+    renderChat([withAttachments]);
+    expect(screen.getByAltText("photo.png")).toBeInTheDocument();
+    expect(screen.queryByAltText("evil.svg")).not.toBeInTheDocument();
+    expect(screen.getByText("evil.svg")).toBeInTheDocument();
+  });
+
   it("sends a message and clears the composer", async () => {
     vi.mocked(api.listMessages).mockResolvedValue([]);
     vi.mocked(api.postMessage).mockResolvedValue(msg("1", "salut", "2026-01-01T00:00:01Z"));

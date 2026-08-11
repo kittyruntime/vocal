@@ -5,6 +5,11 @@ import { useToast } from "../toast/ToastContext";
 import { Icon } from "../ui/Icon";
 
 const PAGE_SIZE = 50;
+// Mirrors the server's inline-safe allowlist (server/src/routes/messages.ts)
+// so an SVG attachment -- which the server always forces as a download,
+// since inline SVG can carry executable script -- doesn't render as a
+// (broken) inline image here; it shows as a regular file download instead.
+const INLINE_SAFE_MIME_TYPES = new Set(["image/png", "image/jpeg", "image/gif", "image/webp", "image/avif"]);
 const EMOTES = [
   "😀", "😂", "🥹", "😍", "🥰", "😎", "🤔", "🫡",
   "😭", "😤", "😡", "🤯", "🥳", "😴", "👀", "💀",
@@ -304,7 +309,7 @@ export function ChatView({
               </div>
               {editingId === message.id ? <form className="message-edit-form" onSubmit={(event) => { event.preventDefault(); void saveEdit(message.id); }}><input aria-label="Edit message" value={editDraft} maxLength={maxMessageLength} autoFocus onChange={(event) => setEditDraft(event.target.value)} /><div><button type="button" onClick={() => setEditingId(null)}>Cancel</button><button type="submit">Save</button></div></form> : <MessageContent content={message.content} />}
               {(message.attachments?.length ?? 0) > 0 ? <div className="message-attachments">
-                {message.attachments!.map((attachment) => attachment.mimeType.startsWith("image/") ? (
+                {message.attachments!.map((attachment) => INLINE_SAFE_MIME_TYPES.has(attachment.mimeType) ? (
                   <a key={attachment.id} className="message-image" href={attachment.url} target="_blank" rel="noreferrer">
                     <img src={attachment.url} alt={attachment.filename} loading="lazy" />
                   </a>

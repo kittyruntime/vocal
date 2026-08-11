@@ -7,6 +7,16 @@ import type { WsHub } from "../ws/hub.js";
 import { channelRequiredCapability } from "../channels/lookup.js";
 import type { Capability } from "../capabilities.js";
 
+// MIME types safe to render inline in the browser. Deliberately NOT just
+// "starts with image/": image/svg+xml is an XML document that can carry
+// <script> and event-handler attributes -- browsers execute those when the
+// SVG is opened as a top-level document (e.g. the "open in new tab" link
+// the web client puts on image attachments), which would be a stored XSS
+// on this app's own origin using an attacker-controlled, client-supplied
+// MIME type. Anything outside this allowlist (including SVG) is always
+// served as a forced download instead.
+const INLINE_SAFE_MIME_TYPES = new Set(["image/png", "image/jpeg", "image/gif", "image/webp", "image/avif"]);
+
 const idSchema = z.object({ id: z.uuid() });
 const postSchema = z.object({ content: z.string().max(10000), replyToMessageId: z.uuid().optional() });
 const messageParamsSchema = z.object({ id: z.uuid(), messageId: z.uuid() });
@@ -102,11 +112,13 @@ export function registerMessageRoutes(
     if (attachment.required_capability && !req.user!.capabilities.includes(attachment.required_capability)) {
       return reply.code(403).send({ error: "forbidden" });
     }
-    const disposition = attachment.mime_type.startsWith("image/") ? "inline" : "attachment";
+    const disposition = INLINE_SAFE_MIME_TYPES.has(attachment.mime_type) ? "inline" : "attachment";
     return reply
       .type(attachment.mime_type)
       .header("Content-Disposition", `${disposition}; filename*=UTF-8''${encodeURIComponent(attachment.filename)}`)
       .header("Cache-Control", "private, max-age=3600")
+      .header("X-Content-Type-Options", "nosniff")
+      .header("Content-Security-Policy", "default-src 'none'; sandbox")
       .send(attachment.content);
   });
 
