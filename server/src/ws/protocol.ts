@@ -41,10 +41,11 @@ export type ServerEvent =
   | { type: "message.created"; message: MessagePayload }
   | { type: "message.updated"; message: MessagePayload }
   | { type: "message.deleted"; channelId: string; messageId: string }
+  | { type: "typing.updated"; channelId: string; userId: string; username: string; active: boolean }
   | { type: "channel.created"; channel: ChannelPayload }
   | { type: "channel.deleted"; channelId: string }
   | { type: "voice.sync"; channels: Record<string, VoiceParticipantPayload[]> }
   | { type: "voice.joined"; channelId: string; participant: VoiceParticipantPayload }
   | { type: "voice.left"; channelId: string; userId: string };
 
-export type ClientEvent = { type: "ping" };
+export type ClientEvent = { type: "ping" } | { type: "typing.update"; channelId: string; active: boolean };

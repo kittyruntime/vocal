@@ -1,4 +1,4 @@
-import type { ServerEvent } from "./protocol";
+import type { ClientEvent, ServerEvent } from "./protocol";
 
 export type ConnectionStatus = "connecting" | "open" | "closed";
 
@@ -7,7 +7,7 @@ export type SocketHandlers = {
   onStatusChange(status: ConnectionStatus): void;
 };
 
-export type SocketClient = { close(): void };
+export type SocketClient = { close(): void; send(event: ClientEvent): void };
 
 const INITIAL_BACKOFF_MS = 500;
 const MAX_BACKOFF_MS = 10_000;
@@ -51,6 +51,9 @@ export function createSocketClient(url: string, handlers: SocketHandlers): Socke
   connect();
 
   return {
+    send(event) {
+      if (currentSocket?.readyState === WebSocket.OPEN && typeof currentSocket.send === "function") currentSocket.send(JSON.stringify(event));
+    },
     close() {
       closedByCaller = true;
       if (timer) clearTimeout(timer);
