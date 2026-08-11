@@ -1,6 +1,6 @@
 # Vocal roadmap
 
-Last updated: 2026-08-11 (forms-ui-cleanup-palier1)
+Last updated: 2026-08-12 (forms-ui-cleanup-palier1 final review)
 
 This file is the hand-off point for the current product pass. Update it after every stable, pushed lot.
 
@@ -52,9 +52,9 @@ under Handoff for what's left, none of it blocking.
 
 ## Handoff for Claude
 
-Branch state: `admin-sound-settings` was merged to `main` (fast-forward, `1ae9f54` → `a02492f`) and its branch/worktree cleaned up. `forms-ui-cleanup-palier1` was then built on a fresh worktree off that same `main` at `a02492f`, on branch `worktree-forms-ui-cleanup` (9 commits + 1 post-review fix commit), pushed to `origin/worktree-forms-ui-cleanup`. `main` itself is still at `a02492f` -- **this branch has not been merged yet.** Decide merge/PR with the user before closing this out (see `superpowers:finishing-a-development-branch`).
+Branch state: `admin-sound-settings` was merged to `main` (fast-forward, `1ae9f54` → `a02492f`) and its branch/worktree cleaned up. `forms-ui-cleanup-palier1` was then built from `a02492f`, reviewed, fast-forwarded onto `main`, and pushed. `main` and `origin/main` now both point to `fac9d25`; the working tree was clean at the start of the final review.
 
-Last verified test baseline (on `worktree-forms-ui-cleanup`):
+Last verified test baseline (on `main`, 2026-08-12):
 
 - server: unchanged from the previous lot -- 15 files, 112 tests passing (this lot is web-only);
 - web: 26 files, 180 tests passing (149 baseline + 25 new `ui/form/*` primitive tests + ~4-5 net-new/changed auth and RangeSlider tests -- exact prior count was itself off by one test miscounted in the plan's own prose, see the `forms-ui-cleanup-palier1` note above);
