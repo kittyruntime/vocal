@@ -26,22 +26,25 @@ function toSettings(row: SettingsRow | undefined) {
   };
 }
 
-type AdminUserRow = { id: string; username: string; created_at: Date; banned_at: Date | null; voice_muted: boolean; capabilities: Capability[] };
+type AdminUserRow = { id: string; username: string; avatar_url: string | null; created_at: Date; banned_at: Date | null; voice_muted: boolean; capabilities: Capability[]; roles: { id: string; name: string; color: string }[] };
+
+const adminUserSelect = `SELECT u.id, u.username, u.avatar_url, u.created_at, u.banned_at, u.voice_muted,
+  ARRAY(SELECT capability FROM user_capabilities WHERE user_id = u.id
+        UNION SELECT rc.capability FROM user_roles ur JOIN role_capabilities rc ON rc.role_id = ur.role_id WHERE ur.user_id = u.id) AS capabilities,
+  COALESCE((SELECT json_agg(json_build_object('id', r.id, 'name', r.name, 'color', r.color) ORDER BY r.position DESC)
+            FROM user_roles ur JOIN roles r ON r.id = ur.role_id WHERE ur.user_id = u.id), '[]') AS roles
+  FROM users u`;
 
 async function fetchAdminUser(pool: pg.Pool, userId: string): Promise<AdminUserRow | null> {
   const result = await pool.query<AdminUserRow>(
-    `SELECT u.id, u.username, u.created_at, u.banned_at, u.voice_muted,
-       COALESCE(array_agg(uc.capability) FILTER (WHERE uc.capability IS NOT NULL), '{}') AS capabilities
-     FROM users u LEFT JOIN user_capabilities uc ON uc.user_id = u.id
-     WHERE u.id = $1
-     GROUP BY u.id, u.username, u.created_at, u.banned_at, u.voice_muted`,
+    `${adminUserSelect} WHERE u.id = $1`,
     [userId],
   );
   return result.rows[0] ?? null;
 }
 
 function toAdminUser(row: AdminUserRow) {
-  return { id: row.id, username: row.username, capabilities: row.capabilities, createdAt: row.created_at, bannedAt: row.banned_at, voiceMuted: row.voice_muted };
+  return { id: row.id, username: row.username, avatarUrl: row.avatar_url ? `/api/users/${row.id}/avatar` : null, capabilities: row.capabilities, roles: row.roles, createdAt: row.created_at, bannedAt: row.banned_at, voiceMuted: row.voice_muted };
 }
 
 export function registerAdminRoutes(
@@ -84,11 +87,7 @@ export function registerAdminRoutes(
 
   app.get("/api/admin/users", { preHandler: [app.requireAuth, requireAnyCapability("manage_server", "moderate")] }, async () => {
     const result = await pool.query<AdminUserRow>(
-      `SELECT u.id, u.username, u.created_at, u.banned_at, u.voice_muted,
-         COALESCE(array_agg(uc.capability) FILTER (WHERE uc.capability IS NOT NULL), '{}') AS capabilities
-       FROM users u LEFT JOIN user_capabilities uc ON uc.user_id = u.id
-       GROUP BY u.id, u.username, u.created_at, u.banned_at, u.voice_muted
-       ORDER BY u.username`,
+      `${adminUserSelect} ORDER BY u.username`,
     );
     return result.rows.map(toAdminUser);
   });

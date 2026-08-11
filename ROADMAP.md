@@ -9,8 +9,8 @@ This file is the hand-off point for the current product pass. Update it after ev
 - [x] Frontend visual system, member settings navigation and client-side member pagination
 - [x] Message interactions: replies, reactions, edit and delete
 - [x] Typing presence, mentions and notification preferences
-- [ ] Named roles with colors and reusable permissions — **in progress**
-- [ ] Global search across messages, attachments, channels and members
+- [x] Named roles with colors and reusable permissions
+- [ ] Global search across messages, attachments, channels and members — **in progress**
 - [ ] Configurable, revocable invitation links
 - [ ] Voice layouts: pinning, speaker/grid modes, hidden audio-only participants and ordering
 - [ ] Call network diagnostics and automatic quality adaptation
@@ -27,3 +27,4 @@ This file is the hand-off point for the current product pass. Update it after ev
 
 - `message-interactions`: encrypted reply previews, realtime reaction aggregation, author editing, author/moderator deletion, Discord-style message toolbar and inline editing.
 - `notifications`: realtime typing presence, highlighted mentions, unread counters, mention badges and per-channel all/mentions/muted preferences.
+- `roles`: additive named roles with colors, reusable capabilities, multi-role member assignment and backwards-compatible effective permissions.

@@ -17,6 +17,7 @@ import { registerVoiceTokenRoute, registerVoiceWebhookRoute } from "./routes/voi
 import { registerAdminRoutes } from "./routes/admin.js";
 import { createVoicePresence, type VoicePresence } from "./voice/presence.js";
 import { createVoiceAdminService, type VoiceAdminService } from "./voice/admin.js";
+import { registerRoleRoutes } from "./routes/roles.js";
 
 export async function buildApp(
   opts: { pool: pg.Pool; voiceAdmin?: VoiceAdminService },
@@ -48,6 +49,7 @@ export async function buildApp(
   app.get("/api/health", async () => ({ status: "ok" }));
   registerAuthRoutes(app, opts.pool);
   registerAdminRoutes(app, opts.pool, hub, voicePresence, voiceAdmin);
+  registerRoleRoutes(app, opts.pool, hub);
   registerInviteRoutes(app, opts.pool);
   registerChannelRoutes(app, opts.pool, hub);
   registerMessageRoutes(app, opts.pool, key, hub);

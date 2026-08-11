@@ -24,7 +24,8 @@ export type Channel = {
   defaultCameraQuality?: "low" | "standard" | "high";
   defaultScreenQuality?: "low" | "standard" | "high" | "game";
 };
-export type AdminUser = CurrentUser & { createdAt: string; bannedAt: string | null; voiceMuted: boolean };
+export type Role = { id: string; name: string; color: string; position: number; capabilities: Capability[]; memberCount: number };
+export type AdminUser = CurrentUser & { createdAt: string; bannedAt: string | null; voiceMuted: boolean; roles?: Pick<Role, "id" | "name" | "color">[] };
 export type ChatSettings = { maxImageSizeMb: number; maxFileSizeMb: number; maxMessageLength: number };
 export type ServerSettings = ChatSettings & { registrationOpen: boolean };
 
@@ -129,6 +130,11 @@ export function updateAdminSettings(settings: ServerSettings): Promise<ServerSet
   return request("/api/admin/settings", { method: "PATCH", body: JSON.stringify(settings) });
 }
 export function listAdminUsers(): Promise<AdminUser[]> { return request("/api/admin/users"); }
+export function listRoles(): Promise<Role[]> { return request("/api/admin/roles"); }
+export function createRole(input: Pick<Role, "name" | "color" | "capabilities">): Promise<Role> { return request("/api/admin/roles", { method: "POST", body: JSON.stringify(input) }); }
+export function updateRole(roleId: string, input: Pick<Role, "name" | "color" | "capabilities">): Promise<Role> { return request(`/api/admin/roles/${roleId}`, { method: "PATCH", body: JSON.stringify(input) }); }
+export function deleteRole(roleId: string): Promise<void> { return request(`/api/admin/roles/${roleId}`, { method: "DELETE" }); }
+export function setUserRoles(userId: string, roleIds: string[]): Promise<AdminUser> { return request(`/api/admin/users/${userId}/roles`, { method: "PUT", body: JSON.stringify({ roleIds }) }); }
 export function updateUserCapabilities(userId: string, capabilities: Capability[]): Promise<AdminUser> {
   return request(`/api/admin/users/${userId}`, { method: "PATCH", body: JSON.stringify({ capabilities }) });
 }

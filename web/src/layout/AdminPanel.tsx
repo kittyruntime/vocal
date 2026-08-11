@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import type { AdminUser, Capability, CurrentUser, ServerSettings } from "../api/client";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
+import type { AdminUser, Capability, CurrentUser, Role, ServerSettings } from "../api/client";
 import { CAPABILITIES } from "../api/client";
 import * as api from "../api/client";
 import { Icon } from "../ui/Icon";
@@ -17,11 +17,12 @@ export function AdminPanel({ currentUser, onClose }: {
   onClose(): void;
 }) {
   const [users, setUsers] = useState<AdminUser[]>([]);
+  const [roles, setRoles] = useState<Role[]>([]);
   const [settings, setSettings] = useState<ServerSettings>({ registrationOpen: true, maxImageSizeMb: 5, maxFileSizeMb: 10, maxMessageLength: 4000 });
   const [error, setError] = useState("");
   const canManageServer = currentUser.capabilities.includes("manage_server");
   const canModerate = currentUser.capabilities.includes("moderate");
-  const [activeTab, setActiveTab] = useState<"members" | "general">(canManageServer ? "general" : "members");
+  const [activeTab, setActiveTab] = useState<"members" | "general" | "roles">(canManageServer ? "general" : "members");
   const [memberSearch, setMemberSearch] = useState("");
   const [memberPage, setMemberPage] = useState(1);
   const filteredUsers = useMemo(() => {
@@ -35,8 +36,8 @@ export function AdminPanel({ currentUser, onClose }: {
   useEffect(() => { setMemberPage((page) => Math.min(page, memberPageCount)); }, [memberPageCount]);
 
   useEffect(() => {
-    void Promise.all([api.listAdminUsers(), canManageServer ? api.getAdminSettings() : Promise.resolve(null)])
-      .then(([nextUsers, nextSettings]) => { setUsers(nextUsers); if (nextSettings) setSettings(nextSettings); })
+    void Promise.all([api.listAdminUsers(), canManageServer ? api.getAdminSettings() : Promise.resolve(null), canManageServer ? api.listRoles() : Promise.resolve([])])
+      .then(([nextUsers, nextSettings, nextRoles]) => { setUsers(nextUsers); setRoles(nextRoles); if (nextSettings) setSettings(nextSettings); })
       .catch(() => setError("Could not load server settings."));
   }, [canManageServer]);
 
@@ -97,6 +98,14 @@ export function AdminPanel({ currentUser, onClose }: {
     }
   }
 
+  async function toggleUserRole(user: AdminUser, role: Role) {
+    const roleIds = user.roles?.some((value) => value.id === role.id) ? user.roles.filter((value) => value.id !== role.id).map((value) => value.id) : [...(user.roles?.map((value) => value.id) ?? []), role.id];
+    try {
+      const updated = await api.setUserRoles(user.id, roleIds);
+      setUsers((values) => values.map((value) => value.id === user.id ? { ...value, ...updated, roles: roles.filter((entry) => roleIds.includes(entry.id)).map(({ id, name, color }) => ({ id, name, color })) } : value));
+    } catch { setError("Could not update this member's roles."); }
+  }
+
   return (
     <div className="voice-modal-backdrop admin-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
       <section className="voice-settings-modal admin-modal" role="dialog" aria-modal="true" aria-labelledby="admin-title">
@@ -104,6 +113,7 @@ export function AdminPanel({ currentUser, onClose }: {
         <div className="admin-settings-layout">
         <nav className="settings-tabs" aria-label="Server settings sections">
           {canManageServer ? <button type="button" className={activeTab === "general" ? "active" : ""} aria-pressed={activeTab === "general"} onClick={() => setActiveTab("general")}><Icon name="settings" size={17} /> General</button> : null}
+          {canManageServer ? <button type="button" className={activeTab === "roles" ? "active" : ""} aria-pressed={activeTab === "roles"} onClick={() => setActiveTab("roles")}><Icon name="users" size={17} /> Roles <span className="settings-tab-count">{roles.length}</span></button> : null}
           <button type="button" className={activeTab === "members" ? "active" : ""} aria-pressed={activeTab === "members"} onClick={() => setActiveTab("members")}><Icon name="users" size={17} /> Members <span className="settings-tab-count">{users.length}</span></button>
         </nav>
         <div className="voice-settings-content admin-settings-content">
@@ -128,6 +138,7 @@ export function AdminPanel({ currentUser, onClose }: {
             </div>
           </div>
           <p className="admin-hint">Channel-specific access and voice quality remain under the <Icon name="settings" size={13} /> icon beside each channel.</p></> : null}
+          {activeTab === "roles" && canManageServer ? <RoleManager roles={roles} onChange={setRoles} onError={setError} /> : null}
           {activeTab === "members" ? <div className="settings-section admin-members-section">
             <div className="admin-members-heading"><div><h3>Members</h3><p>{filteredUsers.length} {filteredUsers.length === 1 ? "member" : "members"}</p></div><input type="search" aria-label="Search members" placeholder="Search members" value={memberSearch} onChange={(event) => setMemberSearch(event.target.value)} /></div>
             <div className="admin-user-list">
@@ -136,6 +147,7 @@ export function AdminPanel({ currentUser, onClose }: {
                   <span className="member-avatar">{user.avatarUrl ? <img src={user.avatarUrl} alt="" /> : user.username[0].toUpperCase()}</span>
                   <strong>{user.username}{user.id === currentUser.id ? " (you)" : ""}{user.bannedAt ? <span className="ban-badge">Banned</span> : null}{user.voiceMuted ? <span className="mute-badge">Voice muted</span> : null}</strong>
                   <div className="admin-user-capabilities">
+                    {canManageServer && roles.length > 0 ? <div className="admin-user-roles">{roles.map((role) => <label key={role.id}><input type="checkbox" checked={user.roles?.some((value) => value.id === role.id) ?? false} onChange={() => void toggleUserRole(user, role)} /><i style={{ background: role.color }} />{role.name}</label>)}</div> : null}
                     {canManageServer ? CAPABILITIES.map((capability) => (
                       <label key={capability}>
                         <input
@@ -163,4 +175,26 @@ export function AdminPanel({ currentUser, onClose }: {
       </section>
     </div>
   );
+}
+
+function RoleManager({ roles, onChange, onError }: { roles: Role[]; onChange(roles: Role[]): void; onError(message: string): void }) {
+  const [name, setName] = useState("");
+  const [color, setColor] = useState("#5865f2");
+  const [capabilities, setCapabilities] = useState<Capability[]>([]);
+  const [editingId, setEditingId] = useState<string | null>(null);
+
+  function edit(role?: Role) { setEditingId(role?.id ?? null); setName(role?.name ?? ""); setColor(role?.color ?? "#5865f2"); setCapabilities(role?.capabilities ?? []); }
+  async function save(event: FormEvent) {
+    event.preventDefault(); if (!name.trim()) return;
+    try {
+      const saved = editingId ? await api.updateRole(editingId, { name: name.trim(), color, capabilities }) : await api.createRole({ name: name.trim(), color, capabilities });
+      onChange(editingId ? roles.map((role) => role.id === editingId ? saved : role) : [...roles, saved]); edit();
+    } catch { onError("Could not save this role."); }
+  }
+  async function remove(role: Role) {
+    if (!window.confirm(`Delete the ${role.name} role?`)) return;
+    try { await api.deleteRole(role.id); onChange(roles.filter((value) => value.id !== role.id)); if (editingId === role.id) edit(); }
+    catch { onError("Could not delete this role."); }
+  }
+  return <div className="settings-section admin-roles-section"><div className="admin-roles-heading"><div><h3>Roles</h3><p>Group permissions and assign them to multiple members.</p></div><button type="button" onClick={() => edit()}>New role</button></div><div className="admin-role-layout"><div className="admin-role-list">{roles.map((role) => <button type="button" key={role.id} className={editingId === role.id ? "active" : ""} onClick={() => edit(role)}><i style={{ background: role.color }} /><span><strong>{role.name}</strong><small>{role.memberCount} members</small></span></button>)}</div><form className="admin-role-editor" onSubmit={save}><label>Role name<input value={name} maxLength={32} placeholder="Community manager" onChange={(event) => setName(event.target.value)} /></label><label>Color<input type="color" value={color} onChange={(event) => setColor(event.target.value)} /></label><fieldset><legend>Permissions</legend>{CAPABILITIES.map((capability) => <label key={capability}><input type="checkbox" checked={capabilities.includes(capability)} onChange={() => setCapabilities((values) => values.includes(capability) ? values.filter((value) => value !== capability) : [...values, capability])} />{CAPABILITY_LABEL[capability]}</label>)}</fieldset><div><button type="submit" disabled={!name.trim()}>{editingId ? "Save role" : "Create role"}</button>{editingId ? <button type="button" className="danger-link" onClick={() => void remove(roles.find((role) => role.id === editingId)!)}>Delete</button> : null}</div></form></div></div>;
 }
