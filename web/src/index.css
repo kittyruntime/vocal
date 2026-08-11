@@ -68,6 +68,12 @@ summary:focus-visible {
   border: 0;
 }
 
+/* Form primitives */
+.form-field { display: flex; flex-direction: column; gap: 6px; }
+.form-field > label { color: var(--text-muted); font-size: 12px; font-weight: 700; letter-spacing: .025em; text-transform: uppercase; }
+.form-hint { margin: 0; color: var(--text-muted); font-size: 12px; }
+.form-error { margin: 0; padding: 10px 12px; border-radius: var(--radius-sm); background: rgb(218 55 60 / 14%); color: #ffb4b7; font-size: 13px; }
+
 /* Authentication */
 .auth-screen,
 .error-boundary-screen {
