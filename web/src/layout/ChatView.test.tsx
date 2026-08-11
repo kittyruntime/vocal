@@ -8,7 +8,7 @@ import type { Channel, Message } from "../api/client";
 
 vi.mock("../api/client", async () => {
   const actual = await vi.importActual<typeof import("../api/client")>("../api/client");
-  return { ...actual, listMessages: vi.fn(), postMessage: vi.fn() };
+  return { ...actual, listMessages: vi.fn(), postMessage: vi.fn(), updateMessage: vi.fn(), deleteMessage: vi.fn(), addMessageReaction: vi.fn(), removeMessageReaction: vi.fn() };
 });
 
 const channel: Channel = { id: "c1", name: "général", type: "text", requiredCapability: null, position: 0, createdAt: "now" };
@@ -20,6 +20,10 @@ function msg(id: string, content: string, createdAt: string): Message {
 beforeEach(() => {
   vi.mocked(api.listMessages).mockReset();
   vi.mocked(api.postMessage).mockReset();
+  vi.mocked(api.updateMessage).mockReset();
+  vi.mocked(api.deleteMessage).mockReset();
+  vi.mocked(api.addMessageReaction).mockReset();
+  vi.mocked(api.removeMessageReaction).mockReset();
 });
 
 function renderChat(messages: Message[] = [], onLoaded = vi.fn(), onPrepended = vi.fn()) {
@@ -151,6 +155,18 @@ describe("ChatView", () => {
     await waitFor(() => expect(api.postMessage).toHaveBeenCalledWith("c1", "salut"));
     expect(input).toHaveValue("");
     expect(input).toHaveFocus();
+  });
+
+  it("replies to a message through the composer", async () => {
+    vi.mocked(api.listMessages).mockResolvedValue([]);
+    vi.mocked(api.postMessage).mockResolvedValue(msg("2", "answer", "2026-01-01T00:00:02Z"));
+    renderChat([msg("1", "original", "2026-01-01T00:00:01Z")]);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Reply" }));
+    expect(screen.getByText(/Replying to/)).toBeInTheDocument();
+    await user.type(screen.getByLabelText("Message in général"), "answer");
+    await user.click(screen.getByRole("button", { name: "Send" }));
+    await waitFor(() => expect(api.postMessage).toHaveBeenCalledWith("c1", "answer", [], "1"));
   });
 
   it("inserts an emote in the composer and keeps keyboard focus", async () => {

@@ -35,6 +35,8 @@ export type AppAction =
   | { type: "messages/loaded"; channelId: string; messages: Message[] }
   | { type: "messages/prepended"; channelId: string; messages: Message[] }
   | { type: "message/received"; message: Message }
+  | { type: "message/updated"; message: Message }
+  | { type: "message/deleted"; channelId: string; messageId: string }
   | { type: "presence/sync"; userIds: string[] }
   | { type: "presence/online"; userId: string }
   | { type: "presence/offline"; userId: string }
@@ -95,6 +97,14 @@ export function appReducer(state: AppState, action: AppAction): AppState {
           ? [...state.unreadChannelIds, channelId]
           : state.unreadChannelIds,
       };
+    }
+    case "message/updated": {
+      const existing = state.messagesByChannel[action.message.channelId] ?? [];
+      return { ...state, messagesByChannel: { ...state.messagesByChannel, [action.message.channelId]: existing.map((message) => message.id === action.message.id ? action.message : message) } };
+    }
+    case "message/deleted": {
+      const existing = state.messagesByChannel[action.channelId] ?? [];
+      return { ...state, messagesByChannel: { ...state.messagesByChannel, [action.channelId]: existing.filter((message) => message.id !== action.messageId) } };
     }
     case "presence/sync":
       return { ...state, onlineUserIds: action.userIds };

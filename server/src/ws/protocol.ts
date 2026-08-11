@@ -6,8 +6,14 @@ export type MessagePayload = {
   avatarUrl: string | null;
   content: string;
   createdAt: string;
+  editedAt?: string | null;
+  replyTo?: MessageReplyPayload | null;
+  reactions?: MessageReactionPayload[];
   attachments?: MessageAttachmentPayload[];
 };
+
+export type MessageReplyPayload = { id: string; userId: string; username: string; content: string };
+export type MessageReactionPayload = { emoji: string; count: number; userIds: string[] };
 
 export type MessageAttachmentPayload = {
   id: string;
@@ -33,6 +39,8 @@ export type ServerEvent =
   | { type: "presence.online"; userId: string }
   | { type: "presence.offline"; userId: string }
   | { type: "message.created"; message: MessagePayload }
+  | { type: "message.updated"; message: MessagePayload }
+  | { type: "message.deleted"; channelId: string; messageId: string }
   | { type: "channel.created"; channel: ChannelPayload }
   | { type: "channel.deleted"; channelId: string }
   | { type: "voice.sync"; channels: Record<string, VoiceParticipantPayload[]> }
