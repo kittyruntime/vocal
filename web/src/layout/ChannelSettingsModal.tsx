@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { Capability, Channel } from "../api/client";
 import * as api from "../api/client";
+import { Select, TextField } from "../ui/form";
 import { Icon } from "../ui/Icon";
 
 const CAPABILITY_LABEL: Record<Capability, string> = {
@@ -73,28 +74,27 @@ export function ChannelSettingsModal({ channel, onUpdated, onDeleted, onClose }:
             <Icon name="close" size={20} />
           </button>
         </header>
-        <div className="voice-settings-content">
-          {error ? <p className="admin-error" role="alert">{error}</p> : null}
+        <form className="voice-settings-content" onSubmit={(event) => { event.preventDefault(); void save(); }}>
+          {error ? <p className="form-error" role="alert">{error}</p> : null}
           <div className="settings-section">
             <h3>Overview</h3>
             <div className="channel-overview-fields">
-              <label>
-                Channel name
-                <div className="channel-name-field"><span aria-hidden="true">{channel.type === "text" ? "#" : "◖))"}</span><input aria-label={`Name of ${channel.name}`} value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} /></div>
-              </label>
-              <label>
-                Who can access this channel?
-                <select
-                  aria-label={`Access to ${channel.name}`}
-                  value={draft.requiredCapability ?? ""}
-                  onChange={(event) => setDraft({ ...draft, requiredCapability: (event.target.value || null) as Capability | null })}
-                >
-                  <option value="">Everyone</option>
-                  {(Object.keys(CAPABILITY_LABEL) as Capability[]).map((capability) => (
-                    <option key={capability} value={capability}>{CAPABILITY_LABEL[capability]}</option>
-                  ))}
-                </select>
-              </label>
+              <TextField
+                label="Channel name"
+                value={draft.name}
+                onChange={(event) => setDraft({ ...draft, name: event.target.value })}
+                prefix={channel.type === "text" ? "#" : "◖))"}
+              />
+              <Select
+                label="Who can access this channel?"
+                value={draft.requiredCapability ?? ""}
+                onChange={(event) => setDraft({ ...draft, requiredCapability: (event.target.value || null) as Capability | null })}
+              >
+                <option value="">Everyone</option>
+                {(Object.keys(CAPABILITY_LABEL) as Capability[]).map((capability) => (
+                  <option key={capability} value={capability}>{CAPABILITY_LABEL[capability]}</option>
+                ))}
+              </Select>
               <p className="channel-access-help">
                 {draft.requiredCapability ? CAPABILITY_HELP[draft.requiredCapability] : "Every server member can see and open this channel."}
               </p>
@@ -116,9 +116,9 @@ export function ChannelSettingsModal({ channel, onUpdated, onDeleted, onClose }:
           </div>
           <div className="admin-channel-actions channel-settings-actions">
             <button type="button" className="profile-cancel" disabled={busy} onClick={onClose}>Cancel</button>
-            <button type="button" disabled={busy || !draft.name.trim()} onClick={() => void save()}>{busy ? "Saving…" : "Save changes"}</button>
+            <button type="submit" disabled={busy || !draft.name.trim()}>{busy ? "Saving…" : "Save changes"}</button>
           </div>
-        </div>
+        </form>
       </section>
     </div>
   );
@@ -126,14 +126,11 @@ export function ChannelSettingsModal({ channel, onUpdated, onDeleted, onClose }:
 
 function Quality({ label, value, game, onChange }: { label: string; value: string; game?: boolean; onChange(value: string): void }) {
   return (
-    <label>
-      {label}
-      <select value={value} onChange={(event) => onChange(event.target.value)}>
-        <option value="low">Data saver</option>
-        <option value="standard">Balanced</option>
-        <option value="high">High</option>
-        {game ? <option value="game">Game mode 1080p60</option> : null}
-      </select>
-    </label>
+    <Select label={label} value={value} onChange={(event) => onChange(event.target.value)}>
+      <option value="low">Data saver</option>
+      <option value="standard">Balanced</option>
+      <option value="high">High</option>
+      {game ? <option value="game">Game mode 1080p60</option> : null}
+    </Select>
   );
 }

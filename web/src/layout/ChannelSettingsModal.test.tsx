@@ -27,7 +27,7 @@ describe("ChannelSettingsModal", () => {
     const onClose = vi.fn();
     render(<ChannelSettingsModal channel={textChannel} onUpdated={onUpdated} onDeleted={vi.fn()} onClose={onClose} />);
     const user = userEvent.setup();
-    const nameInput = screen.getByLabelText("Name of general");
+    const nameInput = screen.getByLabelText("Channel name");
     await user.clear(nameInput);
     await user.type(nameInput, "renamed");
     await user.click(screen.getByRole("button", { name: "Save changes" }));
