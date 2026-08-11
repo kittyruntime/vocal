@@ -33,14 +33,18 @@ This file is the hand-off point for the current product pass. Update it after ev
 - `voice-layouts`: grid/focus modes, click-to-pin media, screen/speaker ordering and an optional audio-only participant strip.
 - `network-diagnostics`: local `ConnectionQuality` tracked via `RoomEvent.ConnectionQualityChanged` and shown as a compact Good/Poor/Lost badge in the voice header (tooltip shows RTT/packet-loss when the browser exposes `remote-inbound-rtp`/`candidate-pair` stats, sampled every 2.5s via `getRTCStatsReport()`); remote video is auto-downgraded to `VideoQuality.LOW` on poor/lost quality and restored to `HIGH` only after 3 consecutive good samples (hysteresis, avoids thrashing), including for tracks subscribed while already downgraded. Also removed automatic voice-channel joining (explicit user request): selecting a voice channel — including switching directly from one voice channel to another while already connected — never auto-connects anymore; it only leaves the previous channel cleanly and always requires an explicit "Join" click. The old `autoJoinedChannelRef` auto-join effect was deleted rather than disabled.
 
+## Security fixes
+
+- SVG attachments were served with `Content-Disposition: inline` (any client-supplied `image/*` MIME type was trusted), and the web client linked directly to that URL for anything it treated as an image -- a stored XSS, since SVG can carry `<script>`/event handlers that execute when opened as a top-level document. Fixed by restricting inline rendering to an explicit raster-image allowlist (`server/src/routes/messages.ts`'s `INLINE_SAFE_MIME_TYPES`, mirrored client-side in `web/src/layout/ChatView.tsx`); anything outside it, including SVG, is always forced to download, plus `X-Content-Type-Options: nosniff` and a restrictive CSP on that response. **Do not widen that allowlist back to a bare `startsWith("image/")` check.**
+
 ## Handoff for Claude
 
-Branch state: `main` is clean and synchronized with `origin/main` at `28ea740`.
+Branch state: `main` is clean and synchronized with `origin/main` at `516beea`.
 
 Last verified test baseline:
 
-- server: 14 files, 99 tests passing;
-- web: 18 files, 132 tests passing;
+- server: 14 files, 100 tests passing;
+- web: 18 files, 133 tests passing;
 - server and web TypeScript checks passing;
 - production web build passing (the existing LiveKit chunk-size warning remains).
 
