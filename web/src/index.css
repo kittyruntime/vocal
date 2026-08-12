@@ -149,7 +149,7 @@ textarea.form-input { resize: vertical; }
   align-items: center;
   justify-content: center;
   padding: 20px;
-  background: radial-gradient(circle at top, #404eed 0, #313338 48%);
+  background: radial-gradient(circle at top, var(--brand) 0, var(--bg-base) 48%);
 }
 
 .auth-card {
@@ -159,7 +159,7 @@ textarea.form-input { resize: vertical; }
   gap: 12px;
   padding: 32px;
   border-radius: 8px;
-  background: #2b2d31;
+  background: var(--bg-sidebar);
   box-shadow: 0 8px 28px rgb(0 0 0 / 35%);
 }
 
@@ -171,8 +171,8 @@ textarea.form-input { resize: vertical; }
   border: 0;
   border-radius: 3px;
   padding: 10px 14px;
-  background: #5865f2;
-  color: #fff;
+  background: var(--brand);
+  color: var(--brand-contrast);
   font-weight: 600;
   cursor: pointer;
 }
@@ -572,7 +572,7 @@ textarea.form-input { resize: vertical; }
 .voice-participant.is-speaking .participant-avatar-wrap { border-color: #23a55a; box-shadow: 0 0 0 5px rgb(35 165 90 / 12%); animation: speaking-ring 1.5s ease-in-out infinite; }
 .voice-participant.is-speaking > span { color: #57d68d; }
 .voice-primary { min-width: 130px; border-radius: 4px; }
-.voice-primary:hover { background: #4752c4; }
+.voice-primary:hover { background: var(--brand-hover); }
 .voice-primary:disabled { opacity: .65; cursor: wait; }
 .connecting-dots { display: inline-flex; align-items: center; gap: 3px; margin-left: 6px; }
 .connecting-dots i { width: 4px; height: 4px; border-radius: 50%; background: currentColor; animation: connecting-dot 900ms ease-in-out infinite; }
