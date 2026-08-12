@@ -455,6 +455,26 @@ describe("VoiceView", () => {
     await user.click(screen.getByRole("button", { name: "Share screen" }));
     await screen.findByText("Screen share cancelled.");
     expect(playAppSound).not.toHaveBeenCalledWith("screenShare");
+    // A dismissed/denied picker must not be retried -- retrying here would
+    // silently reopen the OS picker right after the user closed it.
+    expect(createScreenTracks).toHaveBeenCalledTimes(1);
+  });
+
+  it("retries without audio and shares video-only when the platform can't satisfy the audio request (NotSupportedError)", async () => {
+    const videoOnlyTrack = { kind: "video", attach: vi.fn(() => document.createElement("video")), detach: vi.fn(() => []), stop: vi.fn() };
+    createScreenTracks
+      .mockRejectedValueOnce(Object.assign(new Error("not supported"), { name: "NotSupportedError" }))
+      .mockResolvedValueOnce([videoOnlyTrack]);
+    await renderView();
+    await userEvent.setup().click(await screen.findByRole("button", { name: "Share screen" }));
+
+    expect(createScreenTracks).toHaveBeenCalledTimes(2);
+    expect(createScreenTracks).toHaveBeenNthCalledWith(1, expect.objectContaining({ audio: true, systemAudio: "include" }));
+    expect(createScreenTracks.mock.calls[1][0]).toMatchObject({ audio: false });
+    expect(createScreenTracks.mock.calls[1][0]).not.toHaveProperty("systemAudio");
+    expect(await screen.findByText("Could not share this screen's audio here. Sharing video only.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Stop sharing" })).toBeInTheDocument();
+    expect(playAppSound).toHaveBeenCalledWith("screenShare");
   });
 
   it("configures push-to-talk from voice settings", async () => {
