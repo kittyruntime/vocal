@@ -670,12 +670,6 @@ textarea.form-input { resize: vertical; }
 .settings-section-heading p { margin: 0; color: #949ba4; font-size: 13px; }
 .settings-section-heading strong { color: #f2f3f5; font-size: 13px; }
 .voice-settings { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
-.input-mode-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-.input-mode-options button { min-height: 86px; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 5px; padding: 14px; border: 1px solid #1e1f22; border-radius: 7px; background: #2b2d31; color: #dbdee1; cursor: pointer; text-align: left; }
-.input-mode-options button:hover { background: #35373c; }
-.input-mode-options button.active { border-color: var(--brand); background: color-mix(in srgb, var(--brand) 12%, transparent); box-shadow: inset 3px 0 var(--brand); }
-.input-mode-options span { font-size: 14px; font-weight: 700; }
-.input-mode-options small { color: #949ba4; font-size: 12px; line-height: 1.35; }
 .voice-meter { position: relative; width: 100%; height: 10px; overflow: hidden; margin: 18px 0 12px; border-radius: 5px; background: #1e1f22; }
 .voice-meter span { display: block; height: 100%; background: #23a55a; transition: width 80ms linear; }
 .voice-meter i { position: absolute; top: 0; bottom: 0; width: 2px; background: #f0b232; }
@@ -887,7 +881,6 @@ textarea.form-input { resize: vertical; }
 .create-channel-form footer button:hover,
 .admin-channel-actions button:hover { background: var(--brand-hover); }
 .profile-cancel:hover { background: var(--bg-hover); }
-.input-mode-options button,
 .admin-user,
 .admin-channel { border-radius: var(--radius-md); }
 .profile-preview,
@@ -960,7 +953,6 @@ textarea.form-input { resize: vertical; }
   .main-content { width: 100%; }
   .voice-controls { max-width: calc(100% - 16px); overflow-x: auto; justify-content: flex-start; }
   .voice-settings { grid-template-columns: 1fr; }
-  .input-mode-options { grid-template-columns: 1fr; }
   .admin-channel-head, .admin-quality-row { grid-template-columns: 1fr; }
   .admin-user {
     grid-template-columns: 28px 1fr;

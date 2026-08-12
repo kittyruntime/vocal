@@ -30,7 +30,7 @@ import * as api from "../api/client";
 import { playAppSound } from "../audio/sounds";
 import { useToast } from "../toast/ToastContext";
 import { Icon } from "../ui/Icon";
-import { Select, Switch } from "../ui/form";
+import { RadioGroup, Select, Switch } from "../ui/form";
 import { audioProfiles, cameraProfiles, screenProfiles, type MediaQuality, type QualityProfile, type ScreenQuality } from "./quality";
 import { shouldOpenVoiceGate, VoiceGateProcessor } from "./VoiceGateProcessor";
 
@@ -1197,17 +1197,18 @@ export function VoiceView({
                 </div>
               </div>
               <div className="settings-section">
-                <h3>Input mode</h3>
-                <div className="input-mode-options" role="radiogroup" aria-label="Audio input mode">
-                  <button type="button" role="radio" aria-checked={!settings.pushToTalk} className={!settings.pushToTalk ? "active" : ""} onClick={() => settings.pushToTalk && void togglePushToTalk()}>
-                    <span>Voice detection</span>
-                    <small>The microphone activates automatically based on the chosen threshold.</small>
-                  </button>
-                  <button type="button" role="radio" aria-checked={settings.pushToTalk} className={settings.pushToTalk ? "active" : ""} onClick={() => !settings.pushToTalk && void togglePushToTalk()}>
-                    <span>Push-to-talk</span>
-                    <small>Hold the Space bar to talk.</small>
-                  </button>
-                </div>
+                <RadioGroup<"detection" | "ptt">
+                  label="Audio input mode"
+                  options={[
+                    { value: "detection", label: "Voice detection", description: "The microphone activates automatically based on the chosen threshold." },
+                    { value: "ptt", label: "Push-to-talk", description: "Hold the Space bar to talk." },
+                  ]}
+                  value={settings.pushToTalk ? "ptt" : "detection"}
+                  onChange={(next) => {
+                    const nextPushToTalk = next === "ptt";
+                    if (nextPushToTalk !== settings.pushToTalk) void togglePushToTalk();
+                  }}
+                />
               </div>
               <div className="settings-section voice-detection-section">
                 <div className="settings-section-heading">
