@@ -256,7 +256,7 @@ function AppearanceManager({ appearance, onChange, onError }: {
       ? appearance.enabledPresets.filter((value) => value !== preset)
       : [...appearance.enabledPresets, preset];
     if (enabledPresets.length === 0) return onError("At least one accent preset must stay enabled.");
-    if (preset === appearance.defaultPreset && !enabledPresets.includes(preset)) {
+    if (preset === appearance.defaultPreset && appearance.enabledPresets.includes(preset)) {
       return onError("Set a different default before disabling the current default preset.");
     }
     try {

@@ -149,6 +149,16 @@ function SignOutButton() {
   return <button onClick={() => void signOut()}>Sign out</button>;
 }
 
+function PhaseAndSignOut() {
+  const { state, signOut } = useAuth();
+  return (
+    <div>
+      <span>{state.phase}</span>
+      <button onClick={() => void signOut()}>Sign out</button>
+    </div>
+  );
+}
+
 describe("sign out", () => {
   it("resets the accent to the server default", async () => {
     vi.mocked(api.getAppearance).mockResolvedValue({ enabledPresets: [...ACCENT_PRESETS], defaultPreset: "glacier" });
@@ -162,5 +172,18 @@ describe("sign out", () => {
     const user = userEvent.setup();
     await user.click(await screen.findByRole("button", { name: "Sign out" }));
     await waitFor(() => expect(document.documentElement.dataset.accent).toBe("glacier"));
+  });
+
+  it("still completes sign out even if resetting the accent fails", async () => {
+    vi.mocked(api.getAppearance).mockRejectedValue(new Error("network down"));
+    vi.mocked(api.logout).mockResolvedValue({ ok: true });
+    render(
+      <AuthProvider>
+        <PhaseAndSignOut />
+      </AuthProvider>,
+    );
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "Sign out" }));
+    await waitFor(() => expect(screen.getByText("signed-out")).toBeInTheDocument());
   });
 });
