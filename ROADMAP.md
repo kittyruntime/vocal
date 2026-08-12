@@ -1,6 +1,6 @@
 # Vocal roadmap
 
-Last updated: 2026-08-11 (forms-ui-cleanup-palier2a)
+Last updated: 2026-08-12 (forms-ui-cleanup-palier2a merge)
 
 This file is the hand-off point for the current product pass. Update it after every stable, pushed lot.
 
@@ -58,9 +58,9 @@ under Handoff for what's left, none of it blocking.
 
 ## Handoff for Claude
 
-Branch state: `forms-ui-cleanup-palier1` was merged to `main` (fast-forward, `a02492f` → `fac9d25`) and its branch/worktree cleaned up. `forms-ui-cleanup-palier2a` was then built on a fresh worktree off that same `main` at `fac9d25`, on branch `worktree-forms-ui-cleanup-palier2a` (4 commits). `main` itself is still at `fac9d25` -- **this branch has not been merged yet.** Decide merge/PR with the user before closing this out (see `superpowers:finishing-a-development-branch`).
+Branch state: `forms-ui-cleanup-palier1` was merged to `main` (fast-forward, `a02492f` → `fac9d25`). `forms-ui-cleanup-palier2a` was then built on a worktree off that `main`, but its final whole-branch review was interrupted mid-session and the branch was left unmerged while `main` moved on with several unrelated lots from another agent working under the same git identity ("Codex" in conversation) -- participant media status, personalized per-user sound settings (including custom sound upload/reset, absent from the palier2a branch's own snapshot of `ProfileModal`), typing mentions/notification levels, global search, public profiles, and a `fix(voice): preserve screen share when audio fails` lot -- plus a separate `worktree-screen-share-audio-fix` lot (this session) that layered a second, complementary fix on top (`NotSupportedError` retry-without-audio for the *capture* step, distinct from Codex's fix for the *publish* step). That fix was merged first (fast-forward, `d33e98f` → `ffd7a4c`). `forms-ui-cleanup-palier2a` was then merged into current `main` at `ffd7a4c` with a real (non-fast-forward) merge: `ROADMAP.md` conflict resolved by combining both hand-off notes (this note); `ProfileModal.tsx` conflict resolved by keeping the `RangeSlider` primitive migration but folding Codex's upload/reset/preview buttons into its new `trailing` slot (previously just a single preview button) -- `web/src/index.css` and `ProfileModal.test.tsx` auto-merged cleanly with no conflict.
 
-Last verified test baseline (on `worktree-forms-ui-cleanup-palier2a`):
+Last verified test baseline (on `main`, post-merge):
 
 - server: unchanged -- 15 files, 112 tests passing (this lot is web-only);
 - web: 26 files, 182 tests passing (180 baseline + 2 new primitive-extension tests: `TextField`'s `prefix` and `RangeSlider`'s `trailing`);

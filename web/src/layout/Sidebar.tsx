@@ -185,7 +185,11 @@ function ChannelGroup({
                   return (
                     <li key={participant.userId} className={speaking ? "is-speaking" : ""} onClick={() => onViewProfile?.(participant.userId)}>
                       <span className="member-avatar">{participant.avatarUrl ? <img src={participant.avatarUrl} alt="" /> : participant.username.slice(0, 1).toUpperCase()}</span>
-                      {participant.userId === currentUserId ? `${participant.username} (you)` : participant.username}
+                      <span className="voice-occupant-name">{participant.userId === currentUserId ? `${participant.username} (you)` : participant.username}</span>
+                      <span className="voice-media-status" aria-label={`${participant.username}: ${participant.microphoneMuted ? "microphone muted" : "microphone on"}${participant.deafened ? ", sound muted" : ""}`}>
+                        {participant.microphoneMuted ? <Icon name="microphoneOff" size={14} /> : null}
+                        {participant.deafened ? <Icon name="headphonesOff" size={14} /> : null}
+                      </span>
                     </li>
                   );
                 })}

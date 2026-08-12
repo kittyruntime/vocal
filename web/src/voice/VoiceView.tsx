@@ -36,9 +36,17 @@ import { shouldOpenVoiceGate, VoiceGateProcessor } from "./VoiceGateProcessor";
 type VoiceStatus = "idle" | "connecting" | "connected" | "reconnecting";
 type NetworkQuality = "good" | "poor" | "lost";
 type NetworkStats = { rttMs: number | null; packetLossPercent: number | null };
+type ScreenAudioParticipant = { identity: string; name: string; trackSid: string };
 type MediaKind = "microphone" | "camera" | "screen";
 type DeviceSelections = Partial<Record<MediaDeviceKind, string>>;
-type CallParticipant = { identity: string; name: string; avatarUrl: string | null; local: boolean };
+type CallParticipant = {
+  identity: string;
+  name: string;
+  avatarUrl: string | null;
+  local: boolean;
+  microphoneMuted: boolean;
+  deafened: boolean;
+};
 type VoiceSettings = {
   devices: DeviceSelections;
   vadThreshold: number;
@@ -49,9 +57,17 @@ type VoiceSettings = {
 };
 
 const SETTINGS_KEY = "vocal.voice-settings.v1";
+const DEAFENED_ATTRIBUTE = "vocal.deafened";
 
 function loadLiveKit() {
   return import("livekit-client");
+}
+
+function supportsScreenShareAudio(): boolean {
+  // Firefox currently exposes getDisplayMedia but does not provide source/system
+  // audio tracks. Asking LiveKit to publish audio can make the whole operation
+  // fail instead of returning the usable video track.
+  return !/Firefox\//i.test(navigator.userAgent);
 }
 
 function isQuality(value: unknown): value is MediaQuality {
@@ -233,6 +249,7 @@ export function VoiceView({
   onViewProfile,
   onSpeakingChange,
   onParticipantsChange,
+  onSelfMediaStatusChange,
   onSelfPresenceChange,
 }: {
   channel: Channel;
@@ -242,6 +259,7 @@ export function VoiceView({
   onViewProfile?(userId: string): void;
   onSpeakingChange?(userIds: string[]): void;
   onParticipantsChange?(participants: { userId: string; username: string; avatarUrl?: string | null }[]): void;
+  onSelfMediaStatusChange?(channelId: string, status: { microphoneMuted: boolean; deafened: boolean }): void;
   onSelfPresenceChange?(present: boolean): void;
 }) {
   const { showToast } = useToast();
@@ -267,11 +285,15 @@ export function VoiceView({
   const [pinnedTileId, setPinnedTileId] = useState<string | null>(null);
   const [hideAudioOnly, setHideAudioOnly] = useState(true);
   const [videoParticipantIds, setVideoParticipantIds] = useState<Set<string>>(() => new Set());
+  const [screenAudioParticipants, setScreenAudioParticipants] = useState<ScreenAudioParticipant[]>([]);
+  const [screenAudioVolumes, setScreenAudioVolumes] = useState<Record<string, number>>({});
   const [connectionQuality, setConnectionQuality] = useState<NetworkQuality | null>(null);
   const [networkStats, setNetworkStats] = useState<NetworkStats>({ rttMs: null, packetLossPercent: null });
   const roomRef = useRef<Room | null>(null);
   const voiceViewRef = useRef<HTMLElement>(null);
   const audioRef = useRef<HTMLDivElement>(null);
+  const screenAudioVolumesRef = useRef<Record<string, number>>({});
+  const refreshParticipantsRef = useRef<((localState?: { microphoneMuted?: boolean; deafened?: boolean }) => void) | null>(null);
   const remoteVideoRef = useRef<HTMLDivElement>(null);
   const localCameraRef = useRef<HTMLDivElement>(null);
   const localScreenRef = useRef<HTMLDivElement>(null);
@@ -358,6 +380,16 @@ export function VoiceView({
     remoteVideoRef.current?.replaceChildren();
     localCameraRef.current?.replaceChildren();
     localScreenRef.current?.replaceChildren();
+    setScreenAudioParticipants([]);
+  }
+
+  function setScreenAudioVolume(participantId: string, volume: number) {
+    const next = { ...screenAudioVolumesRef.current, [participantId]: volume };
+    screenAudioVolumesRef.current = next;
+    setScreenAudioVolumes(next);
+    for (const element of audioRef.current?.querySelectorAll<HTMLMediaElement>('audio[data-source="screen-share-audio"]') ?? []) {
+      if (element.dataset.participantId === participantId) element.volume = volume / 100;
+    }
   }
 
   // Shared by every path that ends a room connection (voluntary leave,
@@ -484,9 +516,18 @@ export function VoiceView({
     ) => {
       if (track.kind === Track.Kind.Audio) {
         if (audioRef.current?.querySelector(`[data-track-sid="${track.sid}"]`)) return;
+        const trackSid = track.sid ?? publication.trackSid ?? `${participant.identity}:screen-audio`;
         const element = track.attach();
-        element.dataset.trackSid = track.sid;
+        element.dataset.trackSid = trackSid;
+        element.dataset.participantId = participant.identity;
         element.muted = deafenedRef.current;
+        if (publication.source === Track.Source.ScreenShareAudio) {
+          element.dataset.source = "screen-share-audio";
+          element.volume = (screenAudioVolumesRef.current[participant.identity] ?? 100) / 100;
+          setScreenAudioParticipants((participants) => participants.some((entry) => entry.trackSid === trackSid)
+            ? participants
+            : [...participants, { identity: participant.identity, name: participant.name || participant.identity, trackSid }]);
+        }
         audioRef.current?.append(element);
         return;
       }
@@ -526,6 +567,10 @@ export function VoiceView({
         if ((child as HTMLElement).dataset.trackSid === track.sid) child.remove();
       }
       setPinnedTileId((value) => value === track.sid ? null : value);
+      if (publication.source === Track.Source.ScreenShareAudio) {
+        const trackSid = track.sid ?? publication.trackSid;
+        setScreenAudioParticipants((participants) => participants.filter((entry) => entry.trackSid !== trackSid));
+      }
       if (track.kind === Track.Kind.Video) syncRemoteVideoCounts();
     });
     room.on(RoomEvent.LocalTrackUnpublished, (publication: LocalTrackPublication) => {
@@ -562,28 +607,64 @@ export function VoiceView({
         }
       }
     });
-    const refreshParticipants = () => {
+    const refreshParticipants = (localState: { microphoneMuted?: boolean; deafened?: boolean } = {}) => {
       const localIdentity = room.localParticipant.identity || currentUser.id;
+      const localMicrophone = room.localParticipant.getTrackPublication(Track.Source.Microphone);
       const participants: CallParticipant[] = [
-        { identity: localIdentity, name: room.localParticipant.name || currentUser.username, avatarUrl: currentUser.avatarUrl ?? null, local: true },
+        {
+          identity: localIdentity,
+          name: room.localParticipant.name || currentUser.username,
+          avatarUrl: currentUser.avatarUrl ?? null,
+          local: true,
+          microphoneMuted: localState.microphoneMuted ?? localMicrophone?.isMuted ?? true,
+          deafened: localState.deafened ?? room.localParticipant.attributes?.[DEAFENED_ATTRIBUTE] === "true",
+        },
         ...[...room.remoteParticipants.values()].map((participant) => {
           let avatarUrl: string | null = null;
           try {
             const metadata = JSON.parse(participant.metadata || "{}");
             if (typeof metadata.avatarUrl === "string") avatarUrl = metadata.avatarUrl;
           } catch { /* Participant metadata is optional. */ }
-          return { identity: participant.identity, name: participant.name || participant.identity, avatarUrl, local: false };
+          const microphone = participant.getTrackPublication?.(Track.Source.Microphone)
+            ?? [...(participant.audioTrackPublications?.values?.() ?? [])].find((publication) => publication.source === Track.Source.Microphone);
+          return {
+            identity: participant.identity,
+            name: participant.name || participant.identity,
+            avatarUrl,
+            local: false,
+            microphoneMuted: microphone?.isMuted ?? true,
+            deafened: participant.attributes?.[DEAFENED_ATTRIBUTE] === "true",
+          };
         }),
       ];
       setCallParticipants(participants);
+      for (const container of [remoteVideoRef.current, localCameraRef.current, localScreenRef.current]) {
+        if (!container) continue;
+        const tiles = container.dataset.participantId ? [container] : [...container.querySelectorAll<HTMLElement>("[data-participant-id]")];
+        for (const tile of tiles) {
+          const participant = participants.find((entry) => entry.identity === tile.dataset.participantId);
+          tile.querySelector(".tile-media-status")?.remove();
+          if (!participant || (!participant.microphoneMuted && !participant.deafened)) continue;
+          const status = document.createElement("span");
+          status.className = "tile-media-status";
+          status.textContent = [participant.microphoneMuted ? "Mic muted" : null, participant.deafened ? "Deafened" : null].filter(Boolean).join(" · ");
+          tile.append(status);
+        }
+      }
       onParticipantsChange?.(participants.map((participant) => ({
         userId: participant.identity,
         username: participant.name,
         avatarUrl: participant.avatarUrl,
+        microphoneMuted: participant.microphoneMuted,
+        deafened: participant.deafened,
       })));
     };
-    room.on(RoomEvent.ParticipantConnected, refreshParticipants);
-    room.on(RoomEvent.ParticipantDisconnected, refreshParticipants);
+    refreshParticipantsRef.current = refreshParticipants;
+    room.on(RoomEvent.ParticipantConnected, () => refreshParticipants());
+    room.on(RoomEvent.ParticipantDisconnected, () => refreshParticipants());
+    room.on(RoomEvent.TrackMuted, () => refreshParticipants());
+    room.on(RoomEvent.TrackUnmuted, () => refreshParticipants());
+    room.on(RoomEvent.ParticipantAttributesChanged, () => refreshParticipants());
     room.on(RoomEvent.ParticipantPermissionsChanged, (prevPermissions, participant) => {
       if (!participant.isLocal) return;
       if (prevPermissions?.canPublish && participant.permissions?.canPublish === false) {
@@ -625,12 +706,16 @@ export function VoiceView({
       const audioProfile = audioProfiles[settings.audioQuality];
       const microphone = await room.localParticipant.setMicrophoneEnabled(!settings.pushToTalk, audioProfile.capture, audioProfile.publish);
       setMicrophoneEnabled(!settings.pushToTalk);
+      void room.localParticipant.setAttributes({ [DEAFENED_ATTRIBUTE]: "false" }).catch(() => {
+        showToast("Could not share your sound status");
+      });
       if (microphone?.audioTrack) {
         startMeter(createAudioAnalyser, microphone.audioTrack);
         if (!settings.pushToTalk) await installVoiceGate(microphone.audioTrack);
       }
       setDevices(await Room.getLocalDevices(undefined, false));
-      refreshParticipants();
+      refreshParticipants({ microphoneMuted: settings.pushToTalk, deafened: false });
+      onSelfMediaStatusChange?.(channel.id, { microphoneMuted: settings.pushToTalk, deafened: false });
       setStatus("connected");
       onSelfPresenceChange?.(true);
     } catch (error) {
@@ -670,6 +755,8 @@ export function VoiceView({
         await installVoiceGate(publication.audioTrack);
       }
       setMicrophoneEnabled(!enabled);
+      refreshParticipantsRef.current?.({ microphoneMuted: enabled, deafened });
+      onSelfMediaStatusChange?.(channel.id, { microphoneMuted: enabled, deafened });
     } catch {
       showToast("Could not enable push-to-talk");
     }
@@ -685,6 +772,8 @@ export function VoiceView({
       const profile = audioProfiles[settings.audioQuality];
       void room.localParticipant.setMicrophoneEnabled(pressed, profile.capture, profile.publish).then(() => {
         setMicrophoneEnabled(pressed);
+        refreshParticipantsRef.current?.({ microphoneMuted: !pressed, deafened });
+        onSelfMediaStatusChange?.(channel.id, { microphoneMuted: !pressed, deafened });
       }).catch(async (error) => {
         const { MediaDeviceFailure } = await loadLiveKit();
         showToast(describeMediaError(MediaDeviceFailure, error, "microphone"));
@@ -714,7 +803,7 @@ export function VoiceView({
       window.removeEventListener("blur", onBlur);
       setPressed(false);
     };
-  }, [settings.audioQuality, settings.pushToTalk, showToast, status]);
+  }, [deafened, onSelfMediaStatusChange, settings.audioQuality, settings.pushToTalk, showToast, status]);
 
   async function toggleMicrophone() {
     const room = roomRef.current;
@@ -724,6 +813,8 @@ export function VoiceView({
       const profile = audioProfiles[settings.audioQuality];
       await room.localParticipant.setMicrophoneEnabled(enabled, profile.capture, profile.publish);
       setMicrophoneEnabled(enabled);
+      refreshParticipantsRef.current?.({ microphoneMuted: !enabled, deafened });
+      onSelfMediaStatusChange?.(channel.id, { microphoneMuted: !enabled, deafened });
       playAppSound("muteToggle");
     } catch (error) {
       const { MediaDeviceFailure } = await loadLiveKit();
@@ -731,12 +822,21 @@ export function VoiceView({
     }
   }
 
-  function toggleDeafen() {
+  async function toggleDeafen() {
+    const room = roomRef.current;
+    if (!room) return;
     const next = !deafened;
     deafenedRef.current = next;
     setDeafened(next);
     for (const element of audioRef.current?.querySelectorAll("audio") ?? []) {
       element.muted = next;
+    }
+    refreshParticipantsRef.current?.({ microphoneMuted: !microphoneEnabled, deafened: next });
+    onSelfMediaStatusChange?.(channel.id, { microphoneMuted: !microphoneEnabled, deafened: next });
+    try {
+      await room.localParticipant.setAttributes({ [DEAFENED_ATTRIBUTE]: String(next) });
+    } catch {
+      showToast("Could not share your sound status");
     }
   }
 
@@ -778,7 +878,70 @@ export function VoiceView({
     const previousTrack = room.localParticipant.getTrackPublication(Track.Source.ScreenShare)?.track;
     try {
       const profile = screenProfiles[settings.screenQuality];
-      const publication = await room.localParticipant.setScreenShareEnabled(enabled, profile.capture, profile.publish);
+      const audioSupported = supportsScreenShareAudio();
+      const captureOptions = enabled
+        ? { ...profile.capture, audio: audioSupported, ...(audioSupported ? { systemAudio: "include" as const } : {}) }
+        : profile.capture;
+      console.log("[screen-share] toggle", { enabled, audioSupported, quality: settings.screenQuality, captureOptions });
+      let publication;
+      if (enabled && audioSupported) {
+        let tracks;
+        let capturedWithAudio = true;
+        try {
+          tracks = await room.localParticipant.createScreenTracks(captureOptions);
+        } catch (captureError) {
+          const errorName = captureError instanceof Error ? captureError.name : undefined;
+          console.error("[screen-share] createScreenTracks failed with audio requested", {
+            name: errorName,
+            message: captureError instanceof Error ? captureError.message : String(captureError),
+            captureOptions,
+          });
+          // getDisplayMedia rejects the WHOLE call (not just the audio part) when
+          // the platform/browser combination can't satisfy the audio constraint at
+          // all -- e.g. `systemAudio` capture is only available on some Chrome
+          // versions/platforms (Windows first, macOS from Chrome 141). That shows
+          // up as NotSupportedError, distinct from the video track publishing fine
+          // and only its *publish to LiveKit* failing (handled below) or from the
+          // user dismissing the OS picker entirely (NotAllowedError, where retrying
+          // would just reopen a picker the user just closed). Only retry for the
+          // audio-capability-gap case.
+          if (errorName !== "NotSupportedError") throw captureError;
+          capturedWithAudio = false;
+          console.warn("[screen-share] retrying capture without audio after NotSupportedError");
+          // profile.capture hardcodes audio: true for every screen-share quality
+          // preset (see quality.ts) -- it must be explicitly overridden here, not
+          // just omitted, or the retry would ask for audio again and fail the
+          // same way.
+          tracks = await room.localParticipant.createScreenTracks({ ...profile.capture, audio: false });
+        }
+        const videoTrack = tracks.find((track) => track.kind === Track.Kind.Video);
+        const audioTrack = tracks.find((track) => track.kind === Track.Kind.Audio);
+        console.log("[screen-share] captured tracks", { hasVideo: Boolean(videoTrack), hasAudio: Boolean(audioTrack), capturedWithAudio });
+        if (!videoTrack) throw new Error("Screen capture did not provide a video track");
+        try {
+          publication = await room.localParticipant.publishTrack(videoTrack, profile.publish);
+          console.log("[screen-share] video track published", { trackSid: publication?.trackSid });
+        } catch (error) {
+          console.error("[screen-share] video track publish failed", error);
+          for (const track of tracks) track.stop();
+          throw error;
+        }
+        if (audioTrack) {
+          try {
+            await room.localParticipant.publishTrack(audioTrack, audioProfiles.high.publish);
+            console.log("[screen-share] audio track published");
+          } catch (publishError) {
+            console.error("[screen-share] audio track publish failed", publishError);
+            audioTrack.stop();
+            showToast("The screen is shared, but its audio could not be published.");
+          }
+        } else if (!capturedWithAudio) {
+          showToast("Could not share this screen's audio here. Sharing video only.");
+        }
+      } else {
+        publication = await room.localParticipant.setScreenShareEnabled(enabled, captureOptions, profile.publish);
+        console.log("[screen-share] setScreenShareEnabled", { enabled, hasTrack: Boolean(publication?.track) });
+      }
       localScreenRef.current?.replaceChildren();
       if (enabled && publication?.track) {
         const element = publication.track.attach();
@@ -794,8 +957,15 @@ export function VoiceView({
         for (const element of previousTrack.detach()) element.remove();
       }
       setScreenShareEnabled(enabled);
+      playAppSound("screenShare");
+      if (enabled && !audioSupported) showToast("Firefox does not support sharing tab or system audio. Sharing video only.");
       if (!enabled) setPinnedTileId((value) => value === "local-screen" ? null : value);
     } catch (error) {
+      console.error("[screen-share] toggleScreenShare failed", {
+        name: error instanceof Error ? error.name : undefined,
+        message: error instanceof Error ? error.message : String(error),
+        error,
+      });
       showToast(describeMediaError(MediaDeviceFailure, error, "screen"));
     }
   }
@@ -919,6 +1089,10 @@ export function VoiceView({
                     <span className="participant-avatar">{participant.avatarUrl ? <img src={participant.avatarUrl} alt="" /> : participant.name.slice(0, 1).toUpperCase()}</span>
                   </div>
                   <strong>{participant.name}{participant.local ? " (you)" : ""}</strong>
+                  <div className="participant-media-status" aria-label={`${participant.name}: ${participant.microphoneMuted ? "microphone muted" : "microphone on"}${participant.deafened ? ", sound muted" : ""}`}>
+                    {participant.microphoneMuted ? <span><Icon name="microphoneOff" size={14} /> Muted</span> : null}
+                    {participant.deafened ? <span><Icon name="headphonesOff" size={14} /> Deafened</span> : null}
+                  </div>
                 </article>
               );
             })}
@@ -929,7 +1103,15 @@ export function VoiceView({
           <div ref={localCameraRef} className={`local-video ${pinnedTileId === "local-camera" ? "is-pinned" : ""} ${localSpeaking ? "is-speaking" : ""}`} data-participant-id={currentUser.id} onClick={() => cameraEnabled && setPinnedTileId((value) => value === "local-camera" ? null : "local-camera")} />
           <div ref={remoteVideoRef} className="remote-videos" />
         </div>
-        {hasVideo && !hideAudioOnly && audioOnlyParticipants.length > 0 ? <div className="voice-audio-strip">{audioOnlyParticipants.map((participant) => <button type="button" key={participant.identity} onClick={() => onViewProfile?.(participant.identity)}><span className={`member-avatar ${activeSpeakerIds.has(participant.identity) ? "is-speaking" : ""}`}>{participant.avatarUrl ? <img src={participant.avatarUrl} alt="" /> : participant.name[0].toUpperCase()}</span><span>{participant.name}{participant.local ? " (you)" : ""}</span></button>)}</div> : null}
+        {hasVideo && !hideAudioOnly && audioOnlyParticipants.length > 0 ? <div className="voice-audio-strip">{audioOnlyParticipants.map((participant) => <button type="button" key={participant.identity} onClick={() => onViewProfile?.(participant.identity)}><span className={`member-avatar ${activeSpeakerIds.has(participant.identity) ? "is-speaking" : ""}`}>{participant.avatarUrl ? <img src={participant.avatarUrl} alt="" /> : participant.name[0].toUpperCase()}</span><span>{participant.name}{participant.local ? " (you)" : ""}</span><span className="voice-media-status" aria-label={`${participant.name}: ${participant.microphoneMuted ? "microphone muted" : "microphone on"}${participant.deafened ? ", sound muted" : ""}`}>{participant.microphoneMuted ? <Icon name="microphoneOff" size={14} /> : null}{participant.deafened ? <Icon name="headphonesOff" size={14} /> : null}</span></button>)}</div> : null}
+        {screenAudioParticipants.length > 0 ? (
+          <div className="screen-audio-mixer" aria-label="Screen share audio controls">
+            {screenAudioParticipants.map((participant) => {
+              const volume = screenAudioVolumes[participant.identity] ?? 100;
+              return <label key={participant.trackSid}><span><Icon name="volume" size={15} /> {participant.name}</span><input type="range" min={0} max={100} step={5} value={volume} aria-label={`${participant.name} screen share volume`} onChange={(event) => setScreenAudioVolume(participant.identity, Number(event.target.value))} /><small>{volume}%</small></label>;
+            })}
+          </div>
+        ) : null}
         {status === "idle" ? (
           <button type="button" className="voice-primary" onClick={() => void joinRoom()}>
             Join
@@ -942,7 +1124,7 @@ export function VoiceView({
             <button type="button" title={microphoneEnabled ? "Mute microphone" : "Unmute microphone"} aria-label={settings.pushToTalk ? (microphoneEnabled ? "You're talking…" : "Hold Space") : (microphoneEnabled ? "Mute microphone" : "Unmute microphone")} className={!microphoneEnabled ? "control-off" : ""} onClick={() => void toggleMicrophone()}>
               <Icon name="microphone" size={19} />
             </button>
-            <button type="button" title={deafened ? "Undeafen" : "Deafen"} aria-label={deafened ? "Undeafen" : "Deafen"} className={deafened ? "control-off" : ""} aria-pressed={deafened} onClick={toggleDeafen}>
+            <button type="button" title={deafened ? "Undeafen" : "Deafen"} aria-label={deafened ? "Undeafen" : "Deafen"} className={deafened ? "control-off" : ""} aria-pressed={deafened} onClick={() => void toggleDeafen()}>
               <Icon name="headphones" size={19} />
             </button>
             <button type="button" title={cameraEnabled ? "Stop camera" : "Turn on camera"} aria-label={cameraEnabled ? "Stop camera" : "Turn on camera"} className={!cameraEnabled ? "control-off" : ""} aria-pressed={cameraEnabled} onClick={() => void toggleCamera()}>
@@ -994,6 +1176,7 @@ export function VoiceView({
                   <QualitySelect label="Audio" value={settings.audioQuality} profiles={audioProfiles} onChange={(quality) => selectQuality("audio", quality)} />
                   <QualitySelect label="Webcam" value={settings.cameraQuality} profiles={cameraProfiles} onChange={(quality) => selectQuality("camera", quality)} />
                   <QualitySelect<ScreenQuality> label="Screen share" value={settings.screenQuality} profiles={screenProfiles} onChange={(quality) => selectQuality("screen", quality)} />
+                  <p className="form-hint">To share game, tab, or system audio, enable audio in your browser's sharing picker.</p>
                 </div>
               </div>
               <div className="settings-section">

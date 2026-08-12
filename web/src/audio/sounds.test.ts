@@ -46,9 +46,17 @@ describe("audio/sounds", () => {
     expect(FakeAudio.instances[0].src).toBe("/api/sounds/userJoin/file");
   });
 
+  it("prefers a personal sound over the server custom sound", () => {
+    const personal = Object.fromEntries(SOUND_EVENTS.map((event) => [event, { hasCustom: event === "userJoin" }])) as Record<(typeof SOUND_EVENTS)[number], { hasCustom: boolean }>;
+    configureSounds(settingsFor({ userJoin: { enabled: true, hasCustom: true } }), volumesFor({}), personal);
+    playAppSound("userJoin");
+    expect(FakeAudio.instances[0].src).toBe("/api/me/sounds/userJoin/file");
+  });
+
   it("soundSourceFor resolves default vs custom", () => {
     expect(soundSourceFor("userLeave", false)).toBe("/sounds/user-leave.mp3");
     expect(soundSourceFor("userLeave", true)).toBe("/api/sounds/userLeave/file");
+    expect(soundSourceFor("userLeave", true, true)).toBe("/api/me/sounds/userLeave/file");
   });
 
   it("previewSound plays regardless of the enabled flag, defaulting to 55% volume", () => {

@@ -32,6 +32,7 @@ export function MainLayout({ currentUser }: { currentUser: CurrentUser }) {
   });
   const notificationLevelsRef = useRef(notificationLevels);
   const joinedVoiceChannelIdRef = useRef<string | null>(null);
+  const selfVoiceStatusRef = useRef({ microphoneMuted: true, deafened: false });
   const socketRef = useRef<ReturnType<typeof createSocketClient> | null>(null);
   const typingTimersRef = useRef(new Map<string, ReturnType<typeof setTimeout>>());
   const [typingByChannel, setTypingByChannel] = useState<Record<string, Record<string, string>>>({});
@@ -55,8 +56,8 @@ export function MainLayout({ currentUser }: { currentUser: CurrentUser }) {
   useEffect(() => { void api.getChatSettings().then(setChatSettings).catch(() => {}); }, []);
 
   useEffect(() => {
-    void Promise.all([api.getSoundSettings(), api.getMySoundVolumes()])
-      .then(([soundSettings, soundVolumes]) => configureSounds(soundSettings, soundVolumes))
+    void Promise.all([api.getSoundSettings(), api.getMySoundVolumes(), api.getMySoundSettings()])
+      .then(([soundSettings, soundVolumes, userSoundSettings]) => configureSounds(soundSettings, soundVolumes, userSoundSettings))
       .catch(() => {});
   }, []);
 
@@ -117,10 +118,14 @@ export function MainLayout({ currentUser }: { currentUser: CurrentUser }) {
             dispatch({ type: "voice/joined", channelId: event.channelId, participant: event.participant });
             if (event.participant.userId === currentUser.id) {
               joinedVoiceChannelIdRef.current = event.channelId;
+              socketRef.current?.send({ type: "voice.status", channelId: event.channelId, ...selfVoiceStatusRef.current });
               playAppSound("userJoin");
             } else if (joinedVoiceChannelIdRef.current === event.channelId) {
               playAppSound("userJoin");
             }
+            break;
+          case "voice.updated":
+            dispatch({ type: "voice/updated", channelId: event.channelId, participant: event.participant });
             break;
           case "voice.left":
             dispatch({ type: "voice/left", channelId: event.channelId, userId: event.userId });
@@ -140,6 +145,11 @@ export function MainLayout({ currentUser }: { currentUser: CurrentUser }) {
   const selectChannel = useCallback((channelId: string) => {
     dispatch({ type: "channel/selected", channelId });
     setMobileSidebarOpen(false);
+  }, []);
+
+  const reportSelfVoiceStatus = useCallback((channelId: string, status: { microphoneMuted: boolean; deafened: boolean }) => {
+    selfVoiceStatusRef.current = status;
+    socketRef.current?.send({ type: "voice.status", channelId, ...status });
   }, []);
 
   const selectedChannel = state.channels.find((c) => c.id === state.selectedChannelId) ?? null;
@@ -219,6 +229,7 @@ export function MainLayout({ currentUser }: { currentUser: CurrentUser }) {
                   channelId: voiceChannel.id,
                   participants,
                 })}
+                onSelfMediaStatusChange={reportSelfVoiceStatus}
                 onSelfPresenceChange={(present) => {
                   if (present) {
                     joinedVoiceChannelIdRef.current = voiceChannel.id;

@@ -37,6 +37,7 @@ describe("sound settings", () => {
       userLeave: { enabled: true, hasCustom: false },
       muteToggle: { enabled: true, hasCustom: false },
       forceMuted: { enabled: true, hasCustom: false },
+      screenShare: { enabled: true, hasCustom: false },
     });
   });
 
@@ -118,17 +119,45 @@ describe("sound settings", () => {
 
   it("returns default volumes for a fresh user", async () => {
     const res = await app.inject({ method: "GET", url: "/api/me/sound-volumes", headers: { cookie: adminCookie } });
-    expect(res.json()).toEqual({ message: 55, userJoin: 55, userLeave: 55, muteToggle: 55, forceMuted: 55 });
+    expect(res.json()).toEqual({ message: 55, userJoin: 55, userLeave: 55, muteToggle: 55, forceMuted: 55, screenShare: 55 });
   });
 
   it("updates a single volume without affecting the others", async () => {
     await app.inject({ method: "PATCH", url: "/api/me/sound-volumes", headers: { cookie: adminCookie }, payload: { event: "message", volume: 80 } });
     const second = await app.inject({ method: "PATCH", url: "/api/me/sound-volumes", headers: { cookie: adminCookie }, payload: { event: "userJoin", volume: 10 } });
-    expect(second.json()).toEqual({ message: 80, userJoin: 10, userLeave: 55, muteToggle: 55, forceMuted: 55 });
+    expect(second.json()).toEqual({ message: 80, userJoin: 10, userLeave: 55, muteToggle: 55, forceMuted: 55, screenShare: 55 });
   });
 
   it("rejects an out-of-range volume", async () => {
     const res = await app.inject({ method: "PATCH", url: "/api/me/sound-volumes", headers: { cookie: adminCookie }, payload: { event: "message", volume: 150 } });
     expect(res.statusCode).toBe(400);
+  });
+
+  it("lets each user upload, serve, and reset a personal sound", async () => {
+    const aliceCookie = await registerAlice();
+    const audioData = `data:audio/mpeg;base64,${Buffer.from("alice sound").toString("base64")}`;
+    const upload = await app.inject({ method: "PATCH", url: "/api/me/sounds/userJoin", headers: { cookie: aliceCookie }, payload: { audioData } });
+    expect(upload.json()).toEqual({ hasCustom: true });
+
+    const settings = await app.inject({ method: "GET", url: "/api/me/sounds", headers: { cookie: aliceCookie } });
+    expect(settings.json().userJoin).toEqual({ hasCustom: true });
+    expect(settings.json().message).toEqual({ hasCustom: false });
+
+    const file = await app.inject({ method: "GET", url: "/api/me/sounds/userJoin/file", headers: { cookie: aliceCookie } });
+    expect(file.statusCode).toBe(200);
+    expect(file.rawPayload.toString()).toBe("alice sound");
+
+    const adminFile = await app.inject({ method: "GET", url: "/api/me/sounds/userJoin/file", headers: { cookie: adminCookie } });
+    expect(adminFile.statusCode).toBe(404);
+
+    const reset = await app.inject({ method: "PATCH", url: "/api/me/sounds/userJoin", headers: { cookie: aliceCookie }, payload: { audioData: null } });
+    expect(reset.json()).toEqual({ hasCustom: false });
+    const afterReset = await app.inject({ method: "GET", url: "/api/me/sounds/userJoin/file", headers: { cookie: aliceCookie } });
+    expect(afterReset.statusCode).toBe(404);
+  });
+
+  it("validates personal sound uploads with the same rules as server sounds", async () => {
+    const invalid = await app.inject({ method: "PATCH", url: "/api/me/sounds/message", headers: { cookie: adminCookie }, payload: { audioData: "invalid" } });
+    expect(invalid.statusCode).toBe(400);
   });
 });
