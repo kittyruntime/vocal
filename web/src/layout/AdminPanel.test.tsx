@@ -1,13 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { AdminPanel } from "./AdminPanel";
 import * as api from "../api/client";
-import type { AdminUser, CurrentUser, SoundSettings } from "../api/client";
+import { ACCENT_PRESETS } from "../api/client";
+import type { AccentPreset, AdminUser, AppearanceSettings, CurrentUser, SoundSettings } from "../api/client";
+import { ACCENT_PRESET_LABELS } from "../theme/accent";
 
 vi.mock("../api/client", async () => {
   const actual = await vi.importActual<typeof import("../api/client")>("../api/client");
-  return { ...actual, listAdminUsers: vi.fn(), getAdminSettings: vi.fn(), listRoles: vi.fn(), createRole: vi.fn(), updateRole: vi.fn(), deleteRole: vi.fn(), setUserRoles: vi.fn(), kickUser: vi.fn(), banUser: vi.fn(), unbanUser: vi.fn(), setUserVoiceMuted: vi.fn(), getSoundSettings: vi.fn(), updateSoundSetting: vi.fn() };
+  return { ...actual, listAdminUsers: vi.fn(), getAdminSettings: vi.fn(), listRoles: vi.fn(), createRole: vi.fn(), updateRole: vi.fn(), deleteRole: vi.fn(), setUserRoles: vi.fn(), kickUser: vi.fn(), banUser: vi.fn(), unbanUser: vi.fn(), setUserVoiceMuted: vi.fn(), getSoundSettings: vi.fn(), updateSoundSetting: vi.fn(), getAppearance: vi.fn(), updateAppearance: vi.fn() };
 });
 
 const admin: CurrentUser = { id: "u1", username: "theo", capabilities: ["manage_channels", "manage_server", "moderate", "publish_voice"] };
@@ -35,13 +37,16 @@ const DEFAULT_SOUND_SETTINGS: SoundSettings = {
   screenShare: { enabled: true, hasCustom: false },
 };
 
-function renderPanel(users: AdminUser[] = [alice], openMembers = true, soundSettings: SoundSettings = DEFAULT_SOUND_SETTINGS) {
+const DEFAULT_APPEARANCE: AppearanceSettings = { enabledPresets: [...ACCENT_PRESETS], defaultPreset: "amber" };
+
+function renderPanel(users: AdminUser[] = [alice], openMembers = true, soundSettings: SoundSettings = DEFAULT_SOUND_SETTINGS, appearance: AppearanceSettings = DEFAULT_APPEARANCE, currentUser: CurrentUser = admin) {
   mockListUsers(users);
   vi.mocked(api.getAdminSettings).mockResolvedValue({ registrationOpen: true, maxImageSizeMb: 5, maxFileSizeMb: 10, maxMessageLength: 4000 });
   vi.mocked(api.listRoles).mockResolvedValue([]);
   vi.mocked(api.getSoundSettings).mockResolvedValue(soundSettings);
+  vi.mocked(api.getAppearance).mockResolvedValue(appearance);
   const result = render(
-    <AdminPanel currentUser={admin} onClose={vi.fn()} />,
+    <AdminPanel currentUser={currentUser} onClose={vi.fn()} />,
   );
   if (openMembers) fireEvent.click(screen.getByRole("button", { name: /Members/ }));
   return result;
@@ -52,6 +57,7 @@ beforeEach(() => {
   vi.mocked(api.banUser).mockReset();
   vi.mocked(api.unbanUser).mockReset();
   vi.mocked(api.setUserVoiceMuted).mockReset();
+  vi.mocked(api.updateAppearance).mockReset();
   vi.spyOn(window, "confirm").mockReturnValue(true);
 });
 
@@ -218,5 +224,50 @@ describe("AdminPanel sounds", () => {
     await user.click(screen.getByRole("button", { name: "Sounds" }));
     await user.click(await screen.findByRole("button", { name: "Reset" }));
     await waitFor(() => expect(api.updateSoundSetting).toHaveBeenCalledWith("message", { audioData: null }));
+  });
+});
+
+describe("AdminPanel appearance", () => {
+  it("shows the Appearance tab only to a user with manage_server", async () => {
+    const adminRender = renderPanel([alice], false);
+    expect(await within(adminRender.container).findByRole("button", { name: "Appearance" })).toBeInTheDocument();
+
+    const member: CurrentUser = { id: "u3", username: "bob", capabilities: [] };
+    mockListUsers([alice]);
+    const memberRender = render(<AdminPanel currentUser={member} onClose={vi.fn()} />);
+    await within(memberRender.container).findByText("alice");
+    expect(within(memberRender.container).queryByRole("button", { name: "Appearance" })).not.toBeInTheDocument();
+  });
+
+  it("toggles a preset's enabled state when its swatch is clicked", async () => {
+    const enabledAfterToggle = ACCENT_PRESETS.filter((preset) => preset !== "magenta") as AccentPreset[];
+    vi.mocked(api.updateAppearance).mockResolvedValue({ enabledPresets: enabledAfterToggle, defaultPreset: "amber" });
+    renderPanel([], false);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Appearance" }));
+    await user.click(await screen.findByRole("button", { name: ACCENT_PRESET_LABELS.magenta }));
+    await waitFor(() => expect(api.updateAppearance).toHaveBeenCalledWith({ enabledPresets: enabledAfterToggle }));
+  });
+
+  it("shows an error and does not call the API when disabling the last enabled preset", async () => {
+    renderPanel([], false, DEFAULT_SOUND_SETTINGS, { enabledPresets: ["amber"], defaultPreset: "amber" });
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Appearance" }));
+    await user.click(await screen.findByRole("button", { name: ACCENT_PRESET_LABELS.amber }));
+    expect(await screen.findByText("At least one accent preset must stay enabled.")).toBeInTheDocument();
+    expect(api.updateAppearance).not.toHaveBeenCalled();
+  });
+
+  it("sets a new default preset via 'Set as default', which is disabled for the current default", async () => {
+    vi.mocked(api.updateAppearance).mockResolvedValue({ enabledPresets: [...ACCENT_PRESETS], defaultPreset: "glacier" });
+    renderPanel([], false);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Appearance" }));
+    const amberRow = (await screen.findByRole("button", { name: ACCENT_PRESET_LABELS.amber })).closest(".admin-accent-row") as HTMLElement;
+    expect(within(amberRow).getByRole("button", { name: "Default" })).toBeDisabled();
+    const glacierRow = screen.getByRole("button", { name: ACCENT_PRESET_LABELS.glacier }).closest(".admin-accent-row") as HTMLElement;
+    await user.click(within(glacierRow).getByRole("button", { name: "Set as default" }));
+    await waitFor(() => expect(api.updateAppearance).toHaveBeenCalledWith({ defaultPreset: "glacier" }));
+    expect(await within(glacierRow).findByRole("button", { name: "Default" })).toBeInTheDocument();
   });
 });

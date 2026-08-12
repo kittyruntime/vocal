@@ -701,6 +701,7 @@ textarea.form-input { resize: vertical; }
 .accent-swatch-list { display: flex; gap: 10px; flex-wrap: wrap; }
 .accent-swatch { width: 36px; height: 36px; border-radius: var(--radius-pill); border: 2px solid transparent; cursor: pointer; }
 .accent-swatch.active { border-color: #fff; }
+.admin-accent-row { display: flex; align-items: center; gap: 10px; }
 .attachment-limit-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .attachment-limit-grid label { display: grid; gap: 6px; color: #b5bac1; font-size: 11px; font-weight: 700; text-transform: uppercase; }
 .attachment-limit-grid input { min-width: 0; padding: 9px 10px; border: 1px solid #1e1f22; border-radius: 4px; background: #1e1f22; color: #dbdee1; }
