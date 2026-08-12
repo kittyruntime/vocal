@@ -673,7 +673,6 @@ textarea.form-input { resize: vertical; }
 .voice-meter { position: relative; width: 100%; height: 10px; overflow: hidden; margin: 18px 0 12px; border-radius: 5px; background: #1e1f22; }
 .voice-meter span { display: block; height: 100%; background: #23a55a; transition: width 80ms linear; }
 .voice-meter i { position: absolute; top: 0; bottom: 0; width: 2px; background: #f0b232; }
-.voice-detection-section > input[type="range"] { width: 100%; accent-color: var(--brand); }
 .remote-audio { display: none; }
 .admin-backdrop { position: fixed; }
 .admin-modal { width: min(980px, 100%); height: min(760px, calc(100% - 32px)); }

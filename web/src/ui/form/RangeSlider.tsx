@@ -11,6 +11,7 @@ export function RangeSlider({
   step,
   hint,
   trailing,
+  visuallyHiddenLabel,
   onChange,
   onCommit,
 }: {
@@ -21,6 +22,7 @@ export function RangeSlider({
   step?: number;
   hint?: string;
   trailing?: ReactNode;
+  visuallyHiddenLabel?: boolean;
   onChange(next: number): void;
   onCommit(next: number): void;
 }) {
@@ -41,7 +43,7 @@ export function RangeSlider({
   }
 
   return (
-    <FormField label={label} htmlFor={id} hint={hint}>
+    <FormField label={label} htmlFor={id} hint={hint} visuallyHiddenLabel={visuallyHiddenLabel}>
       <div className="form-range-row">
         <input
           id={id}
