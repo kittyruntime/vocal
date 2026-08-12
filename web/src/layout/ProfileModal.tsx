@@ -61,9 +61,11 @@ export function ProfileModal({ currentUser, onClose, onSaved }: {
   }, []);
 
   async function selectAccent(preset: AccentPreset) {
-    const updated = await api.updateMyAccent(preset);
-    setAccentPreset(updated.accentPreset);
-    applyUserAccent(updated.accentPreset, appearance.enabledPresets, appearance.defaultPreset);
+    try {
+      const updated = await api.updateMyAccent(preset);
+      setAccentPreset(updated.accentPreset);
+      applyUserAccent(updated.accentPreset, appearance.enabledPresets, appearance.defaultPreset);
+    } catch { setError("The accent color could not be changed."); }
   }
 
   async function saveVolume(event: SoundEvent, volume: number) {
