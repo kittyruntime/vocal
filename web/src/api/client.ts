@@ -220,3 +220,16 @@ export function removeMessageReaction(channelId: string, messageId: string, emoj
 export function getVoiceToken(channelId: string): Promise<VoiceToken> {
   return request(`/api/channels/${channelId}/voice-token`, { method: "POST" });
 }
+
+export const ACCENT_PRESETS = ["amber", "ember-red", "magenta", "glacier", "emerald"] as const;
+export type AccentPreset = (typeof ACCENT_PRESETS)[number];
+export type AppearanceSettings = { enabledPresets: AccentPreset[]; defaultPreset: AccentPreset };
+
+export function getAppearance(): Promise<AppearanceSettings> { return request("/api/appearance"); }
+export function updateAppearance(patch: { enabledPresets?: AccentPreset[]; defaultPreset?: AccentPreset }): Promise<AppearanceSettings> {
+  return request("/api/admin/appearance", { method: "PATCH", body: JSON.stringify(patch) });
+}
+export function getMyAccent(): Promise<{ accentPreset: AccentPreset | null }> { return request("/api/me/accent"); }
+export function updateMyAccent(accentPreset: AccentPreset | null): Promise<{ accentPreset: AccentPreset | null }> {
+  return request("/api/me/accent", { method: "PATCH", body: JSON.stringify({ accentPreset }) });
+}
