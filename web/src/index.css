@@ -454,7 +454,6 @@ textarea.form-input { resize: vertical; }
 .message-reactions button.active { border-color: var(--brand); background: color-mix(in srgb, var(--brand) 14%, transparent); color: var(--text-strong); }
 .message-reactions button span { font-size: 16px; }
 .message-edit-form { display: grid; gap: 7px; margin-top: 3px; }
-.message-edit-form input { width: 100%; padding: 9px 11px; border: 1px solid var(--brand); border-radius: 4px; outline: 0; background: #383a40; color: #dbdee1; }
 .message-edit-form > div { display: flex; justify-content: flex-end; gap: 6px; }
 .message-edit-form button { padding: 5px 9px; border: 0; border-radius: 4px; background: #4e5058; color: #fff; font-size: 12px; }
 .message-edit-form button[type="submit"] { background: var(--brand); color: var(--brand-contrast); }
