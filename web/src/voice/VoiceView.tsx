@@ -30,6 +30,7 @@ import * as api from "../api/client";
 import { playAppSound } from "../audio/sounds";
 import { useToast } from "../toast/ToastContext";
 import { Icon } from "../ui/Icon";
+import { Switch } from "../ui/form";
 import { audioProfiles, cameraProfiles, screenProfiles, type MediaQuality, type QualityProfile, type ScreenQuality } from "./quality";
 import { shouldOpenVoiceGate, VoiceGateProcessor } from "./VoiceGateProcessor";
 
@@ -54,6 +55,8 @@ type VoiceSettings = {
   audioQuality: MediaQuality;
   cameraQuality: MediaQuality;
   screenQuality: ScreenQuality;
+  screenAudioQuality: MediaQuality;
+  advancedMode: boolean;
 };
 
 const SETTINGS_KEY = "vocal.voice-settings.v1";
@@ -83,6 +86,7 @@ function loadSettings(): VoiceSettings {
     const parsed = JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? "{}") as {
       devices?: DeviceSelections; vadThreshold?: number; pushToTalk?: boolean;
       audioQuality?: unknown; cameraQuality?: unknown; screenQuality?: unknown;
+      screenAudioQuality?: unknown; advancedMode?: unknown;
     };
     return {
       devices: parsed.devices ?? {},
@@ -91,9 +95,15 @@ function loadSettings(): VoiceSettings {
       audioQuality: isQuality(parsed.audioQuality) ? parsed.audioQuality : "standard",
       cameraQuality: isQuality(parsed.cameraQuality) ? parsed.cameraQuality : "standard",
       screenQuality: isScreenQuality(parsed.screenQuality) ? parsed.screenQuality : "standard",
+      screenAudioQuality: isQuality(parsed.screenAudioQuality) ? parsed.screenAudioQuality : "high",
+      advancedMode: parsed.advancedMode === true,
     };
   } catch {
-    return { devices: {}, vadThreshold: 0.15, pushToTalk: false, audioQuality: "standard", cameraQuality: "standard", screenQuality: "standard" };
+    return {
+      devices: {}, vadThreshold: 0.15, pushToTalk: false,
+      audioQuality: "standard", cameraQuality: "standard", screenQuality: "standard",
+      screenAudioQuality: "high", advancedMode: false,
+    };
   }
 }
 
@@ -928,7 +938,7 @@ export function VoiceView({
         }
         if (audioTrack) {
           try {
-            await room.localParticipant.publishTrack(audioTrack, audioProfiles.high.publish);
+            await room.localParticipant.publishTrack(audioTrack, audioProfiles[settings.screenAudioQuality].publish);
             console.log("[screen-share] audio track published");
           } catch (publishError) {
             console.error("[screen-share] audio track publish failed", publishError);
@@ -970,13 +980,14 @@ export function VoiceView({
     }
   }
 
-  function selectQuality(kind: "audio" | "camera", quality: MediaQuality): void;
+  function selectQuality(kind: "audio" | "camera" | "screenAudio", quality: MediaQuality): void;
   function selectQuality(kind: "screen", quality: ScreenQuality): void;
-  function selectQuality(kind: "audio" | "camera" | "screen", quality: ScreenQuality) {
+  function selectQuality(kind: "audio" | "camera" | "screen" | "screenAudio", quality: ScreenQuality) {
     const key = `${kind}Quality` as const;
     saveSettings({ ...settings, [key]: quality });
     const active = kind === "audio" ? microphoneEnabled : kind === "camera" ? cameraEnabled : screenShareEnabled;
-    if (active) showToast(`The new ${kind === "audio" ? "audio" : kind === "camera" ? "webcam" : "screen share"} quality will apply the next time it's turned on.`);
+    const label = kind === "audio" ? "audio" : kind === "camera" ? "webcam" : kind === "screenAudio" ? "screen share audio" : "screen share";
+    if (active) showToast(`The new ${label} quality will apply the next time it's turned on.`);
   }
 
   const hasVideo = cameraEnabled || screenShareEnabled || remoteVideoCount > 0;
@@ -1161,6 +1172,9 @@ export function VoiceView({
                 <Icon name="close" size={20} />
               </button>
             </header>
+            <div className="settings-section">
+              <Switch label="Advanced mode" checked={settings.advancedMode} onChange={(next) => saveSettings({ ...settings, advancedMode: next })} />
+            </div>
             <div className="voice-settings-content">
               <div className="settings-section">
                 <h3>Devices</h3>
@@ -1176,6 +1190,9 @@ export function VoiceView({
                   <QualitySelect label="Audio" value={settings.audioQuality} profiles={audioProfiles} onChange={(quality) => selectQuality("audio", quality)} />
                   <QualitySelect label="Webcam" value={settings.cameraQuality} profiles={cameraProfiles} onChange={(quality) => selectQuality("camera", quality)} />
                   <QualitySelect<ScreenQuality> label="Screen share" value={settings.screenQuality} profiles={screenProfiles} onChange={(quality) => selectQuality("screen", quality)} />
+                  {settings.advancedMode ? (
+                    <QualitySelect label="Screen share audio" value={settings.screenAudioQuality} profiles={audioProfiles} onChange={(quality) => selectQuality("screenAudio", quality)} />
+                  ) : null}
                   <p className="form-hint">To share game, tab, or system audio, enable audio in your browser's sharing picker.</p>
                 </div>
               </div>

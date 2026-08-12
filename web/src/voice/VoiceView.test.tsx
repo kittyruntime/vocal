@@ -248,6 +248,58 @@ describe("VoiceView", () => {
     expect(screen.getByRole("button", { name: "Stop sharing" })).toBeInTheDocument();
   });
 
+  it("hides the screen share audio quality selector until advanced mode is turned on", async () => {
+    await renderView();
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "Settings" }));
+    await screen.findByRole("dialog", { name: "Voice & Video" });
+    expect(screen.queryByLabelText("Screen share audio")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("switch", { name: "Advanced mode" }));
+    expect(screen.getByLabelText("Screen share audio")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("switch", { name: "Advanced mode" }));
+    expect(screen.queryByLabelText("Screen share audio")).not.toBeInTheDocument();
+  });
+
+  it("persists advanced mode to localStorage", async () => {
+    await renderView();
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "Settings" }));
+    await screen.findByRole("dialog", { name: "Voice & Video" });
+    await user.click(screen.getByRole("switch", { name: "Advanced mode" }));
+
+    const stored = JSON.parse(window.localStorage.getItem("vocal.voice-settings.v1") ?? "{}");
+    expect(stored.advancedMode).toBe(true);
+  });
+
+  it("publishes screen share audio at the selected quality once advanced mode is on", async () => {
+    await renderView();
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "Settings" }));
+    await screen.findByRole("dialog", { name: "Voice & Video" });
+    await user.click(screen.getByRole("switch", { name: "Advanced mode" }));
+    await user.selectOptions(screen.getByLabelText("Screen share audio"), "low");
+    await user.click(screen.getByRole("button", { name: "Close settings" }));
+
+    await user.click(screen.getByRole("button", { name: "Share screen" }));
+
+    expect(publishTrack).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: "audio" }),
+      expect.objectContaining({ audioPreset: expect.objectContaining({ maxBitrate: 24_000 }) }),
+    );
+  });
+
+  it("still publishes screen share audio at the default high quality when advanced mode is never touched", async () => {
+    await renderView();
+    await userEvent.setup().click(await screen.findByRole("button", { name: "Share screen" }));
+
+    expect(publishTrack).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: "audio" }),
+      expect.objectContaining({ audioPreset: expect.objectContaining({ maxBitrate: 96_000 }) }),
+    );
+  });
+
   it("shows a fullscreen button on a local video tile and requests fullscreen on click", async () => {
     await renderView();
     const user = userEvent.setup();
