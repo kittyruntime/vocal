@@ -256,6 +256,9 @@ function AppearanceManager({ appearance, onChange, onError }: {
       ? appearance.enabledPresets.filter((value) => value !== preset)
       : [...appearance.enabledPresets, preset];
     if (enabledPresets.length === 0) return onError("At least one accent preset must stay enabled.");
+    if (preset === appearance.defaultPreset && !enabledPresets.includes(preset)) {
+      return onError("Set a different default before disabling the current default preset.");
+    }
     try {
       const updated = await api.updateAppearance({ enabledPresets });
       onChange(updated);
@@ -284,7 +287,12 @@ function AppearanceManager({ appearance, onChange, onError }: {
               style={{ background: ACCENT_SWATCH_COLORS[preset] }}
               onClick={() => void toggle(preset)}
             />
-            <button type="button" disabled={!appearance.enabledPresets.includes(preset) || appearance.defaultPreset === preset} onClick={() => void setDefault(preset)}>
+            <button
+              type="button"
+              aria-label={`Set ${ACCENT_PRESET_LABELS[preset]} as default`}
+              disabled={!appearance.enabledPresets.includes(preset) || appearance.defaultPreset === preset}
+              onClick={() => void setDefault(preset)}
+            >
               {appearance.defaultPreset === preset ? "Default" : "Set as default"}
             </button>
           </div>

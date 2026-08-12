@@ -258,16 +258,25 @@ describe("AdminPanel appearance", () => {
     expect(api.updateAppearance).not.toHaveBeenCalled();
   });
 
+  it("shows an error and does not call the API when disabling the current default preset (with others still enabled)", async () => {
+    renderPanel([], false, DEFAULT_SOUND_SETTINGS, { enabledPresets: [...ACCENT_PRESETS], defaultPreset: "amber" });
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Appearance" }));
+    await user.click(await screen.findByRole("button", { name: ACCENT_PRESET_LABELS.amber }));
+    expect(await screen.findByText("Set a different default before disabling the current default preset.")).toBeInTheDocument();
+    expect(api.updateAppearance).not.toHaveBeenCalled();
+  });
+
   it("sets a new default preset via 'Set as default', which is disabled for the current default", async () => {
     vi.mocked(api.updateAppearance).mockResolvedValue({ enabledPresets: [...ACCENT_PRESETS], defaultPreset: "glacier" });
     renderPanel([], false);
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: "Appearance" }));
     const amberRow = (await screen.findByRole("button", { name: ACCENT_PRESET_LABELS.amber })).closest(".admin-accent-row") as HTMLElement;
-    expect(within(amberRow).getByRole("button", { name: "Default" })).toBeDisabled();
+    expect(within(amberRow).getByRole("button", { name: `Set ${ACCENT_PRESET_LABELS.amber} as default` })).toBeDisabled();
     const glacierRow = screen.getByRole("button", { name: ACCENT_PRESET_LABELS.glacier }).closest(".admin-accent-row") as HTMLElement;
-    await user.click(within(glacierRow).getByRole("button", { name: "Set as default" }));
+    await user.click(within(glacierRow).getByRole("button", { name: `Set ${ACCENT_PRESET_LABELS.glacier} as default` }));
     await waitFor(() => expect(api.updateAppearance).toHaveBeenCalledWith({ defaultPreset: "glacier" }));
-    expect(await within(glacierRow).findByRole("button", { name: "Default" })).toBeInTheDocument();
+    expect(await within(glacierRow).findByRole("button", { name: `Set ${ACCENT_PRESET_LABELS.glacier} as default` })).toBeInTheDocument();
   });
 });
