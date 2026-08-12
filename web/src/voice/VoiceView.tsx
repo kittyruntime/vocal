@@ -30,7 +30,7 @@ import * as api from "../api/client";
 import { playAppSound } from "../audio/sounds";
 import { useToast } from "../toast/ToastContext";
 import { Icon } from "../ui/Icon";
-import { Switch } from "../ui/form";
+import { Select, Switch } from "../ui/form";
 import { audioProfiles, cameraProfiles, screenProfiles, type MediaQuality, type QualityProfile, type ScreenQuality } from "./quality";
 import { shouldOpenVoiceGate, VoiceGateProcessor } from "./VoiceGateProcessor";
 
@@ -1241,14 +1241,11 @@ function QualitySelect<TQuality extends string = MediaQuality>({
   onChange(value: TQuality): void;
 }) {
   return (
-    <label>
-      {label}
-      <select value={value} onChange={(event) => onChange(event.target.value as TQuality)}>
-        {(Object.entries(profiles) as [TQuality, QualityProfile<unknown>][]).map(([key, profile]) => (
-          <option key={key} value={key}>{profile.label} — {profile.detail}</option>
-        ))}
-      </select>
-    </label>
+    <Select label={label} value={value} onChange={(event) => onChange(event.target.value as TQuality)}>
+      {(Object.entries(profiles) as [TQuality, QualityProfile<unknown>][]).map(([key, profile]) => (
+        <option key={key} value={key}>{profile.label} — {profile.detail}</option>
+      ))}
+    </Select>
   );
 }
 
@@ -1268,14 +1265,11 @@ function DeviceSelect({
   const matching = devices.filter((device) => device.kind === kind);
   if (matching.length === 0) return null;
   return (
-    <label>
-      {label}
-      <select value={value ?? ""} onChange={(event) => void onChange(kind, event.target.value)}>
-        <option value="">Default</option>
-        {matching.map((device, index) => (
-          <option key={device.deviceId} value={device.deviceId}>{device.label || `${label} ${index + 1}`}</option>
-        ))}
-      </select>
-    </label>
+    <Select label={label} value={value ?? ""} onChange={(event) => void onChange(kind, event.target.value)}>
+      <option value="">Default</option>
+      {matching.map((device, index) => (
+        <option key={device.deviceId} value={device.deviceId}>{device.label || `${label} ${index + 1}`}</option>
+      ))}
+    </Select>
   );
 }

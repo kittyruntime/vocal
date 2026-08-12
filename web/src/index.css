@@ -670,9 +670,6 @@ textarea.form-input { resize: vertical; }
 .settings-section-heading p { margin: 0; color: #949ba4; font-size: 13px; }
 .settings-section-heading strong { color: #f2f3f5; font-size: 13px; }
 .voice-settings { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
-.voice-settings label { min-width: 0; display: flex; flex-direction: column; gap: 7px; color: #b5bac1; font-size: 11px; font-weight: 700; letter-spacing: .025em; text-align: left; text-transform: uppercase; }
-.voice-settings select { width: 100%; min-width: 0; min-height: 40px; padding: 8px 34px 8px 10px; border: 1px solid #1e1f22; border-radius: 4px; outline: none; background: #1e1f22; color: #dbdee1; font-size: 13px; text-transform: none; }
-.voice-settings select:focus { border-color: var(--brand); }
 .input-mode-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .input-mode-options button { min-height: 86px; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 5px; padding: 14px; border: 1px solid #1e1f22; border-radius: 7px; background: #2b2d31; color: #dbdee1; cursor: pointer; text-align: left; }
 .input-mode-options button:hover { background: #35373c; }
@@ -868,16 +865,13 @@ textarea.form-input { resize: vertical; }
 .voice-settings-content { padding-top: 4px; }
 .settings-section { padding-block: 18px 20px; border-bottom-color: var(--divider); }
 .settings-section h3,
-.voice-settings label,
 .attachment-limit-grid label { letter-spacing: .045em; }
 .settings-tabs { gap: 3px; border-color: var(--divider); }
 .settings-tabs button { min-height: 36px; border-radius: var(--radius-sm); }
 .settings-tabs button.active { background: var(--bg-active); }
-.voice-settings select,
 .attachment-limit-grid input,
 .admin-channel select,
 .admin-channel input { min-height: 42px; border-color: transparent; border-radius: var(--radius-sm); background: var(--bg-sunken); }
-.voice-settings select:hover,
 .attachment-limit-grid input:hover { border-color: rgb(255 255 255 / 8%); }
 .profile-actions,
 .channel-settings-actions,
