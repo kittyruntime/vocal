@@ -77,7 +77,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = useCallback(async () => {
     await api.logout();
-    await applyServerDefaultAccent();
+    try {
+      await applyServerDefaultAccent();
+    } catch {
+      /* cosmetic reset; never block sign-out */
+    }
     setState({ phase: "signed-out" });
   }, []);
 

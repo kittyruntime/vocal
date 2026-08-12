@@ -133,7 +133,7 @@ describe("appearance settings", () => {
   it("rejects a duplicate-containing enabled_accent_presets array at the database layer", async () => {
     await expect(
       pool.query("UPDATE server_settings SET enabled_accent_presets = ARRAY['amber','amber'] WHERE singleton = true"),
-    ).rejects.toThrow();
+    ).rejects.toMatchObject({ code: "23514", constraint: "enabled_accent_presets_no_duplicates" });
   });
 
   it("returns 401 for GET /api/me/accent without auth", async () => {
