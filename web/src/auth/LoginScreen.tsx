@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import { useAuth } from "./AuthContext";
 import { ApiError } from "../api/client";
 import { TextField } from "../ui/form";
+import { Wordmark } from "../ui/Wordmark";
 
 export function LoginScreen({ onShowRegister, registrationOpen = true }: { onShowRegister(): void; registrationOpen?: boolean }) {
   const { signIn } = useAuth();
@@ -26,6 +27,7 @@ export function LoginScreen({ onShowRegister, registrationOpen = true }: { onSho
   return (
     <div className="auth-screen">
       <form className="auth-card" onSubmit={handleSubmit}>
+        <Wordmark size={26} />
         <h1>Log in</h1>
         <TextField label="Username" value={username} onChange={(e) => setUsername(e.target.value)} required />
         <TextField label="Password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
