@@ -277,6 +277,6 @@ describe("AdminPanel appearance", () => {
     const glacierRow = screen.getByRole("button", { name: ACCENT_PRESET_LABELS.glacier }).closest(".admin-accent-row") as HTMLElement;
     await user.click(within(glacierRow).getByRole("button", { name: `Set ${ACCENT_PRESET_LABELS.glacier} as default` }));
     await waitFor(() => expect(api.updateAppearance).toHaveBeenCalledWith({ defaultPreset: "glacier" }));
-    expect(await within(glacierRow).findByRole("button", { name: `Set ${ACCENT_PRESET_LABELS.glacier} as default` })).toBeInTheDocument();
+    expect(await within(glacierRow).findByRole("button", { name: `Set ${ACCENT_PRESET_LABELS.glacier} as default` })).toBeDisabled();
   });
 });
