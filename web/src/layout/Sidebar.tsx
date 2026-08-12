@@ -5,6 +5,7 @@ import { useToast } from "../toast/ToastContext";
 import type { VoiceParticipant } from "../ws/protocol";
 import { Icon } from "../ui/Icon";
 import { RadioGroup, Select, TextField } from "../ui/form";
+import { Wordmark } from "../ui/Wordmark";
 import { AdminPanel } from "./AdminPanel";
 import { ChannelSettingsModal } from "./ChannelSettingsModal";
 
@@ -62,7 +63,7 @@ export function Sidebar({
   return (
     <nav className="sidebar" aria-label="Channels">
       <div className="sidebar-server-name">
-        <span>Vocal</span>
+        <Wordmark />
         <div className="sidebar-server-actions">
           <button type="button" className="server-settings-button" aria-label="Search" title="Search" onClick={onOpenSearch}><Icon name="search" size={17} /></button>
           <span className="online-dot" aria-label={`${onlineUserIds.length} members online`} />
