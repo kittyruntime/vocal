@@ -1,6 +1,6 @@
 import type { ComponentProps } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ToastProvider } from "../toast/ToastContext";
 import { VoiceView } from "./VoiceView";
@@ -14,8 +14,11 @@ const disconnect = vi.fn();
 const setMicrophoneEnabled = vi.fn();
 const setCameraEnabled = vi.fn();
 const setScreenShareEnabled = vi.fn();
+const createScreenTracks = vi.fn();
+const publishTrack = vi.fn();
 const getTrackPublication = vi.fn();
 const switchActiveDevice = vi.fn();
+const setAttributes = vi.fn();
 const roomHandlers = new Map<string, (...args: unknown[]) => void>();
 const remoteParticipants = new Map<string, any>();
 
@@ -26,7 +29,7 @@ vi.mock("livekit-client", () => ({
     connect = connect;
     disconnect = disconnect;
     switchActiveDevice = switchActiveDevice;
-    localParticipant = { setMicrophoneEnabled, setCameraEnabled, setScreenShareEnabled, getTrackPublication };
+    localParticipant = { identity: "u1", name: "theo", attributes: {}, setMicrophoneEnabled, setCameraEnabled, setScreenShareEnabled, createScreenTracks, publishTrack, getTrackPublication, setAttributes };
     on(event: string, handler: (...args: unknown[]) => void) { roomHandlers.set(event, handler); return this; }
   },
   RoomEvent: {
@@ -38,6 +41,9 @@ vi.mock("livekit-client", () => ({
     ParticipantConnected: "participantConnected",
     ParticipantDisconnected: "participantDisconnected",
     ParticipantPermissionsChanged: "participantPermissionsChanged",
+    ParticipantAttributesChanged: "participantAttributesChanged",
+    TrackMuted: "trackMuted",
+    TrackUnmuted: "trackUnmuted",
     Reconnecting: "reconnecting",
     Reconnected: "reconnected",
     Disconnected: "disconnected",
@@ -46,7 +52,7 @@ vi.mock("livekit-client", () => ({
   VideoQuality: { LOW: 0, MEDIUM: 1, HIGH: 2 },
   Track: {
     Kind: { Audio: "audio", Video: "video" },
-    Source: { Camera: "camera", ScreenShare: "screen_share", Microphone: "microphone" },
+    Source: { Camera: "camera", ScreenShare: "screen_share", ScreenShareAudio: "screen_share_audio", Microphone: "microphone" },
   },
   createAudioAnalyser: vi.fn(),
   MediaDeviceFailure: Object.assign(
@@ -93,6 +99,7 @@ const channel = { id: "c2", name: "salle", type: "voice", requiredCapability: nu
 const currentUser: CurrentUser = { id: "u1", username: "theo", capabilities: [] };
 
 beforeEach(() => {
+  vi.restoreAllMocks();
   vi.clearAllMocks();
   roomHandlers.clear();
   remoteParticipants.clear();
@@ -101,14 +108,20 @@ beforeEach(() => {
   connect.mockResolvedValue(undefined);
   disconnect.mockResolvedValue(undefined);
   switchActiveDevice.mockResolvedValue(true);
+  setAttributes.mockResolvedValue(undefined);
   setMicrophoneEnabled.mockResolvedValue(undefined);
   getTrackPublication.mockReturnValue(undefined);
   const videoTrack = {
+    kind: "video",
     attach: vi.fn(() => document.createElement("video")),
     detach: vi.fn(() => []),
+    stop: vi.fn(),
   };
+  const screenAudioTrack = { kind: "audio", stop: vi.fn() };
   setCameraEnabled.mockResolvedValue({ track: videoTrack });
   setScreenShareEnabled.mockResolvedValue({ track: videoTrack });
+  createScreenTracks.mockResolvedValue([videoTrack, screenAudioTrack]);
+  publishTrack.mockImplementation((track) => Promise.resolve({ track }));
   HTMLElement.prototype.requestFullscreen = vi.fn().mockResolvedValue(undefined);
   document.exitFullscreen = vi.fn().mockResolvedValue(undefined);
   Object.defineProperty(document, "fullscreenElement", { value: null, writable: true, configurable: true });
@@ -149,8 +162,8 @@ describe("VoiceView", () => {
 
     await screen.findByRole("button", { name: "Mute microphone" });
     expect(onParticipantsChange).toHaveBeenLastCalledWith([
-      { userId: "u1", username: "theo", avatarUrl: null },
-      { userId: "u2", username: "alice", avatarUrl: null },
+      { userId: "u1", username: "theo", avatarUrl: null, microphoneMuted: false, deafened: false },
+      { userId: "u2", username: "alice", avatarUrl: null, microphoneMuted: true, deafened: false },
     ]);
     expect(screen.getByLabelText("Channel videos").querySelectorAll(".screen-share")).toHaveLength(1);
     expect(existingTrack.attach).toHaveBeenCalledOnce();
@@ -162,6 +175,26 @@ describe("VoiceView", () => {
     expect(api.getVoiceToken).toHaveBeenCalledWith("c2");
     expect(connect).toHaveBeenCalledWith("ws://livekit", "jwt");
     expect(setMicrophoneEnabled).toHaveBeenCalledWith(true, expect.any(Object), expect.any(Object));
+  });
+
+  it("shows remote microphone and sound status and refreshes it from LiveKit events", async () => {
+    const microphone = { source: "microphone", isMuted: true };
+    const participant = {
+      identity: "u2",
+      name: "alice",
+      attributes: { "vocal.deafened": "true" },
+      getTrackPublication: vi.fn(() => microphone),
+      trackPublications: new Map(),
+    };
+    remoteParticipants.set(participant.identity, participant);
+
+    await renderView();
+    expect(await screen.findByLabelText("alice: microphone muted, sound muted")).toBeInTheDocument();
+
+    microphone.isMuted = false;
+    participant.attributes["vocal.deafened"] = "false";
+    act(() => roomHandlers.get("trackUnmuted")?.());
+    expect(screen.getByLabelText("alice: microphone on")).toBeInTheDocument();
   });
 
   it("mutes and leaves the room", async () => {
@@ -202,13 +235,16 @@ describe("VoiceView", () => {
     const user = userEvent.setup();
     await user.click(await screen.findByRole("button", { name: "Deafen" }));
     expect(screen.getByRole("button", { name: "Undeafen" })).toHaveAttribute("aria-pressed", "true");
+    expect(setAttributes).toHaveBeenLastCalledWith({ "vocal.deafened": "true" });
 
     await user.click(screen.getByRole("button", { name: "Turn on camera" }));
     expect(setCameraEnabled).toHaveBeenCalledWith(true, expect.any(Object), expect.any(Object));
     expect(screen.getByRole("button", { name: "Stop camera" })).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Share screen" }));
-    expect(setScreenShareEnabled).toHaveBeenCalledWith(true, expect.any(Object), expect.any(Object));
+    expect(createScreenTracks).toHaveBeenCalledWith(expect.objectContaining({ audio: true, systemAudio: "include" }));
+    expect(publishTrack).toHaveBeenCalledTimes(2);
+    expect(playAppSound).toHaveBeenCalledWith("screenShare");
     expect(screen.getByRole("button", { name: "Stop sharing" })).toBeInTheDocument();
   });
 
@@ -252,6 +288,31 @@ describe("VoiceView", () => {
     expect(await screen.findByRole("button", { name: "Enter fullscreen" })).toBeInTheDocument();
   });
 
+  it("plays remote screen-share audio and exposes a per-stream volume control", async () => {
+    await renderView();
+    const audio = document.createElement("audio");
+    const remoteTrack = {
+      kind: "audio",
+      sid: "screen-audio-1",
+      attach: vi.fn(() => audio),
+      detach: vi.fn(() => [audio]),
+    };
+    const publication = { source: "screen_share_audio" };
+    const participant = { identity: "u2", name: "alice" };
+
+    act(() => roomHandlers.get("trackSubscribed")?.(remoteTrack, publication, participant));
+    const slider = await screen.findByLabelText("alice screen share volume");
+    expect(audio.muted).toBe(false);
+    expect(audio.volume).toBe(1);
+
+    fireEvent.change(slider, { target: { value: "35" } });
+    expect(audio.volume).toBe(0.35);
+    expect(screen.getByText("35%")).toBeInTheDocument();
+
+    act(() => roomHandlers.get("trackUnsubscribed")?.(remoteTrack, publication));
+    expect(screen.queryByLabelText("alice screen share volume")).not.toBeInTheDocument();
+  });
+
   it("publishes screen sharing in 1080p60 game mode", async () => {
     await renderView();
     const user = userEvent.setup();
@@ -260,11 +321,30 @@ describe("VoiceView", () => {
     await user.selectOptions(screen.getByLabelText("Screen share"), "game");
     await user.click(screen.getByRole("button", { name: "Share screen" }));
 
+    expect(createScreenTracks).toHaveBeenLastCalledWith(
+      expect.objectContaining({ resolution: expect.objectContaining({ width: 1920, height: 1080, frameRate: 60 }) }),
+    );
+    expect(publishTrack).toHaveBeenCalledWith(expect.objectContaining({ kind: "video" }), expect.objectContaining({ screenShareEncoding: expect.objectContaining({ maxFramerate: 60 }) }));
+  });
+
+  it("falls back to video-only screen sharing on Firefox", async () => {
+    vi.spyOn(window.navigator, "userAgent", "get").mockReturnValue("Mozilla/5.0 Firefox/142.0");
+    await renderView();
+    await userEvent.setup().click(await screen.findByRole("button", { name: "Share screen" }));
     expect(setScreenShareEnabled).toHaveBeenLastCalledWith(
       true,
-      expect.objectContaining({ resolution: expect.objectContaining({ width: 1920, height: 1080, frameRate: 60 }) }),
-      expect.objectContaining({ screenShareEncoding: expect.objectContaining({ maxFramerate: 60 }) }),
+      expect.objectContaining({ audio: false }),
+      expect.any(Object),
     );
+    expect(await screen.findByText("Firefox does not support sharing tab or system audio. Sharing video only.")).toBeInTheDocument();
+  });
+
+  it("keeps the video share active when publishing its audio fails", async () => {
+    publishTrack.mockResolvedValueOnce({ track: { kind: "video", attach: vi.fn(() => document.createElement("video")) } }).mockRejectedValueOnce(new Error("audio publish failed"));
+    await renderView();
+    await userEvent.setup().click(await screen.findByRole("button", { name: "Share screen" }));
+    expect(await screen.findByText("The screen is shared, but its audio could not be published.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Stop sharing" })).toBeInTheDocument();
   });
 
   it("opens voice settings in a modal and closes it with Escape", async () => {
@@ -371,9 +451,30 @@ describe("VoiceView", () => {
     await renderView();
     const user = userEvent.setup();
     await screen.findByRole("button", { name: "Mute microphone" });
-    setScreenShareEnabled.mockRejectedValueOnce(Object.assign(new Error("cancel"), { name: "NotAllowedError" }));
+    createScreenTracks.mockRejectedValueOnce(Object.assign(new Error("cancel"), { name: "NotAllowedError" }));
     await user.click(screen.getByRole("button", { name: "Share screen" }));
     await screen.findByText("Screen share cancelled.");
+    expect(playAppSound).not.toHaveBeenCalledWith("screenShare");
+    // A dismissed/denied picker must not be retried -- retrying here would
+    // silently reopen the OS picker right after the user closed it.
+    expect(createScreenTracks).toHaveBeenCalledTimes(1);
+  });
+
+  it("retries without audio and shares video-only when the platform can't satisfy the audio request (NotSupportedError)", async () => {
+    const videoOnlyTrack = { kind: "video", attach: vi.fn(() => document.createElement("video")), detach: vi.fn(() => []), stop: vi.fn() };
+    createScreenTracks
+      .mockRejectedValueOnce(Object.assign(new Error("not supported"), { name: "NotSupportedError" }))
+      .mockResolvedValueOnce([videoOnlyTrack]);
+    await renderView();
+    await userEvent.setup().click(await screen.findByRole("button", { name: "Share screen" }));
+
+    expect(createScreenTracks).toHaveBeenCalledTimes(2);
+    expect(createScreenTracks).toHaveBeenNthCalledWith(1, expect.objectContaining({ audio: true, systemAudio: "include" }));
+    expect(createScreenTracks.mock.calls[1][0]).toMatchObject({ audio: false });
+    expect(createScreenTracks.mock.calls[1][0]).not.toHaveProperty("systemAudio");
+    expect(await screen.findByText("Could not share this screen's audio here. Sharing video only.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Stop sharing" })).toBeInTheDocument();
+    expect(playAppSound).toHaveBeenCalledWith("screenShare");
   });
 
   it("configures push-to-talk from voice settings", async () => {

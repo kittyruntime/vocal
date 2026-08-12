@@ -19,6 +19,7 @@ const SOUND_EVENT_LABEL: Record<SoundEvent, { title: string; description: string
   userLeave: { title: "Voice leave", description: "Plays when someone leaves the voice channel you're in." },
   muteToggle: { title: "Microphone mute/unmute", description: "Plays when a member mutes or unmutes their own microphone." },
   forceMuted: { title: "Force-muted by a moderator", description: "Plays for a member when a moderator revokes their voice permission." },
+  screenShare: { title: "Screen sharing", description: "Plays when you start or stop sharing your screen." },
 };
 
 export function AdminPanel({ currentUser, onClose }: {

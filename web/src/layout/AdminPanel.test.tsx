@@ -32,6 +32,7 @@ const DEFAULT_SOUND_SETTINGS: SoundSettings = {
   userLeave: { enabled: true, hasCustom: false },
   muteToggle: { enabled: true, hasCustom: false },
   forceMuted: { enabled: true, hasCustom: false },
+  screenShare: { enabled: true, hasCustom: false },
 };
 
 function renderPanel(users: AdminUser[] = [alice], openMembers = true, soundSettings: SoundSettings = DEFAULT_SOUND_SETTINGS) {
@@ -211,6 +212,7 @@ describe("AdminPanel sounds", () => {
       userLeave: { enabled: true, hasCustom: false },
       muteToggle: { enabled: true, hasCustom: false },
       forceMuted: { enabled: true, hasCustom: false },
+      screenShare: { enabled: true, hasCustom: false },
     });
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: "Sounds" }));

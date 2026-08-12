@@ -10,7 +10,9 @@ vi.mock("../api/client", async () => ({
   updateProfile: vi.fn(),
   getSoundSettings: vi.fn(),
   getMySoundVolumes: vi.fn(),
+  getMySoundSettings: vi.fn(),
   updateMySoundVolume: vi.fn(),
+  updateMySoundSetting: vi.fn(),
 }));
 
 vi.mock("../audio/sounds", async () => ({
@@ -26,8 +28,10 @@ beforeEach(() => {
     userLeave: { enabled: true, hasCustom: false },
     muteToggle: { enabled: true, hasCustom: false },
     forceMuted: { enabled: true, hasCustom: false },
+    screenShare: { enabled: true, hasCustom: false },
   });
-  vi.mocked(api.getMySoundVolumes).mockResolvedValue({ message: 55, userJoin: 55, userLeave: 55, muteToggle: 55, forceMuted: 55 });
+  vi.mocked(api.getMySoundVolumes).mockResolvedValue({ message: 55, userJoin: 55, userLeave: 55, muteToggle: 55, forceMuted: 55, screenShare: 55 });
+  vi.mocked(api.getMySoundSettings).mockResolvedValue(Object.fromEntries(api.SOUND_EVENTS.map((event) => [event, { hasCustom: false }])) as api.UserSoundSettings);
 });
 
 describe("ProfileModal", () => {
@@ -61,7 +65,7 @@ describe("ProfileModal", () => {
   });
 
   it("adjusts and saves a per-sound volume", async () => {
-    vi.mocked(api.updateMySoundVolume).mockResolvedValue({ message: 80, userJoin: 55, userLeave: 55, muteToggle: 55, forceMuted: 55 });
+    vi.mocked(api.updateMySoundVolume).mockResolvedValue({ message: 80, userJoin: 55, userLeave: 55, muteToggle: 55, forceMuted: 55, screenShare: 55 });
     render(<ProfileModal currentUser={{ id: "u1", username: "theo", capabilities: [] }} onSaved={vi.fn()} onClose={vi.fn()} />);
     const slider = await screen.findByLabelText("Message received — 55%");
     fireEvent.change(slider, { target: { value: "80" } });
@@ -70,7 +74,7 @@ describe("ProfileModal", () => {
   });
 
   it("applies a saved volume to the live sound engine immediately, without a reload", async () => {
-    const freshVolumes = { message: 80, userJoin: 55, userLeave: 55, muteToggle: 55, forceMuted: 55 };
+    const freshVolumes = { message: 80, userJoin: 55, userLeave: 55, muteToggle: 55, forceMuted: 55, screenShare: 55 };
     vi.mocked(api.updateMySoundVolume).mockResolvedValue(freshVolumes);
     render(<ProfileModal currentUser={{ id: "u1", username: "theo", capabilities: [] }} onSaved={vi.fn()} onClose={vi.fn()} />);
     const slider = await screen.findByLabelText("Message received — 55%");
@@ -83,8 +87,20 @@ describe("ProfileModal", () => {
         userLeave: { enabled: true, hasCustom: false },
         muteToggle: { enabled: true, hasCustom: false },
         forceMuted: { enabled: true, hasCustom: false },
+        screenShare: { enabled: true, hasCustom: false },
       },
       freshVolumes,
+      expect.objectContaining({ message: { hasCustom: false } }),
     ));
+  });
+
+  it("uploads and resets a personal sound", async () => {
+    vi.mocked(api.updateMySoundSetting).mockResolvedValueOnce({ hasCustom: true }).mockResolvedValueOnce({ hasCustom: false });
+    render(<ProfileModal currentUser={{ id: "u1", username: "theo", capabilities: [] }} onSaved={vi.fn()} onClose={vi.fn()} />);
+    const input = await screen.findByLabelText("Voice join sound file");
+    await userEvent.setup().upload(input, new File([new Uint8Array([1, 2, 3])], "join.mp3", { type: "audio/mpeg" }));
+    await waitFor(() => expect(api.updateMySoundSetting).toHaveBeenCalledWith("userJoin", expect.stringMatching(/^data:audio\/mpeg;base64,/)));
+    await userEvent.setup().click(await screen.findByLabelText("Reset Voice join"));
+    await waitFor(() => expect(api.updateMySoundSetting).toHaveBeenLastCalledWith("userJoin", null));
   });
 });

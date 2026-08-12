@@ -32,7 +32,7 @@ export type ChannelPayload = {
   createdAt: string;
 };
 
-export type VoiceParticipantPayload = { userId: string; username: string; avatarUrl?: string | null };
+export type VoiceParticipantPayload = { userId: string; username: string; avatarUrl?: string | null; microphoneMuted?: boolean; deafened?: boolean };
 
 export type ServerEvent =
   | { type: "presence.sync"; userIds: string[] }
@@ -46,6 +46,7 @@ export type ServerEvent =
   | { type: "channel.deleted"; channelId: string }
   | { type: "voice.sync"; channels: Record<string, VoiceParticipantPayload[]> }
   | { type: "voice.joined"; channelId: string; participant: VoiceParticipantPayload }
+  | { type: "voice.updated"; channelId: string; participant: VoiceParticipantPayload }
   | { type: "voice.left"; channelId: string; userId: string };
 
-export type ClientEvent = { type: "ping" } | { type: "typing.update"; channelId: string; active: boolean };
+export type ClientEvent = { type: "ping" } | { type: "typing.update"; channelId: string; active: boolean } | { type: "voice.status"; channelId: string; microphoneMuted: boolean; deafened: boolean };

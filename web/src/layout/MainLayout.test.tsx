@@ -14,6 +14,7 @@ vi.mock("../api/client", async () => {
     getChatSettings: vi.fn(),
     getSoundSettings: vi.fn(),
     getMySoundVolumes: vi.fn(),
+    getMySoundSettings: vi.fn(),
     // MainLayout receives currentUser as a prop, but it still mounts inside AuthProvider
     // (to reach useAuth().signOut), whose own bootstrap effect calls getSetupStatus/getMe.
     // Mock those too so that effect doesn't fire real, unmocked fetches during this test.
@@ -60,8 +61,10 @@ beforeEach(() => {
     userLeave: { enabled: true, hasCustom: false },
     muteToggle: { enabled: true, hasCustom: false },
     forceMuted: { enabled: true, hasCustom: false },
+    screenShare: { enabled: true, hasCustom: false },
   });
-  vi.mocked(api.getMySoundVolumes).mockResolvedValue({ message: 55, userJoin: 55, userLeave: 55, muteToggle: 55, forceMuted: 55 });
+  vi.mocked(api.getMySoundVolumes).mockResolvedValue({ message: 55, userJoin: 55, userLeave: 55, muteToggle: 55, forceMuted: 55, screenShare: 55 });
+  vi.mocked(api.getMySoundSettings).mockResolvedValue(Object.fromEntries(api.SOUND_EVENTS.map((event) => [event, { hasCustom: false }])) as api.UserSoundSettings);
   vi.mocked(api.getSetupStatus).mockResolvedValue({ done: true });
   vi.mocked(api.getMe).mockResolvedValue(admin);
 });
