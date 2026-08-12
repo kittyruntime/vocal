@@ -3,6 +3,7 @@ import type { Channel, CurrentUser, Message } from "../api/client";
 import * as api from "../api/client";
 import { useToast } from "../toast/ToastContext";
 import { Icon } from "../ui/Icon";
+import { TextField } from "../ui/form";
 
 const PAGE_SIZE = 50;
 // Mirrors the server's inline-safe allowlist (server/src/routes/messages.ts)
@@ -366,9 +367,10 @@ export function ChatView({
             addFiles(selected);
             event.target.value = "";
           }} />
-          <input
+          <TextField
             ref={composerInputRef}
-            aria-label={`Message in ${channel.name}`}
+            label={`Message in ${channel.name}`}
+            visuallyHiddenLabel
             placeholder={`Send a message in #${channel.name}`}
             value={draft}
             maxLength={maxMessageLength}
