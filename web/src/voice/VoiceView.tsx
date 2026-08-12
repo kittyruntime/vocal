@@ -882,28 +882,65 @@ export function VoiceView({
       const captureOptions = enabled
         ? { ...profile.capture, audio: audioSupported, ...(audioSupported ? { systemAudio: "include" as const } : {}) }
         : profile.capture;
+      console.log("[screen-share] toggle", { enabled, audioSupported, quality: settings.screenQuality, captureOptions });
       let publication;
       if (enabled && audioSupported) {
-        const tracks = await room.localParticipant.createScreenTracks(captureOptions);
+        let tracks;
+        let capturedWithAudio = true;
+        try {
+          tracks = await room.localParticipant.createScreenTracks(captureOptions);
+        } catch (captureError) {
+          const errorName = captureError instanceof Error ? captureError.name : undefined;
+          console.error("[screen-share] createScreenTracks failed with audio requested", {
+            name: errorName,
+            message: captureError instanceof Error ? captureError.message : String(captureError),
+            captureOptions,
+          });
+          // getDisplayMedia rejects the WHOLE call (not just the audio part) when
+          // the platform/browser combination can't satisfy the audio constraint at
+          // all -- e.g. `systemAudio` capture is only available on some Chrome
+          // versions/platforms (Windows first, macOS from Chrome 141). That shows
+          // up as NotSupportedError, distinct from the video track publishing fine
+          // and only its *publish to LiveKit* failing (handled below) or from the
+          // user dismissing the OS picker entirely (NotAllowedError, where retrying
+          // would just reopen a picker the user just closed). Only retry for the
+          // audio-capability-gap case.
+          if (errorName !== "NotSupportedError") throw captureError;
+          capturedWithAudio = false;
+          console.warn("[screen-share] retrying capture without audio after NotSupportedError");
+          // profile.capture hardcodes audio: true for every screen-share quality
+          // preset (see quality.ts) -- it must be explicitly overridden here, not
+          // just omitted, or the retry would ask for audio again and fail the
+          // same way.
+          tracks = await room.localParticipant.createScreenTracks({ ...profile.capture, audio: false });
+        }
         const videoTrack = tracks.find((track) => track.kind === Track.Kind.Video);
         const audioTrack = tracks.find((track) => track.kind === Track.Kind.Audio);
+        console.log("[screen-share] captured tracks", { hasVideo: Boolean(videoTrack), hasAudio: Boolean(audioTrack), capturedWithAudio });
         if (!videoTrack) throw new Error("Screen capture did not provide a video track");
         try {
           publication = await room.localParticipant.publishTrack(videoTrack, profile.publish);
+          console.log("[screen-share] video track published", { trackSid: publication?.trackSid });
         } catch (error) {
+          console.error("[screen-share] video track publish failed", error);
           for (const track of tracks) track.stop();
           throw error;
         }
         if (audioTrack) {
           try {
             await room.localParticipant.publishTrack(audioTrack, audioProfiles.high.publish);
-          } catch {
+            console.log("[screen-share] audio track published");
+          } catch (publishError) {
+            console.error("[screen-share] audio track publish failed", publishError);
             audioTrack.stop();
             showToast("The screen is shared, but its audio could not be published.");
           }
+        } else if (!capturedWithAudio) {
+          showToast("Could not share this screen's audio here. Sharing video only.");
         }
       } else {
         publication = await room.localParticipant.setScreenShareEnabled(enabled, captureOptions, profile.publish);
+        console.log("[screen-share] setScreenShareEnabled", { enabled, hasTrack: Boolean(publication?.track) });
       }
       localScreenRef.current?.replaceChildren();
       if (enabled && publication?.track) {
@@ -924,6 +961,11 @@ export function VoiceView({
       if (enabled && !audioSupported) showToast("Firefox does not support sharing tab or system audio. Sharing video only.");
       if (!enabled) setPinnedTileId((value) => value === "local-screen" ? null : value);
     } catch (error) {
+      console.error("[screen-share] toggleScreenShare failed", {
+        name: error instanceof Error ? error.name : undefined,
+        message: error instanceof Error ? error.message : String(error),
+        error,
+      });
       showToast(describeMediaError(MediaDeviceFailure, error, "screen"));
     }
   }
