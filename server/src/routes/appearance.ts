@@ -7,7 +7,11 @@ export const ACCENT_PRESETS = ["amber", "ember-red", "magenta", "glacier", "emer
 export type AccentPreset = (typeof ACCENT_PRESETS)[number];
 
 const patchAppearanceSchema = z.object({
-  enabledPresets: z.array(z.enum(ACCENT_PRESETS)).min(1).optional(),
+  enabledPresets: z
+    .array(z.enum(ACCENT_PRESETS))
+    .min(1)
+    .refine((presets) => new Set(presets).size === presets.length, { message: "duplicate preset id" })
+    .optional(),
   defaultPreset: z.enum(ACCENT_PRESETS).optional(),
 });
 const patchAccentSchema = z.object({

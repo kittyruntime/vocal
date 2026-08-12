@@ -120,6 +120,22 @@ describe("appearance settings", () => {
     expect(res.statusCode).toBe(400);
   });
 
+  it("rejects an enabledPresets list containing a duplicate preset id", async () => {
+    const res = await app.inject({
+      method: "PATCH",
+      url: "/api/admin/appearance",
+      headers: { cookie: adminCookie },
+      payload: { enabledPresets: ["amber", "amber", "glacier"] },
+    });
+    expect(res.statusCode).toBe(400);
+  });
+
+  it("rejects a duplicate-containing enabled_accent_presets array at the database layer", async () => {
+    await expect(
+      pool.query("UPDATE server_settings SET enabled_accent_presets = ARRAY['amber','amber'] WHERE singleton = true"),
+    ).rejects.toThrow();
+  });
+
   it("returns 401 for GET /api/me/accent without auth", async () => {
     const res = await app.inject({ method: "GET", url: "/api/me/accent" });
     expect(res.statusCode).toBe(401);
