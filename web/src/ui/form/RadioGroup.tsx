@@ -1,4 +1,4 @@
-import { useRef, type KeyboardEvent } from "react";
+import { useRef, type KeyboardEvent, type ReactNode } from "react";
 
 export function RadioGroup<T extends string>({
   label,
@@ -7,7 +7,7 @@ export function RadioGroup<T extends string>({
   onChange,
 }: {
   label: string;
-  options: { value: T; label: string; description?: string }[];
+  options: { value: T; label: string; description?: string; icon?: ReactNode }[];
   value: T;
   onChange(next: T): void;
 }) {
@@ -40,8 +40,11 @@ export function RadioGroup<T extends string>({
             onClick={() => onChange(option.value)}
             onKeyDown={(event) => handleKeyDown(event, index)}
           >
-            <strong>{option.label}</strong>
-            {option.description ? <small>{option.description}</small> : null}
+            {option.icon ? <i aria-hidden="true" className="radio-option-icon">{option.icon}</i> : null}
+            <span>
+              <strong>{option.label}</strong>
+              {option.description ? <small>{option.description}</small> : null}
+            </span>
           </button>
         ))}
       </div>

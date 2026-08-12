@@ -104,7 +104,7 @@ describe("Sidebar", () => {
     await user.click(screen.getByRole("button", { name: "Create channel" }));
     const dialog = screen.getByRole("dialog", { name: "Create a channel" });
     expect(dialog).toBeInTheDocument();
-    await user.type(screen.getByLabelText("New channel name"), "annonces");
+    await user.type(screen.getByLabelText("Channel name"), "annonces");
     await user.click(within(dialog).getByRole("button", { name: "Create channel" }));
     await waitFor(() => expect(onCreated).toHaveBeenCalledWith(created));
     expect(api.createChannel).toHaveBeenCalledWith({ name: "annonces", type: "text", requiredCapability: null });
@@ -118,9 +118,9 @@ describe("Sidebar", () => {
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: "Create channel" }));
     const dialog = screen.getByRole("dialog", { name: "Create a channel" });
-    await user.click(screen.getByRole("button", { name: /^Voice/ }));
-    await user.type(screen.getByLabelText("New channel name"), "staff voice");
-    await user.selectOptions(screen.getByLabelText("New channel access"), "moderate");
+    await user.click(screen.getByRole("radio", { name: /^Voice/ }));
+    await user.type(screen.getByLabelText("Channel name"), "staff voice");
+    await user.selectOptions(screen.getByLabelText("Who can access it?"), "moderate");
     await user.click(within(dialog).getByRole("button", { name: "Create channel" }));
     await waitFor(() => expect(api.createChannel).toHaveBeenCalledWith({ name: "staff voice", type: "voice", requiredCapability: "moderate" }));
   });
