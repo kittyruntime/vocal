@@ -65,4 +65,11 @@ describe("RangeSlider", () => {
     expect(screen.getByRole("button", { name: "Preview" })).toBeInTheDocument();
     expect(screen.getByLabelText("Volume")).toBeInTheDocument();
   });
+
+  it("hides the visible label when visuallyHiddenLabel is set, while remaining reachable by accessible name", () => {
+    render(<RangeSlider label="Voice threshold" value={50} min={0} max={100} visuallyHiddenLabel onChange={() => {}} onCommit={() => {}} />);
+    const label = screen.getByText("Voice threshold");
+    expect(label.className).toContain("sr-only");
+    expect(screen.getByLabelText("Voice threshold")).toBeInTheDocument();
+  });
 });

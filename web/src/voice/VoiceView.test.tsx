@@ -539,6 +539,21 @@ describe("VoiceView", () => {
     expect(setMicrophoneEnabled).toHaveBeenLastCalledWith(false, expect.any(Object), expect.any(Object));
   });
 
+  it("only persists the voice threshold to localStorage on release, not on every drag tick", async () => {
+    await renderView();
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "Settings" }));
+    const slider = await screen.findByLabelText("Voice threshold");
+
+    fireEvent.change(slider, { target: { value: "0.3" } });
+    let stored = JSON.parse(window.localStorage.getItem("vocal.voice-settings.v1") ?? "{}");
+    expect(stored.vadThreshold).not.toBe(0.3);
+
+    fireEvent.pointerUp(slider);
+    stored = JSON.parse(window.localStorage.getItem("vocal.voice-settings.v1") ?? "{}");
+    expect(stored.vadThreshold).toBe(0.3);
+  });
+
   it("reports active speakers to the parent and clears them on leave", async () => {
     const onSpeakingChange = vi.fn();
     await renderView({ onSpeakingChange });

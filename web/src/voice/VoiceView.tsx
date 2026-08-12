@@ -30,7 +30,7 @@ import * as api from "../api/client";
 import { playAppSound } from "../audio/sounds";
 import { useToast } from "../toast/ToastContext";
 import { Icon } from "../ui/Icon";
-import { RadioGroup, Select, Switch } from "../ui/form";
+import { RadioGroup, RangeSlider, Select, Switch } from "../ui/form";
 import { audioProfiles, cameraProfiles, screenProfiles, type MediaQuality, type QualityProfile, type ScreenQuality } from "./quality";
 import { shouldOpenVoiceGate, VoiceGateProcessor } from "./VoiceGateProcessor";
 
@@ -1219,7 +1219,20 @@ export function VoiceView({
                   <span style={{ width: `${Math.min(audioLevel * 100, 100)}%` }} />
                   <i style={{ left: `${settings.vadThreshold * 100}%` }} />
                 </div>
-                <input aria-label="Voice threshold" type="range" min="0.02" max="0.6" step="0.01" value={settings.vadThreshold} onChange={(event) => saveSettings({ ...settings, vadThreshold: Number(event.target.value) })} />
+                <RangeSlider
+                  label="Voice threshold"
+                  visuallyHiddenLabel
+                  min={0.02}
+                  max={0.6}
+                  step={0.01}
+                  value={settings.vadThreshold}
+                  onChange={(next) => {
+                    const updated = { ...settings, vadThreshold: next };
+                    settingsRef.current = updated;
+                    setSettings(updated);
+                  }}
+                  onCommit={(next) => localStorage.setItem(SETTINGS_KEY, JSON.stringify({ ...settingsRef.current, vadThreshold: next }))}
+                />
               </div>
             </div>
           </section>
