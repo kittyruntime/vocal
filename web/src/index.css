@@ -352,6 +352,7 @@ textarea.form-input { resize: vertical; }
 .create-channel-form footer button { padding: 9px 14px; border: 0; border-radius: 4px; color: #fff; cursor: pointer; }
 .create-channel-form footer .profile-cancel { background: transparent; }
 .create-channel-form footer button:disabled { opacity: .45; cursor: default; }
+.create-channel-form footer button[type="submit"] { color: var(--brand-contrast); }
 
 .user-bar {
   min-height: 56px;
@@ -488,7 +489,7 @@ textarea.form-input { resize: vertical; }
 .emote-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 3px; }
 .emote-grid button { width: 32px; height: 32px; display: grid; place-items: center; padding: 0; border: 0; border-radius: var(--radius-sm); background: transparent; font-size: 21px; line-height: 1; transition: background-color 100ms ease, transform 100ms ease; }
 .emote-grid button:hover, .emote-grid button:focus-visible { background: var(--bg-active); transform: scale(1.15); }
-.chat-composer > button { width: 44px; display: grid; place-items: center; border: 0; border-radius: 8px; color: #fff; cursor: pointer; }
+.chat-composer > button { width: 44px; display: grid; place-items: center; border: 0; border-radius: 8px; color: var(--brand-contrast); cursor: pointer; }
 .chat-composer > button:disabled { opacity: .35; cursor: default; }
 .typing-indicator { height: 20px; flex: 0 0 20px; padding: 2px 18px 0; color: #b5bac1; font-size: 11px; font-weight: 500; }
 .no-channel { flex: 1; display: grid; place-items: center; gap: 12px; color: #949ba4; }
@@ -628,6 +629,7 @@ textarea.form-input { resize: vertical; }
 .profile-actions { position: sticky; bottom: 0; display: flex; justify-content: flex-end; gap: 10px; margin: 22px -24px 0; padding: 16px 24px; background: #2b2d31; }
 .profile-actions button { padding: 10px 16px; border: 0; border-radius: 4px; color: #fff; cursor: pointer; }
 .profile-cancel { background: transparent; }
+.profile-save { color: var(--brand-contrast); }
 .profile-actions button:disabled { opacity: .5; cursor: default; }
 .public-profile-modal { position: relative; width: min(360px, 100%); overflow: hidden; border: 1px solid rgb(255 255 255 / 7%); border-radius: 14px; background: #111214; box-shadow: 0 24px 72px rgb(0 0 0 / 60%); animation: modal-enter 180ms ease-out both; }
 .public-profile-close { position: absolute; top: 10px; right: 10px; z-index: 2; border-color: transparent; background: rgb(0 0 0 / 45%); color: #fff; }
@@ -782,6 +784,7 @@ textarea.form-input { resize: vertical; }
 .admin-channel-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }
 .admin-channel-actions button { padding: 7px 10px; border: 0; border-radius: 4px; color: white; cursor: pointer; }
 .admin-channel-actions .danger-link { background: transparent; color: #fa777c; }
+.admin-channel-actions button[type="submit"] { color: var(--brand-contrast); }
 .sound-settings-list { display: flex; flex-direction: column; gap: 8px; }
 .sound-setting-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 10px 12px; border-radius: 6px; background: #2b2d31; }
 .sound-setting-row h4 { margin: 0 0 3px; color: #f2f3f5; font-size: 13px; }
