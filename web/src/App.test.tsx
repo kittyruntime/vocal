@@ -4,7 +4,13 @@ import { App } from "./App";
 
 vi.mock("./api/client", async () => {
   const actual = await vi.importActual<typeof import("./api/client")>("./api/client");
-  return { ...actual, getSetupStatus: vi.fn(() => new Promise(() => {})) };
+  return {
+    ...actual,
+    getSetupStatus: vi.fn(() => new Promise(() => {})),
+    // App's mount effect calls applyServerDefaultAccent(), which calls getAppearance().
+    // Mock it so this test doesn't fire a real, unmocked fetch.
+    getAppearance: vi.fn(() => new Promise(() => {})),
+  };
 });
 
 describe("App", () => {

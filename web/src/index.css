@@ -1,24 +1,30 @@
+@import "@fontsource/space-grotesk/700.css";
+@import "@fontsource/inter/400.css";
+@import "@fontsource/inter/600.css";
+
 :root {
   color-scheme: dark;
   --bg-app: #313338;
-  --bg-sidebar: #2b2d31;
-  --bg-sunken: #1e1f22;
+  --bg-base: #0a0a0c;
+  --bg-sidebar: #141416;
+  --bg-sunken: #101012;
   --bg-panel: #232428;
   --bg-hover: #35373c;
   --bg-active: #404249;
   --text-normal: #dbdee1;
   --text-strong: #f2f3f5;
   --text-muted: #949ba4;
-  --brand: #5865f2;
-  --brand-hover: #4752c4;
+  --text-primary: #f7f5f0;
   --success: #23a55a;
   --danger: #da373c;
   --divider: rgb(255 255 255 / 6%);
   --radius-sm: 4px;
   --radius-md: 8px;
   --radius-lg: 12px;
+  --radius-sharp: 2px;
+  --radius-pill: 999px;
   --shadow-elevated: 0 16px 40px rgb(0 0 0 / 38%);
-  font-family: "gg sans", "Noto Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-family: "Inter", "Helvetica Neue", Helvetica, Arial, sans-serif;
   background: var(--bg-app);
   color: var(--text-normal);
   font-synthesis: none;
@@ -28,6 +34,15 @@
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+
+[data-accent="amber"] { --brand: #ffb92e; --brand-hover: #e6a319; --brand-contrast: #1a1200; }
+[data-accent="ember-red"] { --brand: #ff5a36; --brand-hover: #e8481f; --brand-contrast: #200800; }
+[data-accent="magenta"] { --brand: #ff2f7e; --brand-hover: #e01c66; --brand-contrast: #1f0010; }
+[data-accent="glacier"] { --brand: #35d1e0; --brand-hover: #1fb5c4; --brand-contrast: #00232a; }
+[data-accent="emerald"] { --brand: #4ee08a; --brand-hover: #2fc46e; --brand-contrast: #00230f; }
+
+.wordmark { font-family: "Space Grotesk", sans-serif; font-weight: 700; text-transform: uppercase; letter-spacing: -.01em; }
+.wordmark .wordmark-accent { display: inline-block; color: var(--brand); transform: skewX(-8deg); }
 
 * { box-sizing: border-box; }
 
