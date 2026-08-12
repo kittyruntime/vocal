@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import * as api from "../api/client";
 import { ApiError } from "../api/client";
 import type { CurrentUser } from "../api/client";
+import { applyServerDefaultAccent } from "../theme/accent";
 
 type AuthState =
   | { phase: "loading" }
@@ -76,6 +77,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = useCallback(async () => {
     await api.logout();
+    await applyServerDefaultAccent();
     setState({ phase: "signed-out" });
   }, []);
 
