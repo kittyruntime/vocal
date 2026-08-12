@@ -336,7 +336,7 @@ export function ChatView({
                 <button type="button" className="chat-author" onClick={() => onViewProfile?.(message.userId)}>{message.username}</button>
                 <time dateTime={message.createdAt}>{formatMessageTime(message.createdAt)}</time>{message.editedAt ? <span className="message-edited">(edited)</span> : null}
               </div>
-              {editingId === message.id ? <form className="message-edit-form" onSubmit={(event) => { event.preventDefault(); void saveEdit(message.id); }}><input aria-label="Edit message" value={editDraft} maxLength={maxMessageLength} autoFocus onChange={(event) => setEditDraft(event.target.value)} /><div><button type="button" onClick={() => setEditingId(null)}>Cancel</button><button type="submit">Save</button></div></form> : <MessageContent content={message.content} />}
+              {editingId === message.id ? <form className="message-edit-form" onSubmit={(event) => { event.preventDefault(); void saveEdit(message.id); }}><TextField label="Edit message" visuallyHiddenLabel value={editDraft} maxLength={maxMessageLength} autoFocus onChange={(event) => setEditDraft(event.target.value)} /><div><button type="button" onClick={() => setEditingId(null)}>Cancel</button><button type="submit">Save</button></div></form> : <MessageContent content={message.content} />}
               {(message.attachments?.length ?? 0) > 0 ? <div className="message-attachments">
                 {message.attachments!.map((attachment) => INLINE_SAFE_MIME_TYPES.has(attachment.mimeType) ? (
                   <a key={attachment.id} className="message-image" href={attachment.url} target="_blank" rel="noreferrer">
