@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { AuthProvider } from "./AuthContext";
+import { AuthProvider, useAuth } from "./AuthContext";
 import { AuthGate } from "./AuthGate";
 import * as api from "../api/client";
-import { ApiError } from "../api/client";
+import { ApiError, ACCENT_PRESETS } from "../api/client";
 
 vi.mock("../api/client", async () => {
   const actual = await vi.importActual<typeof import("../api/client")>("../api/client");
@@ -16,6 +16,7 @@ vi.mock("../api/client", async () => {
     login: vi.fn(),
     register: vi.fn(),
     logout: vi.fn(),
+    getAppearance: vi.fn(),
   };
 });
 
@@ -33,6 +34,8 @@ beforeEach(() => {
   vi.mocked(api.setup).mockReset();
   vi.mocked(api.login).mockReset();
   vi.mocked(api.register).mockReset();
+  vi.mocked(api.getAppearance).mockReset();
+  delete document.documentElement.dataset.accent;
   window.history.replaceState({}, "", "/");
 });
 
@@ -138,5 +141,26 @@ describe("AuthGate", () => {
     expect(await screen.findByText("Protected content for theo")).toBeInTheDocument();
     expect(window.location.search).toBe("");
     expect(api.register).toHaveBeenCalledWith("theo", "correct horse battery", "abc123");
+  });
+});
+
+function SignOutButton() {
+  const { signOut } = useAuth();
+  return <button onClick={() => void signOut()}>Sign out</button>;
+}
+
+describe("sign out", () => {
+  it("resets the accent to the server default", async () => {
+    vi.mocked(api.getAppearance).mockResolvedValue({ enabledPresets: [...ACCENT_PRESETS], defaultPreset: "glacier" });
+    vi.mocked(api.logout).mockResolvedValue({ ok: true });
+    document.documentElement.dataset.accent = "emerald";
+    render(
+      <AuthProvider>
+        <SignOutButton />
+      </AuthProvider>,
+    );
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "Sign out" }));
+    await waitFor(() => expect(document.documentElement.dataset.accent).toBe("glacier"));
   });
 });
