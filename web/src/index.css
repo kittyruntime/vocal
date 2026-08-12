@@ -629,7 +629,7 @@ textarea.form-input { resize: vertical; }
 .profile-actions { position: sticky; bottom: 0; display: flex; justify-content: flex-end; gap: 10px; margin: 22px -24px 0; padding: 16px 24px; background: #2b2d31; }
 .profile-actions button { padding: 10px 16px; border: 0; border-radius: 4px; color: #fff; cursor: pointer; }
 .profile-cancel { background: transparent; }
-.profile-save { color: var(--brand-contrast); }
+.profile-actions button[type="submit"] { color: var(--brand-contrast); }
 .profile-actions button:disabled { opacity: .5; cursor: default; }
 .public-profile-modal { position: relative; width: min(360px, 100%); overflow: hidden; border: 1px solid rgb(255 255 255 / 7%); border-radius: 14px; background: #111214; box-shadow: 0 24px 72px rgb(0 0 0 / 60%); animation: modal-enter 180ms ease-out both; }
 .public-profile-close { position: absolute; top: 10px; right: 10px; z-index: 2; border-color: transparent; background: rgb(0 0 0 / 45%); color: #fff; }
