@@ -31,4 +31,11 @@ describe("TextField", () => {
     expect(screen.getByText("#")).toBeInTheDocument();
     expect(screen.getByLabelText("Channel name")).toHaveValue("general");
   });
+
+  it("forwards a ref to the underlying input element", () => {
+    const ref = { current: null as HTMLInputElement | null };
+    render(<TextField ref={ref} label="Username" value="theo" onChange={() => {}} />);
+    expect(ref.current).toBeInstanceOf(HTMLInputElement);
+    expect(ref.current).toBe(screen.getByLabelText("Username"));
+  });
 });

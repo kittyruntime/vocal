@@ -1,24 +1,19 @@
-import { useId, type InputHTMLAttributes, type ReactNode } from "react";
+import { forwardRef, useId, type InputHTMLAttributes, type ReactNode } from "react";
 import { FormField } from "./FormField";
 
-export function TextField({
-  label,
-  error,
-  hint,
-  visuallyHiddenLabel,
-  prefix,
-  className,
-  ...inputProps
-}: {
-  label: string;
-  error?: string;
-  hint?: string;
-  visuallyHiddenLabel?: boolean;
-  prefix?: ReactNode;
-} & Omit<InputHTMLAttributes<HTMLInputElement>, "id">) {
+export const TextField = forwardRef<
+  HTMLInputElement,
+  {
+    label: string;
+    error?: string;
+    hint?: string;
+    visuallyHiddenLabel?: boolean;
+    prefix?: ReactNode;
+  } & Omit<InputHTMLAttributes<HTMLInputElement>, "id">
+>(function TextField({ label, error, hint, visuallyHiddenLabel, prefix, className, ...inputProps }, ref) {
   const id = useId();
   const input = (
-    <input id={id} className={["form-input", className].filter(Boolean).join(" ")} {...inputProps} />
+    <input ref={ref} id={id} className={["form-input", className].filter(Boolean).join(" ")} {...inputProps} />
   );
   return (
     <FormField label={label} htmlFor={id} error={error} hint={hint} visuallyHiddenLabel={visuallyHiddenLabel}>
@@ -30,4 +25,4 @@ export function TextField({
       ) : input}
     </FormField>
   );
-}
+});
