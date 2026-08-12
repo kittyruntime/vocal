@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import type { AdminUser, Capability, CurrentUser, Invite, Role, ServerSettings, SoundEvent, SoundSettings } from "../api/client";
-import { CAPABILITIES, SOUND_EVENTS } from "../api/client";
+import type { AccentPreset, AdminUser, AppearanceSettings, Capability, CurrentUser, Invite, Role, ServerSettings, SoundEvent, SoundSettings } from "../api/client";
+import { ACCENT_PRESETS, CAPABILITIES, SOUND_EVENTS } from "../api/client";
 import * as api from "../api/client";
 import { previewSound } from "../audio/sounds";
+import { ACCENT_PRESET_LABELS, ACCENT_SWATCH_COLORS } from "../theme/accent";
 import { Icon } from "../ui/Icon";
 
 const CAPABILITY_LABEL: Record<Capability, string> = {
@@ -33,10 +34,11 @@ export function AdminPanel({ currentUser, onClose }: {
   const [soundSettings, setSoundSettings] = useState<SoundSettings>(() => Object.fromEntries(
     SOUND_EVENTS.map((event) => [event, { enabled: true, hasCustom: false }]),
   ) as SoundSettings);
+  const [appearance, setAppearance] = useState<AppearanceSettings>({ enabledPresets: [...ACCENT_PRESETS], defaultPreset: "amber" });
   const [error, setError] = useState("");
   const canManageServer = currentUser.capabilities.includes("manage_server");
   const canModerate = currentUser.capabilities.includes("moderate");
-  const [activeTab, setActiveTab] = useState<"members" | "general" | "sounds" | "roles" | "invites">(canManageServer ? "general" : "members");
+  const [activeTab, setActiveTab] = useState<"members" | "general" | "sounds" | "roles" | "invites" | "appearance">(canManageServer ? "general" : "members");
   const [memberSearch, setMemberSearch] = useState("");
   const [debouncedMemberSearch, setDebouncedMemberSearch] = useState("");
   const [memberPage, setMemberPage] = useState(1);
@@ -55,11 +57,13 @@ export function AdminPanel({ currentUser, onClose }: {
       canManageServer ? api.getAdminSettings() : Promise.resolve(null),
       canManageServer ? api.listRoles() : Promise.resolve([]),
       canManageServer ? api.getSoundSettings() : Promise.resolve(null),
+      canManageServer ? api.getAppearance() : Promise.resolve(null),
     ])
-      .then(([nextSettings, nextRoles, nextSoundSettings]) => {
+      .then(([nextSettings, nextRoles, nextSoundSettings, nextAppearance]) => {
         setRoles(nextRoles);
         if (nextSettings) setSettings(nextSettings);
         if (nextSoundSettings) setSoundSettings(nextSoundSettings);
+        if (nextAppearance) setAppearance(nextAppearance);
       })
       .catch(() => setError("Could not load server settings."));
   }, [canManageServer]);
@@ -145,6 +149,7 @@ export function AdminPanel({ currentUser, onClose }: {
           {canManageServer ? <button type="button" className={activeTab === "sounds" ? "active" : ""} aria-pressed={activeTab === "sounds"} onClick={() => setActiveTab("sounds")}><Icon name="volume" size={17} /> Sounds</button> : null}
           {canManageServer ? <button type="button" className={activeTab === "roles" ? "active" : ""} aria-pressed={activeTab === "roles"} onClick={() => setActiveTab("roles")}><Icon name="users" size={17} /> Roles <span className="settings-tab-count">{roles.length}</span></button> : null}
           {canManageServer ? <button type="button" className={activeTab === "invites" ? "active" : ""} aria-pressed={activeTab === "invites"} onClick={() => setActiveTab("invites")}><Icon name="plus" size={17} /> Invitations</button> : null}
+          {canManageServer ? <button type="button" className={activeTab === "appearance" ? "active" : ""} aria-pressed={activeTab === "appearance"} onClick={() => setActiveTab("appearance")}><Icon name="settings" size={17} /> Appearance</button> : null}
           <button type="button" className={activeTab === "members" ? "active" : ""} aria-pressed={activeTab === "members"} onClick={() => setActiveTab("members")}><Icon name="users" size={17} /> Members <span className="settings-tab-count">{totalUsers}</span></button>
         </nav>
         <div className="voice-settings-content admin-settings-content">
@@ -172,6 +177,7 @@ export function AdminPanel({ currentUser, onClose }: {
           {activeTab === "sounds" && canManageServer ? <SoundSettingsManager soundSettings={soundSettings} onChange={setSoundSettings} onError={setError} /> : null}
           {activeTab === "roles" && canManageServer ? <RoleManager roles={roles} onChange={setRoles} onError={setError} /> : null}
           {activeTab === "invites" && canManageServer ? <InviteManager onError={setError} /> : null}
+          {activeTab === "appearance" && canManageServer ? <AppearanceManager appearance={appearance} onChange={setAppearance} onError={setError} /> : null}
           {activeTab === "members" ? <div className="settings-section admin-members-section">
             <div className="admin-members-heading"><div><h3>Members</h3><p>{totalUsers} {totalUsers === 1 ? "member" : "members"}</p></div><input type="search" aria-label="Search members" placeholder="Search members" value={memberSearch} onChange={(event) => setMemberSearch(event.target.value)} /></div>
             <div className="admin-user-list">
@@ -238,6 +244,54 @@ function RoleManager({ roles, onChange, onError }: { roles: Role[]; onChange(rol
     catch { onError("Could not delete this role."); }
   }
   return <div className="settings-section admin-roles-section"><div className="admin-roles-heading"><div><h3>Roles</h3><p>Group permissions and assign them to multiple members.</p></div><button type="button" onClick={() => edit()}>New role</button></div><div className="admin-role-layout"><div className="admin-role-list">{roles.map((role) => <button type="button" key={role.id} className={editingId === role.id ? "active" : ""} onClick={() => edit(role)}><i style={{ background: role.color }} /><span><strong>{role.name}</strong><small>{role.memberCount} members</small></span></button>)}</div><form className="admin-role-editor" onSubmit={save}><label>Role name<input value={name} maxLength={32} placeholder="Community manager" onChange={(event) => setName(event.target.value)} /></label><label>Color<input type="color" value={color} onChange={(event) => setColor(event.target.value)} /></label><fieldset><legend>Permissions</legend>{CAPABILITIES.map((capability) => <label key={capability}><input type="checkbox" checked={capabilities.includes(capability)} onChange={() => setCapabilities((values) => values.includes(capability) ? values.filter((value) => value !== capability) : [...values, capability])} />{CAPABILITY_LABEL[capability]}</label>)}</fieldset><div><button type="submit" disabled={!name.trim()}>{editingId ? "Save role" : "Create role"}</button>{editingId ? <button type="button" className="danger-link" onClick={() => void remove(roles.find((role) => role.id === editingId)!)}>Delete</button> : null}</div></form></div></div>;
+}
+
+function AppearanceManager({ appearance, onChange, onError }: {
+  appearance: AppearanceSettings;
+  onChange(appearance: AppearanceSettings): void;
+  onError(message: string): void;
+}) {
+  async function toggle(preset: AccentPreset) {
+    const enabledPresets = appearance.enabledPresets.includes(preset)
+      ? appearance.enabledPresets.filter((value) => value !== preset)
+      : [...appearance.enabledPresets, preset];
+    if (enabledPresets.length === 0) return onError("At least one accent preset must stay enabled.");
+    try {
+      const updated = await api.updateAppearance({ enabledPresets });
+      onChange(updated);
+    } catch { onError("Could not update the enabled presets."); }
+  }
+
+  async function setDefault(preset: AccentPreset) {
+    try {
+      const updated = await api.updateAppearance({ defaultPreset: preset });
+      onChange(updated);
+    } catch { onError("Could not update the default preset."); }
+  }
+
+  return (
+    <div className="settings-section admin-appearance-section">
+      <h3>Appearance</h3>
+      <p className="admin-setting-description">Choose which accent colors members can pick from, and which one is the default.</p>
+      <div className="accent-swatch-list">
+        {ACCENT_PRESETS.map((preset) => (
+          <div key={preset} className="admin-accent-row">
+            <button
+              type="button"
+              aria-label={ACCENT_PRESET_LABELS[preset]}
+              aria-pressed={appearance.enabledPresets.includes(preset)}
+              className={`accent-swatch ${appearance.enabledPresets.includes(preset) ? "active" : ""}`}
+              style={{ background: ACCENT_SWATCH_COLORS[preset] }}
+              onClick={() => void toggle(preset)}
+            />
+            <button type="button" disabled={!appearance.enabledPresets.includes(preset) || appearance.defaultPreset === preset} onClick={() => void setDefault(preset)}>
+              {appearance.defaultPreset === preset ? "Default" : "Set as default"}
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 function SoundSettingsManager({ soundSettings, onChange, onError }: {
