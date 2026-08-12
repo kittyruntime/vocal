@@ -29,17 +29,33 @@ export function registerAppearanceRoutes(app: FastifyInstance, pool: pg.Pool): v
   app.patch("/api/admin/appearance", { preHandler: [app.requireAuth, requireCapability("manage_server")] }, async (req, reply) => {
     const body = patchAppearanceSchema.safeParse(req.body);
     if (!body.success) return reply.code(400).send({ error: "invalid payload" });
-    if (body.data.defaultPreset && body.data.enabledPresets && !body.data.enabledPresets.includes(body.data.defaultPreset)) {
-      return reply.code(400).send({ error: "default preset must be one of the enabled presets" });
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      const current = await client.query<AppearanceRow>(
+        "SELECT enabled_accent_presets, default_accent_preset FROM server_settings WHERE singleton = true FOR UPDATE",
+      );
+      const resultingEnabled = body.data.enabledPresets ?? current.rows[0].enabled_accent_presets;
+      const resultingDefault = body.data.defaultPreset ?? current.rows[0].default_accent_preset;
+      if (!resultingEnabled.includes(resultingDefault)) {
+        await client.query("ROLLBACK");
+        return reply.code(400).send({ error: "default preset must be one of the enabled presets" });
+      }
+      const result = await client.query<AppearanceRow>(
+        `UPDATE server_settings SET
+           enabled_accent_presets = $1,
+           default_accent_preset = $2
+         WHERE singleton = true RETURNING enabled_accent_presets, default_accent_preset`,
+        [resultingEnabled, resultingDefault],
+      );
+      await client.query("COMMIT");
+      return { enabledPresets: result.rows[0].enabled_accent_presets, defaultPreset: result.rows[0].default_accent_preset };
+    } catch (err) {
+      await client.query("ROLLBACK");
+      throw err;
+    } finally {
+      client.release();
     }
-    const result = await pool.query<AppearanceRow>(
-      `UPDATE server_settings SET
-         enabled_accent_presets = COALESCE($1, enabled_accent_presets),
-         default_accent_preset = COALESCE($2, default_accent_preset)
-       WHERE singleton = true RETURNING enabled_accent_presets, default_accent_preset`,
-      [body.data.enabledPresets ?? null, body.data.defaultPreset ?? null],
-    );
-    return { enabledPresets: result.rows[0].enabled_accent_presets, defaultPreset: result.rows[0].default_accent_preset };
   });
 
   app.get("/api/me/accent", { preHandler: app.requireAuth }, async (req) => {

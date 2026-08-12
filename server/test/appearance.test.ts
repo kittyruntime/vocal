@@ -73,6 +73,43 @@ describe("appearance settings", () => {
     expect(res.statusCode).toBe(400);
   });
 
+  it("rejects an isolated defaultPreset PATCH against a preset disabled by an earlier PATCH", async () => {
+    const disable = await app.inject({
+      method: "PATCH",
+      url: "/api/admin/appearance",
+      headers: { cookie: adminCookie },
+      payload: { enabledPresets: ["glacier", "emerald"], defaultPreset: "glacier" },
+    });
+    expect(disable.statusCode).toBe(200);
+
+    const res = await app.inject({
+      method: "PATCH",
+      url: "/api/admin/appearance",
+      headers: { cookie: adminCookie },
+      payload: { defaultPreset: "amber" },
+    });
+    expect(res.statusCode).toBe(400);
+
+    const get = await app.inject({ method: "GET", url: "/api/appearance" });
+    expect(get.json()).toEqual({ enabledPresets: ["glacier", "emerald"], defaultPreset: "glacier" });
+  });
+
+  it("rejects an isolated enabledPresets PATCH that would strand the current default", async () => {
+    const res = await app.inject({
+      method: "PATCH",
+      url: "/api/admin/appearance",
+      headers: { cookie: adminCookie },
+      payload: { enabledPresets: ["glacier", "emerald"] },
+    });
+    expect(res.statusCode).toBe(400);
+
+    const get = await app.inject({ method: "GET", url: "/api/appearance" });
+    expect(get.json()).toEqual({
+      enabledPresets: ["amber", "ember-red", "magenta", "glacier", "emerald"],
+      defaultPreset: "amber",
+    });
+  });
+
   it("rejects an unknown preset id", async () => {
     const res = await app.inject({
       method: "PATCH",
