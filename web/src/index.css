@@ -1,6 +1,7 @@
 @import "@fontsource/space-grotesk/700.css";
 @import "@fontsource/inter/400.css";
 @import "@fontsource/inter/600.css";
+@import "@fontsource/inter/700.css";
 
 :root {
   color-scheme: dark;
@@ -35,11 +36,11 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
-[data-accent="amber"] { --brand: #ffb92e; --brand-hover: #e6a319; --brand-contrast: #1a1200; }
-[data-accent="ember-red"] { --brand: #ff5a36; --brand-hover: #e8481f; --brand-contrast: #200800; }
-[data-accent="magenta"] { --brand: #ff2f7e; --brand-hover: #e01c66; --brand-contrast: #1f0010; }
-[data-accent="glacier"] { --brand: #35d1e0; --brand-hover: #1fb5c4; --brand-contrast: #00232a; }
-[data-accent="emerald"] { --brand: #4ee08a; --brand-hover: #2fc46e; --brand-contrast: #00230f; }
+[data-accent="amber"] { --brand: #ffb92e; --brand-hover: #e6a319; --brand-contrast: #1a1200; --brand-glow: rgb(255 185 46 / 18%); }
+[data-accent="ember-red"] { --brand: #ff5a36; --brand-hover: #e8481f; --brand-contrast: #200800; --brand-glow: rgb(255 90 54 / 18%); }
+[data-accent="magenta"] { --brand: #ff2f7e; --brand-hover: #e01c66; --brand-contrast: #1f0010; --brand-glow: rgb(255 47 126 / 18%); }
+[data-accent="glacier"] { --brand: #35d1e0; --brand-hover: #1fb5c4; --brand-contrast: #00232a; --brand-glow: rgb(53 209 224 / 18%); }
+[data-accent="emerald"] { --brand: #4ee08a; --brand-hover: #2fc46e; --brand-contrast: #00230f; --brand-glow: rgb(78 224 138 / 18%); }
 
 .wordmark { font-family: "Space Grotesk", sans-serif; font-weight: 700; text-transform: uppercase; letter-spacing: -.01em; }
 .wordmark .wordmark-accent { display: inline-block; color: var(--brand); transform: skewX(-8deg); }
@@ -101,10 +102,10 @@ summary:focus-visible {
 .form-input:focus-visible {
   outline: none;
   border-color: var(--brand);
-  box-shadow: 0 0 0 4px rgb(88 101 242 / 18%);
+  box-shadow: 0 0 0 4px var(--brand-glow);
 }
 .form-input-group { display: flex; align-items: center; overflow: hidden; border: 1px solid rgb(255 255 255 / 10%); border-radius: var(--radius-md); background: var(--bg-sunken); transition: border-color 120ms ease, box-shadow 120ms ease; }
-.form-input-group:focus-within { border-color: var(--brand); box-shadow: 0 0 0 4px rgb(88 101 242 / 18%); }
+.form-input-group:focus-within { border-color: var(--brand); box-shadow: 0 0 0 4px var(--brand-glow); }
 .form-input-prefix { padding-left: 12px; color: var(--text-muted); font-size: 17px; }
 .form-input-group .form-input { border: 0; background: transparent; }
 .form-input-group .form-input:focus-visible { border-color: transparent; box-shadow: none; }
@@ -115,11 +116,11 @@ textarea.form-input { resize: vertical; }
 .switch.on { background: var(--brand); }
 .switch-thumb { position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; border-radius: 50%; background: #fff; transition: left 140ms ease; }
 .switch.on .switch-thumb { left: 18px; }
-.switch:focus-visible { outline: none; box-shadow: 0 0 0 4px rgb(88 101 242 / 18%); }
+.switch:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--brand-glow); }
 .form-range { width: 100%; accent-color: var(--brand); }
 .form-range:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 4px rgb(88 101 242 / 18%);
+  box-shadow: 0 0 0 4px var(--brand-glow);
 }
 .form-range-row { display: flex; align-items: center; gap: 10px; }
 .form-range-row .form-range { flex: 1; }
@@ -128,13 +129,13 @@ textarea.form-input { resize: vertical; }
 .radio-group-label { color: var(--text-muted); font-size: 12px; font-weight: 700; letter-spacing: .025em; text-transform: uppercase; }
 .radio-group { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
 .radio-option { min-width: 0; display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid rgb(255 255 255 / 10%); border-radius: var(--radius-md); background: var(--bg-sidebar); color: var(--text-normal); text-align: left; cursor: pointer; }
-.radio-option.active { border-color: var(--brand); background: rgb(88 101 242 / 12%); box-shadow: inset 3px 0 var(--brand); }
+.radio-option.active { border-color: var(--brand); background: var(--brand-glow); box-shadow: inset 3px 0 var(--brand); }
 .radio-option > span { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .radio-option strong { font-size: 14px; }
 .radio-option small { color: var(--text-muted); font-size: 12px; line-height: 1.35; }
 .radio-option-icon { flex-shrink: 0; display: flex; color: var(--text-muted); }
 .radio-option.active .radio-option-icon { color: var(--brand); }
-.radio-option:focus-visible { outline: none; box-shadow: 0 0 0 4px rgb(88 101 242 / 18%); }
+.radio-option:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--brand-glow); }
 
 @media (prefers-reduced-motion: reduce) {
   .form-input, .switch, .switch-thumb, .radio-option { transition: none; }
