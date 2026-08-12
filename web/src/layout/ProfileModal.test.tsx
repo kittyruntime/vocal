@@ -138,4 +138,13 @@ describe("ProfileModal", () => {
     await waitFor(() => expect(api.updateMyAccent).toHaveBeenCalledWith("emerald"));
     await waitFor(() => expect(swatch).toHaveAttribute("aria-pressed", "true"));
   });
+
+  it("shows an error when selecting an accent color fails", async () => {
+    vi.mocked(api.getMyAccent).mockResolvedValue({ accentPreset: null });
+    vi.mocked(api.updateMyAccent).mockRejectedValue(new Error("network down"));
+    render(<ProfileModal currentUser={{ id: "u1", username: "theo", capabilities: [] }} onSaved={vi.fn()} onClose={vi.fn()} />);
+    const swatch = await screen.findByRole("button", { name: ACCENT_PRESET_LABELS.emerald });
+    await userEvent.setup().click(swatch);
+    expect(await screen.findByRole("alert")).toHaveTextContent("The accent color could not be changed.");
+  });
 });
