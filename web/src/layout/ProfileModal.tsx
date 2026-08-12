@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
-import type { CurrentUser, SoundEvent, SoundSettings, SoundVolumes, UserSoundSettings } from "../api/client";
-import { SOUND_EVENTS } from "../api/client";
+import type { AccentPreset, AppearanceSettings, CurrentUser, SoundEvent, SoundSettings, SoundVolumes, UserSoundSettings } from "../api/client";
+import { ACCENT_PRESETS, SOUND_EVENTS } from "../api/client";
 import * as api from "../api/client";
 import { configureSounds, previewSound } from "../audio/sounds";
+import { ACCENT_PRESET_LABELS, ACCENT_SWATCH_COLORS, applyUserAccent } from "../theme/accent";
 import { Icon } from "../ui/Icon";
 import { RangeSlider, TextField, Textarea } from "../ui/form";
 
@@ -44,12 +45,26 @@ export function ProfileModal({ currentUser, onClose, onSaved }: {
   const [soundVolumes, setSoundVolumes] = useState<SoundVolumes>(DEFAULT_SOUND_VOLUMES);
   const [userSoundSettings, setUserSoundSettings] = useState<UserSoundSettings>(DEFAULT_USER_SOUND_SETTINGS);
   const soundInputRefs = useRef<Partial<Record<SoundEvent, HTMLInputElement | null>>>({});
+  const [appearance, setAppearance] = useState<AppearanceSettings>({ enabledPresets: ACCENT_PRESETS as unknown as AccentPreset[], defaultPreset: "amber" });
+  const [accentPreset, setAccentPreset] = useState<AccentPreset | null>(null);
 
   useEffect(() => {
-    void Promise.all([api.getSoundSettings(), api.getMySoundVolumes(), api.getMySoundSettings()])
-      .then(([nextSettings, nextVolumes, nextUserSettings]) => { setSoundSettings(nextSettings); setSoundVolumes(nextVolumes); setUserSoundSettings(nextUserSettings); })
+    void Promise.all([api.getSoundSettings(), api.getMySoundVolumes(), api.getMySoundSettings(), api.getAppearance(), api.getMyAccent()])
+      .then(([nextSettings, nextVolumes, nextUserSettings, nextAppearance, myAccent]) => {
+        setSoundSettings(nextSettings);
+        setSoundVolumes(nextVolumes);
+        setUserSoundSettings(nextUserSettings);
+        setAppearance(nextAppearance);
+        setAccentPreset(myAccent.accentPreset);
+      })
       .catch(() => {});
   }, []);
+
+  async function selectAccent(preset: AccentPreset) {
+    const updated = await api.updateMyAccent(preset);
+    setAccentPreset(updated.accentPreset);
+    applyUserAccent(updated.accentPreset, appearance.enabledPresets, appearance.defaultPreset);
+  }
 
   async function saveVolume(event: SoundEvent, volume: number) {
     setSoundVolumes((value) => ({ ...value, [event]: volume }));
@@ -182,6 +197,23 @@ export function ProfileModal({ currentUser, onClose, onSaved }: {
               <button type="button" onClick={() => bannerInputRef.current?.click()}>Upload banner</button>
               {bannerUrl ? <button type="button" className="danger-link" onClick={() => setBannerUrl(null)}>Remove banner</button> : null}
               <small>Recommended ratio 3:1 · 512 KB max</small>
+            </div>
+          </div>
+          <div className="settings-section appearance-section">
+            <h3>Appearance</h3>
+            <p className="admin-setting-description">Choose your own accent color from what the server makes available.</p>
+            <div className="accent-swatch-list">
+              {appearance.enabledPresets.map((preset) => (
+                <button
+                  key={preset}
+                  type="button"
+                  aria-label={ACCENT_PRESET_LABELS[preset]}
+                  aria-pressed={(accentPreset ?? appearance.defaultPreset) === preset}
+                  className={`accent-swatch ${(accentPreset ?? appearance.defaultPreset) === preset ? "active" : ""}`}
+                  style={{ background: ACCENT_SWATCH_COLORS[preset] }}
+                  onClick={() => void selectAccent(preset)}
+                />
+              ))}
             </div>
           </div>
           <div className="settings-section sound-volume-section">

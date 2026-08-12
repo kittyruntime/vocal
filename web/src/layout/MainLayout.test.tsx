@@ -15,6 +15,10 @@ vi.mock("../api/client", async () => {
     getSoundSettings: vi.fn(),
     getMySoundVolumes: vi.fn(),
     getMySoundSettings: vi.fn(),
+    // MainLayout's post-login effect also calls applyAuthenticatedAccent(), which calls
+    // getAppearance()/getMyAccent(). Mock those too so it doesn't fire real, unmocked fetches.
+    getAppearance: vi.fn(),
+    getMyAccent: vi.fn(),
     // MainLayout receives currentUser as a prop, but it still mounts inside AuthProvider
     // (to reach useAuth().signOut), whose own bootstrap effect calls getSetupStatus/getMe.
     // Mock those too so that effect doesn't fire real, unmocked fetches during this test.
@@ -65,6 +69,8 @@ beforeEach(() => {
   });
   vi.mocked(api.getMySoundVolumes).mockResolvedValue({ message: 55, userJoin: 55, userLeave: 55, muteToggle: 55, forceMuted: 55, screenShare: 55 });
   vi.mocked(api.getMySoundSettings).mockResolvedValue(Object.fromEntries(api.SOUND_EVENTS.map((event) => [event, { hasCustom: false }])) as api.UserSoundSettings);
+  vi.mocked(api.getAppearance).mockResolvedValue({ enabledPresets: api.ACCENT_PRESETS as unknown as api.AccentPreset[], defaultPreset: "amber" });
+  vi.mocked(api.getMyAccent).mockResolvedValue({ accentPreset: null });
   vi.mocked(api.getSetupStatus).mockResolvedValue({ done: true });
   vi.mocked(api.getMe).mockResolvedValue(admin);
 });
