@@ -4,6 +4,7 @@ import * as api from "../api/client";
 import { useToast } from "../toast/ToastContext";
 import type { VoiceParticipant } from "../ws/protocol";
 import { Icon } from "../ui/Icon";
+import { RadioGroup, Select, TextField } from "../ui/form";
 import { AdminPanel } from "./AdminPanel";
 import { ChannelSettingsModal } from "./ChannelSettingsModal";
 
@@ -238,15 +239,32 @@ function CreateChannelModal({
       <section className="voice-settings-modal create-channel-modal" role="dialog" aria-modal="true" aria-labelledby="create-channel-title">
         <header><div><span>NEW CHANNEL</span><h2 id="create-channel-title">Create a channel</h2></div><button type="button" className="modal-close" aria-label="Close channel creation" onClick={onClose}><Icon name="close" size={18} /></button></header>
         <form className="create-channel-form" onSubmit={handleSubmit}>
-          <fieldset>
-            <legend>Channel type</legend>
-            <div className="channel-type-options">
-              <button type="button" className={type === "text" ? "active" : ""} aria-pressed={type === "text"} onClick={() => setType("text")}><Icon name="hash" size={22} /><span><strong>Text</strong><small>Send messages, images and files</small></span></button>
-              <button type="button" className={type === "voice" ? "active" : ""} aria-pressed={type === "voice"} onClick={() => setType("voice")}><Icon name="volume" size={22} /><span><strong>Voice</strong><small>Talk, use cameras and share screens</small></span></button>
-            </div>
-          </fieldset>
-          <label>Channel name<div className="channel-name-field"><span aria-hidden="true">{type === "text" ? "#" : "◖))"}</span><input aria-label="New channel name" placeholder={type === "text" ? "new-channel" : "Voice lounge"} value={name} maxLength={64} autoFocus onChange={(event) => setName(event.target.value)} /></div></label>
-          <label>Who can access it?<select aria-label="New channel access" value={requiredCapability ?? ""} onChange={(event) => setRequiredCapability((event.target.value || null) as Capability | null)}><option value="">Everyone</option>{(Object.keys(CAPABILITY_LABEL) as Capability[]).map((capability) => <option key={capability} value={capability}>{CAPABILITY_LABEL[capability]}</option>)}</select></label>
+          <RadioGroup<Channel["type"]>
+            label="Channel type"
+            value={type}
+            onChange={setType}
+            options={[
+              { value: "text" as const, label: "Text", description: "Send messages, images and files", icon: <Icon name="hash" size={22} /> },
+              { value: "voice" as const, label: "Voice", description: "Talk, use cameras and share screens", icon: <Icon name="volume" size={22} /> },
+            ]}
+          />
+          <TextField
+            label="Channel name"
+            placeholder={type === "text" ? "new-channel" : "Voice lounge"}
+            value={name}
+            maxLength={64}
+            autoFocus
+            onChange={(event) => setName(event.target.value)}
+            prefix={type === "text" ? "#" : "◖))"}
+          />
+          <Select
+            label="Who can access it?"
+            value={requiredCapability ?? ""}
+            onChange={(event) => setRequiredCapability((event.target.value || null) as Capability | null)}
+          >
+            <option value="">Everyone</option>
+            {(Object.keys(CAPABILITY_LABEL) as Capability[]).map((capability) => <option key={capability} value={capability}>{CAPABILITY_LABEL[capability]}</option>)}
+          </Select>
           <p className="create-channel-summary"><Icon name={type === "text" ? "hash" : "volume"} size={16} /> <span><strong>{name.trim() || (type === "text" ? "new-channel" : "Voice lounge")}</strong><small>{requiredCapability ? CAPABILITY_LABEL[requiredCapability] : "Visible to everyone"}</small></span></p>
           <footer><button type="button" className="profile-cancel" onClick={onClose} disabled={submitting}>Cancel</button><button type="submit" disabled={submitting || !name.trim()}>{submitting ? "Creating…" : "Create channel"}</button></footer>
         </form>

@@ -44,4 +44,14 @@ describe("RadioGroup", () => {
     await userEvent.setup().keyboard("{ArrowLeft}");
     expect(onChange).toHaveBeenCalledWith("voice");
   });
+
+  it("renders an optional icon without changing the option's accessible name", () => {
+    const withIcons = [
+      { value: "text" as const, label: "Text", description: "Send messages", icon: <svg data-testid="text-icon" /> },
+      { value: "voice" as const, label: "Voice", description: "Talk live" },
+    ];
+    render(<RadioGroup label="Channel type" options={withIcons} value="text" onChange={() => {}} />);
+    expect(screen.getByTestId("text-icon")).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: /Text/ })).toBeInTheDocument();
+  });
 });
