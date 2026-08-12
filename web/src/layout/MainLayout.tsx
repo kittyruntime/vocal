@@ -10,6 +10,7 @@ import { ChatView } from "./ChatView";
 import { UserBar } from "./UserBar";
 import { ConnectionBanner } from "./ConnectionBanner";
 import { configureSounds, playAppSound } from "../audio/sounds";
+import { applyAuthenticatedAccent } from "../theme/accent";
 import { Icon } from "../ui/Icon";
 import { ProfileModal } from "./ProfileModal";
 import { UserProfileModal } from "./UserProfileModal";
@@ -59,6 +60,7 @@ export function MainLayout({ currentUser }: { currentUser: CurrentUser }) {
     void Promise.all([api.getSoundSettings(), api.getMySoundVolumes(), api.getMySoundSettings()])
       .then(([soundSettings, soundVolumes, userSoundSettings]) => configureSounds(soundSettings, soundVolumes, userSoundSettings))
       .catch(() => {});
+    void applyAuthenticatedAccent();
   }, []);
 
   useEffect(() => {
