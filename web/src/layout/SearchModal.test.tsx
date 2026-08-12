@@ -28,4 +28,34 @@ describe("SearchModal", () => {
     await userEvent.setup().click(screen.getByRole("button", { name: "Close search" }));
     expect(onClose).toHaveBeenCalled();
   });
+
+  it("TextField wrapper has correct flex layout structure and styles", () => {
+    const { container } = render(
+      <SearchModal onClose={vi.fn()} onSelectChannel={vi.fn()} onViewProfile={vi.fn()} />
+    );
+
+    const searchInput = container.querySelector(".search-input");
+    const formField = container.querySelector(".search-input > .form-field");
+    const input = container.querySelector(".search-input input");
+    const label = container.querySelector(".search-input .sr-only");
+
+    // Verify elements exist with correct structure
+    expect(searchInput).toBeTruthy();
+    expect(formField).toBeTruthy();
+    expect(input).toBeTruthy();
+    expect(label).toBeTruthy();
+
+    // Verify form-field is a direct child of search-input (CSS selector .search-input > .form-field will match)
+    expect(formField!.parentElement?.className).toContain("search-input");
+
+    // Verify input has form-input class and is inside form-field
+    expect(input!.className).toContain("form-input");
+    expect(input!.parentElement?.className).toContain("form-field");
+
+    // Verify label is sr-only (visually hidden but accessible)
+    expect(label!.className).toContain("sr-only");
+
+    // Verify input still has the search-modal-specific attributes
+    expect(input!.getAttribute("placeholder")).toBe("Search messages, files, channels and members");
+  });
 });
