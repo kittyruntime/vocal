@@ -9,7 +9,7 @@ import { ACCENT_PRESET_LABELS } from "../theme/accent";
 
 vi.mock("../api/client", async () => {
   const actual = await vi.importActual<typeof import("../api/client")>("../api/client");
-  return { ...actual, listAdminUsers: vi.fn(), getAdminSettings: vi.fn(), updateAdminSettings: vi.fn(), listRoles: vi.fn(), createRole: vi.fn(), updateRole: vi.fn(), deleteRole: vi.fn(), setUserRoles: vi.fn(), kickUser: vi.fn(), banUser: vi.fn(), unbanUser: vi.fn(), setUserVoiceMuted: vi.fn(), getSoundSettings: vi.fn(), updateSoundSetting: vi.fn(), getAppearance: vi.fn(), updateAppearance: vi.fn() };
+  return { ...actual, listAdminUsers: vi.fn(), getAdminSettings: vi.fn(), updateAdminSettings: vi.fn(), listRoles: vi.fn(), createRole: vi.fn(), updateRole: vi.fn(), deleteRole: vi.fn(), setUserRoles: vi.fn(), kickUser: vi.fn(), banUser: vi.fn(), unbanUser: vi.fn(), setUserVoiceMuted: vi.fn(), getSoundSettings: vi.fn(), updateSoundSetting: vi.fn(), getAppearance: vi.fn(), updateAppearance: vi.fn(), listInvites: vi.fn(), createInvite: vi.fn(), revokeInvite: vi.fn() };
 });
 
 const admin: CurrentUser = { id: "u1", username: "theo", capabilities: ["manage_channels", "manage_server", "moderate", "publish_voice"] };
@@ -354,5 +354,33 @@ describe("AdminPanel roles", () => {
     expect(screen.getByLabelText("Color")).toHaveValue("#ff0000");
     expect(screen.getByRole("checkbox", { name: "Moderate" })).toBeChecked();
     expect(screen.getByRole("checkbox", { name: "Manage channels" })).not.toBeChecked();
+  });
+});
+
+describe("AdminPanel invites", () => {
+  it("creates an invite with the selected expiry and max uses via the primitive fields", async () => {
+    vi.mocked(api.listInvites).mockResolvedValue([]);
+    vi.mocked(api.createInvite).mockResolvedValue({ id: "i1", token: "tok", expiresAt: new Date(Date.now() + 86_400_000).toISOString(), maxUses: 5, useCount: 0 });
+    renderPanel([], false);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "Invitations" }));
+    await user.selectOptions(screen.getByLabelText("Expires"), "24");
+    const maxUsesInput = screen.getByLabelText("Maximum uses");
+    await user.clear(maxUsesInput);
+    await user.type(maxUsesInput, "5");
+    await user.click(screen.getByRole("button", { name: "Create link" }));
+    await waitFor(() => expect(api.createInvite).toHaveBeenCalledWith({ expiresInHours: 24, maxUses: 5 }));
+  });
+
+  it("renders the form fields using the Select and TextField primitives with form-field wrapper divs", async () => {
+    vi.mocked(api.listInvites).mockResolvedValue([]);
+    renderPanel([], false);
+    await userEvent.setup().click(await screen.findByRole("button", { name: "Invitations" }));
+    const form = screen.getByRole("button", { name: "Create link" }).closest("form");
+    expect(form).toHaveClass("invite-create-form");
+    const formFields = form?.querySelectorAll(".form-field");
+    expect(formFields?.length).toBe(2);
+    expect(screen.getByLabelText("Expires")).toBeInTheDocument();
+    expect(screen.getByLabelText("Maximum uses")).toBeInTheDocument();
   });
 });
