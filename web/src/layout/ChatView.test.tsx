@@ -299,6 +299,29 @@ describe("ChatView", () => {
     await waitFor(() => expect(onLoaded).toHaveBeenCalledWith(overCap.slice(1)));
   });
 
+  it("edits a message via its accessible edit input", async () => {
+    vi.mocked(api.listMessages).mockResolvedValue([]);
+    vi.mocked(api.updateMessage).mockResolvedValue(msg("1", "updated text", "2026-01-01T00:00:01Z"));
+    render(
+      <ToastProvider>
+        <ChatView
+          channel={channel}
+          messages={[msg("1", "original", "2026-01-01T00:00:01Z")]}
+          onMessagesLoaded={vi.fn()}
+          onMessagesPrepended={vi.fn()}
+          currentUser={{ id: "u1", username: "theo", capabilities: [] }}
+        />
+      </ToastProvider>,
+    );
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Edit message" }));
+    const editInput = await screen.findByRole("textbox", { name: "Edit message" });
+    await user.clear(editInput);
+    await user.type(editInput, "updated text");
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(api.updateMessage).toHaveBeenCalledWith("c1", "1", "updated text"));
+  });
+
   it("does not trim messages while the user is scrolled up reading history", async () => {
     vi.mocked(api.listMessages).mockResolvedValueOnce([]);
     const atCap = Array.from({ length: 300 }, (_, i) => msg(`m${i}`, `x${i}`, `2026-01-01T00:${String(i % 60).padStart(2, "0")}:00Z`));
