@@ -25,6 +25,14 @@ describe("Textarea", () => {
     expect(textarea.getAttribute("aria-describedby")).toBe(screen.getByRole("alert").id);
   });
 
+  it("wires aria-describedby to the hint message", () => {
+    render(<Textarea label="About me" value="" onChange={() => {}} hint="190 characters max" />);
+    const textarea = screen.getByLabelText("About me");
+    const hint = screen.getByText("190 characters max");
+    expect(hint.id).not.toBe("");
+    expect(textarea).toHaveAttribute("aria-describedby", hint.id);
+  });
+
   it("forwards arbitrary textarea props", () => {
     render(<Textarea label="About me" value="" onChange={() => {}} maxLength={190} rows={4} />);
     const textarea = screen.getByLabelText("About me");

@@ -37,4 +37,16 @@ describe("Select", () => {
     expect(select).toHaveAttribute("aria-invalid", "true");
     expect(select.getAttribute("aria-describedby")).toBe(screen.getByRole("alert").id);
   });
+
+  it("wires aria-describedby to the hint message", () => {
+    render(
+      <Select label="Access" value="" onChange={() => {}} hint="Choose an access level">
+        <option value="">Select…</option>
+      </Select>,
+    );
+    const select = screen.getByLabelText("Access");
+    const hint = screen.getByText("Choose an access level");
+    expect(hint.id).not.toBe("");
+    expect(select).toHaveAttribute("aria-describedby", hint.id);
+  });
 });
