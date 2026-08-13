@@ -759,7 +759,7 @@ textarea.form-input { resize: vertical; }
 .admin-role-editor > div button { padding: 8px 12px; border: 0; border-radius: 4px; background: var(--brand); color: var(--brand-contrast); font-weight: 600; }
 .admin-role-editor > div .danger-link { background: transparent; color: #fa777c; }
 .invite-create-form { display: grid; grid-template-columns: 1fr 1fr auto; align-items: end; gap: 12px; padding: 14px; border-radius: 8px; background: #2b2d31; }
-.invite-create-form .form-input { min-height: 40px; }
+.invite-create-form .form-input { min-height: 46px; }
 .invite-created input { min-width: 0; min-height: 40px; padding: 8px 10px; border: 1px solid #1e1f22; border-radius: 4px; background: #1e1f22; color: #fff; }
 .invite-create-form button, .invite-created button { min-height: 40px; padding: 8px 13px; border: 0; border-radius: 4px; background: var(--brand); color: var(--brand-contrast); font-weight: 600; }
 .invite-created { display: flex; gap: 8px; margin-top: 12px; }
