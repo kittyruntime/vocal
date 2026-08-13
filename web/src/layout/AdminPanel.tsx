@@ -5,7 +5,7 @@ import * as api from "../api/client";
 import { previewSound } from "../audio/sounds";
 import { ACCENT_PRESET_LABELS, ACCENT_SWATCH_COLORS } from "../theme/accent";
 import { Icon } from "../ui/Icon";
-import { Switch, TextField } from "../ui/form";
+import { Checkbox, ColorField, Switch, TextField } from "../ui/form";
 
 const CAPABILITY_LABEL: Record<Capability, string> = {
   manage_channels: "Manage channels",
@@ -261,7 +261,43 @@ function RoleManager({ roles, onChange, onError }: { roles: Role[]; onChange(rol
     try { await api.deleteRole(role.id); onChange(roles.filter((value) => value.id !== role.id)); if (editingId === role.id) edit(); }
     catch { onError("Could not delete this role."); }
   }
-  return <div className="settings-section admin-roles-section"><div className="admin-roles-heading"><div><h3>Roles</h3><p>Group permissions and assign them to multiple members.</p></div><button type="button" onClick={() => edit()}>New role</button></div><div className="admin-role-layout"><div className="admin-role-list">{roles.map((role) => <button type="button" key={role.id} className={editingId === role.id ? "active" : ""} onClick={() => edit(role)}><i style={{ background: role.color }} /><span><strong>{role.name}</strong><small>{role.memberCount} members</small></span></button>)}</div><form className="admin-role-editor" onSubmit={save}><label>Role name<input value={name} maxLength={32} placeholder="Community manager" onChange={(event) => setName(event.target.value)} /></label><label>Color<input type="color" value={color} onChange={(event) => setColor(event.target.value)} /></label><fieldset><legend>Permissions</legend>{CAPABILITIES.map((capability) => <label key={capability}><input type="checkbox" checked={capabilities.includes(capability)} onChange={() => setCapabilities((values) => values.includes(capability) ? values.filter((value) => value !== capability) : [...values, capability])} />{CAPABILITY_LABEL[capability]}</label>)}</fieldset><div><button type="submit" disabled={!name.trim()}>{editingId ? "Save role" : "Create role"}</button>{editingId ? <button type="button" className="danger-link" onClick={() => void remove(roles.find((role) => role.id === editingId)!)}>Delete</button> : null}</div></form></div></div>;
+  return (
+    <div className="settings-section admin-roles-section">
+      <div className="admin-roles-heading">
+        <div><h3>Roles</h3><p>Group permissions and assign them to multiple members.</p></div>
+        <button type="button" onClick={() => edit()}>New role</button>
+      </div>
+      <div className="admin-role-layout">
+        <div className="admin-role-list">
+          {roles.map((role) => (
+            <button type="button" key={role.id} className={editingId === role.id ? "active" : ""} onClick={() => edit(role)}>
+              <i style={{ background: role.color }} />
+              <span><strong>{role.name}</strong><small>{role.memberCount} members</small></span>
+            </button>
+          ))}
+        </div>
+        <form className="admin-role-editor" onSubmit={save}>
+          <TextField label="Role name" value={name} maxLength={32} placeholder="Community manager" onChange={(event) => setName(event.target.value)} />
+          <ColorField label="Color" value={color} onChange={setColor} />
+          <fieldset>
+            <legend>Permissions</legend>
+            {CAPABILITIES.map((capability) => (
+              <Checkbox
+                key={capability}
+                label={CAPABILITY_LABEL[capability]}
+                checked={capabilities.includes(capability)}
+                onChange={() => setCapabilities((values) => values.includes(capability) ? values.filter((value) => value !== capability) : [...values, capability])}
+              />
+            ))}
+          </fieldset>
+          <div>
+            <button type="submit" disabled={!name.trim()}>{editingId ? "Save role" : "Create role"}</button>
+            {editingId ? <button type="button" className="danger-link" onClick={() => void remove(roles.find((role) => role.id === editingId)!)}>Delete</button> : null}
+          </div>
+        </form>
+      </div>
+    </div>
+  );
 }
 
 function AppearanceManager({ appearance, onChange, onError }: {
