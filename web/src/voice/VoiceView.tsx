@@ -1172,10 +1172,10 @@ export function VoiceView({
                 <Icon name="close" size={20} />
               </button>
             </header>
-            <div className="settings-section">
-              <Switch label="Advanced mode" checked={settings.advancedMode} onChange={(next) => saveSettings({ ...settings, advancedMode: next })} />
-            </div>
             <div className="voice-settings-content">
+              <div className="settings-section">
+                <Switch label="Advanced mode" checked={settings.advancedMode} onChange={(next) => saveSettings({ ...settings, advancedMode: next })} />
+              </div>
               <div className="settings-section">
                 <h3>Devices</h3>
                 <div className="voice-settings">
