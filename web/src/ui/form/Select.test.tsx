@@ -26,4 +26,15 @@ describe("Select", () => {
     );
     expect(screen.getByRole("alert")).toHaveTextContent("Choose an access level");
   });
+
+  it("wires aria-describedby and aria-invalid to an error message", () => {
+    render(
+      <Select label="Access" value="" onChange={() => {}} error="Choose an access level">
+        <option value="">Select…</option>
+      </Select>,
+    );
+    const select = screen.getByLabelText("Access");
+    expect(select).toHaveAttribute("aria-invalid", "true");
+    expect(select.getAttribute("aria-describedby")).toBe(screen.getByRole("alert").id);
+  });
 });

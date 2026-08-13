@@ -18,6 +18,18 @@ describe("TextField", () => {
     expect(screen.getByRole("alert")).toHaveTextContent("Username is required");
   });
 
+  it("wires aria-describedby and aria-invalid to the error message", () => {
+    render(<TextField label="Username" value="" onChange={() => {}} error="Username is required" />);
+    const input = screen.getByLabelText("Username");
+    expect(input).toHaveAttribute("aria-invalid", "true");
+    expect(input.getAttribute("aria-describedby")).toBe(screen.getByRole("alert").id);
+  });
+
+  it("does not set aria-invalid when there is no error", () => {
+    render(<TextField label="Username" value="" onChange={() => {}} />);
+    expect(screen.getByLabelText("Username")).not.toHaveAttribute("aria-invalid");
+  });
+
   it("forwards arbitrary input props", () => {
     render(<TextField label="Password" type="password" value="" onChange={() => {}} required maxLength={256} />);
     const input = screen.getByLabelText("Password");
