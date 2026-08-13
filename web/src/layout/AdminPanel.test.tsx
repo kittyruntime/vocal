@@ -222,6 +222,20 @@ describe("AdminPanel general", () => {
     await user.click(screen.getByRole("button", { name: "Save length" }));
     await waitFor(() => expect(api.updateAdminSettings).toHaveBeenCalledWith(expect.objectContaining({ maxMessageLength: 2000 })));
   });
+
+  it("does not leak an unsaved draft from one section into another section's save", async () => {
+    vi.mocked(api.updateAdminSettings).mockResolvedValue({ registrationOpen: true, maxImageSizeMb: 8, maxFileSizeMb: 10, maxMessageLength: 4000 });
+    renderPanel([], false);
+    const user = userEvent.setup();
+    const lengthInput = await screen.findByLabelText("Characters per message");
+    await user.clear(lengthInput);
+    await user.type(lengthInput, "9999");
+    const imageInput = screen.getByLabelText("Images (MB)");
+    await user.clear(imageInput);
+    await user.type(imageInput, "8");
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
+    await waitFor(() => expect(api.updateAdminSettings).toHaveBeenCalledWith(expect.objectContaining({ maxImageSizeMb: 8, maxMessageLength: 4000 })));
+  });
 });
 
 describe("AdminPanel sounds", () => {
