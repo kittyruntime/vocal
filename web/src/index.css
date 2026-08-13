@@ -881,6 +881,7 @@ textarea.form-input { resize: vertical; }
 .profile-save:hover,
 .create-channel-form footer button:hover,
 .admin-channel-actions button:hover { background: var(--brand-hover); }
+.admin-channel-actions .profile-cancel:hover { background: var(--bg-hover); }
 .profile-cancel:hover { background: var(--bg-hover); }
 .admin-user,
 .admin-channel { border-radius: var(--radius-md); }
