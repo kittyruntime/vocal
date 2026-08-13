@@ -41,6 +41,24 @@ describe("FormField", () => {
     expect(screen.getByRole("alert")).toHaveTextContent("Too short");
   });
 
+  it("gives the error message a stable id derived from htmlFor, for aria-describedby wiring", () => {
+    render(
+      <FormField label="Username" htmlFor="the-id" error="Username is required">
+        <input id="the-id" />
+      </FormField>,
+    );
+    expect(screen.getByRole("alert")).toHaveAttribute("id", "the-id-message");
+  });
+
+  it("gives the hint the same stable id pattern when there is no error", () => {
+    render(
+      <FormField label="Username" htmlFor="the-id" hint="2-32 characters">
+        <input id="the-id" />
+      </FormField>,
+    );
+    expect(screen.getByText("2-32 characters")).toHaveAttribute("id", "the-id-message");
+  });
+
   it("visually hides the label without removing it from the accessibility tree", () => {
     render(
       <FormField label="Search Vocal" htmlFor="the-id" visuallyHiddenLabel>

@@ -22,11 +22,11 @@ export function FormField({
       </label>
       {children}
       {error ? (
-        <p className="form-error" role="alert">
+        <p id={`${htmlFor}-message`} className="form-error" role="alert">
           {error}
         </p>
       ) : hint ? (
-        <p className="form-hint">{hint}</p>
+        <p id={`${htmlFor}-message`} className="form-hint">{hint}</p>
       ) : null}
     </div>
   );

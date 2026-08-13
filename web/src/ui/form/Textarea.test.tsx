@@ -18,6 +18,13 @@ describe("Textarea", () => {
     expect(screen.getByText("190 characters max")).toBeInTheDocument();
   });
 
+  it("wires aria-describedby and aria-invalid to an error message", () => {
+    render(<Textarea label="About me" value="" onChange={() => {}} error="Too long" />);
+    const textarea = screen.getByLabelText("About me");
+    expect(textarea).toHaveAttribute("aria-invalid", "true");
+    expect(textarea.getAttribute("aria-describedby")).toBe(screen.getByRole("alert").id);
+  });
+
   it("forwards arbitrary textarea props", () => {
     render(<Textarea label="About me" value="" onChange={() => {}} maxLength={190} rows={4} />);
     const textarea = screen.getByLabelText("About me");

@@ -17,7 +17,13 @@ export function Select({
   const id = useId();
   return (
     <FormField label={label} htmlFor={id} error={error} hint={hint}>
-      <select id={id} className={["form-input", className].filter(Boolean).join(" ")} {...selectProps}>
+      <select
+        id={id}
+        className={["form-input", className].filter(Boolean).join(" ")}
+        aria-describedby={error || hint ? `${id}-message` : undefined}
+        aria-invalid={error ? true : undefined}
+        {...selectProps}
+      >
         {children}
       </select>
     </FormField>

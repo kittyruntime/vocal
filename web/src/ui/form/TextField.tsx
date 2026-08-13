@@ -13,7 +13,14 @@ export const TextField = forwardRef<
 >(function TextField({ label, error, hint, visuallyHiddenLabel, prefix, className, ...inputProps }, ref) {
   const id = useId();
   const input = (
-    <input ref={ref} id={id} className={["form-input", className].filter(Boolean).join(" ")} {...inputProps} />
+    <input
+      ref={ref}
+      id={id}
+      className={["form-input", className].filter(Boolean).join(" ")}
+      aria-describedby={error || hint ? `${id}-message` : undefined}
+      aria-invalid={error ? true : undefined}
+      {...inputProps}
+    />
   );
   return (
     <FormField label={label} htmlFor={id} error={error} hint={hint} visuallyHiddenLabel={visuallyHiddenLabel}>
