@@ -197,23 +197,35 @@ export function AdminPanel({ currentUser, onClose }: {
           {activeTab === "invites" && canManageServer ? <InviteManager onError={setError} /> : null}
           {activeTab === "appearance" && canManageServer ? <AppearanceManager appearance={appearance} onChange={setAppearance} onError={setError} /> : null}
           {activeTab === "members" ? <div className="settings-section admin-members-section">
-            <div className="admin-members-heading"><div><h3>Members</h3><p>{totalUsers} {totalUsers === 1 ? "member" : "members"}</p></div><input type="search" aria-label="Search members" placeholder="Search members" value={memberSearch} onChange={(event) => setMemberSearch(event.target.value)} /></div>
+            <div className="admin-members-heading">
+              <div><h3>Members</h3><p>{totalUsers} {totalUsers === 1 ? "member" : "members"}</p></div>
+              <TextField type="search" label="Search members" visuallyHiddenLabel placeholder="Search members" value={memberSearch} onChange={(event) => setMemberSearch(event.target.value)} />
+            </div>
             <div className="admin-user-list">
               {users.map((user) => (
                 <div className={`admin-user ${user.bannedAt ? "is-banned" : ""}`} key={user.id}>
                   <span className="member-avatar">{user.avatarUrl ? <img src={user.avatarUrl} alt="" /> : user.username[0].toUpperCase()}</span>
                   <strong>{user.username}{user.id === currentUser.id ? " (you)" : ""}{user.bannedAt ? <span className="ban-badge">Banned</span> : null}{user.voiceMuted ? <span className="mute-badge">Voice muted</span> : null}</strong>
                   <div className="admin-user-capabilities">
-                    {canManageServer && roles.length > 0 ? <div className="admin-user-roles">{roles.map((role) => <label key={role.id}><input type="checkbox" checked={user.roles?.some((value) => value.id === role.id) ?? false} onChange={() => void toggleUserRole(user, role)} /><i style={{ background: role.color }} />{role.name}</label>)}</div> : null}
+                    {canManageServer && roles.length > 0 ? (
+                      <div className="admin-user-roles">
+                        {roles.map((role) => (
+                          <Checkbox
+                            key={role.id}
+                            label={<><i style={{ background: role.color }} />{role.name}</>}
+                            checked={user.roles?.some((value) => value.id === role.id) ?? false}
+                            onChange={() => void toggleUserRole(user, role)}
+                          />
+                        ))}
+                      </div>
+                    ) : null}
                     {canManageServer ? CAPABILITIES.map((capability) => (
-                      <label key={capability}>
-                        <input
-                          type="checkbox"
-                          checked={user.capabilities.includes(capability)}
-                          onChange={() => void toggleCapability(user, capability)}
-                        />
-                        {CAPABILITY_LABEL[capability]}
-                      </label>
+                      <Checkbox
+                        key={capability}
+                        label={CAPABILITY_LABEL[capability]}
+                        checked={user.capabilities.includes(capability)}
+                        onChange={() => void toggleCapability(user, capability)}
+                      />
                     )) : <span className="admin-capability-summary">{user.capabilities.map((capability) => CAPABILITY_LABEL[capability]).join(" · ") || "No capabilities"}</span>}
                   </div>
                   {user.id === currentUser.id ? null : (
