@@ -19,12 +19,15 @@ const publishTrack = vi.fn();
 const getTrackPublication = vi.fn();
 const switchActiveDevice = vi.fn();
 const setAttributes = vi.fn();
+const { getLocalDevices } = vi.hoisted(() => ({
+  getLocalDevices: vi.fn().mockResolvedValue([]),
+}));
 const roomHandlers = new Map<string, (...args: unknown[]) => void>();
 const remoteParticipants = new Map<string, any>();
 
 vi.mock("livekit-client", () => ({
   Room: class {
-    static getLocalDevices() { return Promise.resolve([]); }
+    static getLocalDevices = getLocalDevices;
     remoteParticipants = remoteParticipants;
     connect = connect;
     disconnect = disconnect;
@@ -109,7 +112,8 @@ beforeEach(() => {
   disconnect.mockResolvedValue(undefined);
   switchActiveDevice.mockResolvedValue(true);
   setAttributes.mockResolvedValue(undefined);
-  setMicrophoneEnabled.mockResolvedValue(undefined);
+  setMicrophoneEnabled.mockResolvedValue({ audioTrack: { kind: "audio" } });
+  getLocalDevices.mockClear().mockResolvedValue([]);
   getTrackPublication.mockReturnValue(undefined);
   const videoTrack = {
     kind: "video",
@@ -482,14 +486,31 @@ describe("VoiceView", () => {
   it("shows a differentiated toast when the microphone permission is denied on join", async () => {
     setMicrophoneEnabled.mockRejectedValueOnce(Object.assign(new Error("denied"), { name: "NotAllowedError" }));
     await renderView();
-    await screen.findByText("Microphone permission denied. Check your browser settings.");
-    expect(screen.getByRole("button", { name: "Join" })).toBeInTheDocument();
+    expect(await screen.findByText("Could not enable the microphone. You've joined the call — connect one and try again.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Unmute microphone" })).toBeInTheDocument();
   });
 
   it("shows a differentiated toast when no microphone is found on join", async () => {
     setMicrophoneEnabled.mockRejectedValueOnce(Object.assign(new Error("missing"), { name: "NotFoundError" }));
     await renderView();
-    await screen.findByText("No microphone detected on this device.");
+    expect(await screen.findByText("Could not enable the microphone. You've joined the call — connect one and try again.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Unmute microphone" })).toBeInTheDocument();
+  });
+
+  it("resolves Firefox default deviceId to real deviceId before enabling microphone", async () => {
+    vi.spyOn(window.navigator, "userAgent", "get").mockReturnValue("Mozilla/5.0 Firefox/142.0");
+    getLocalDevices.mockResolvedValue([{ deviceId: "real-mic-id", kind: "audioinput", label: "Built-in Microphone", groupId: "g1" }]);
+    await renderView();
+    expect(getLocalDevices).toHaveBeenCalledWith("audioinput", false);
+    expect(setMicrophoneEnabled).toHaveBeenCalledWith(true, expect.objectContaining({ deviceId: { exact: "real-mic-id" } }), expect.any(Object));
+    expect(screen.getByRole("button", { name: "Mute microphone" })).toBeInTheDocument();
+  });
+
+  it("does not resolve Firefox deviceId on non-Firefox browsers", async () => {
+    vi.spyOn(window.navigator, "userAgent", "get").mockReturnValue("Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0");
+    await renderView();
+    expect(getLocalDevices).not.toHaveBeenCalledWith("audioinput", false);
+    expect(setMicrophoneEnabled).toHaveBeenCalledWith(true, expect.not.objectContaining({ deviceId: { exact: expect.anything() } }), expect.any(Object));
   });
 
   it("shows a network-loss toast when the initial connection is unreachable", async () => {
