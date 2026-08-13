@@ -17,19 +17,58 @@ const setScreenShareEnabled = vi.fn();
 const createScreenTracks = vi.fn();
 const publishTrack = vi.fn();
 const getTrackPublication = vi.fn();
+const unpublishTrack = vi.fn();
+const getLocalDevices = vi.fn();
 const switchActiveDevice = vi.fn();
 const setAttributes = vi.fn();
 const roomHandlers = new Map<string, (...args: unknown[]) => void>();
 const remoteParticipants = new Map<string, any>();
+type MockLocalTrack = {
+  kind: "audio" | "video";
+  source: string;
+  captureOptions: unknown;
+  publishOptions: unknown;
+  attach: () => HTMLMediaElement;
+  detach: () => HTMLMediaElement[];
+  stop: () => void;
+  getProcessor: () => unknown;
+  stopProcessor: () => Promise<void>;
+  setProcessor: (next: unknown) => Promise<void>;
+  getRTCStatsReport: () => Promise<undefined>;
+};
+type MockLocalPublication = {
+  source: string;
+  isMuted: boolean;
+  track?: MockLocalTrack;
+  audioTrack?: MockLocalTrack;
+};
+const localPublications = new Map<string, MockLocalPublication>();
+
+function createMockLocalTrack(kind: "audio" | "video", source: string, captureOptions: unknown, publishOptions: unknown): MockLocalTrack {
+  let processor: unknown;
+  return {
+    kind,
+    source,
+    captureOptions,
+    publishOptions,
+    attach: vi.fn(() => document.createElement(kind === "video" ? "video" : "audio")),
+    detach: vi.fn(() => []),
+    stop: vi.fn(),
+    getProcessor: vi.fn(() => processor),
+    stopProcessor: vi.fn(async () => { processor = undefined; }),
+    setProcessor: vi.fn(async (next: unknown) => { processor = next; }),
+    getRTCStatsReport: vi.fn().mockResolvedValue(undefined),
+  };
+}
 
 vi.mock("livekit-client", () => ({
   Room: class {
-    static getLocalDevices() { return Promise.resolve([]); }
+    static getLocalDevices(...args: unknown[]) { return getLocalDevices(...args); }
     remoteParticipants = remoteParticipants;
     connect = connect;
     disconnect = disconnect;
     switchActiveDevice = switchActiveDevice;
-    localParticipant = { identity: "u1", name: "theo", attributes: {}, setMicrophoneEnabled, setCameraEnabled, setScreenShareEnabled, createScreenTracks, publishTrack, getTrackPublication, setAttributes };
+    localParticipant = { identity: "u1", name: "theo", attributes: {}, setMicrophoneEnabled, setCameraEnabled, setScreenShareEnabled, createScreenTracks, publishTrack, getTrackPublication, unpublishTrack, setAttributes };
     on(event: string, handler: (...args: unknown[]) => void) { roomHandlers.set(event, handler); return this; }
   },
   RoomEvent: {
@@ -103,14 +142,54 @@ beforeEach(() => {
   vi.clearAllMocks();
   roomHandlers.clear();
   remoteParticipants.clear();
+  localPublications.clear();
   localStorage.clear();
   vi.mocked(api.getVoiceToken).mockResolvedValue({ token: "jwt", url: "ws://livekit" });
   connect.mockResolvedValue(undefined);
   disconnect.mockResolvedValue(undefined);
+  getLocalDevices.mockResolvedValue([]);
   switchActiveDevice.mockResolvedValue(true);
   setAttributes.mockResolvedValue(undefined);
-  setMicrophoneEnabled.mockResolvedValue(undefined);
-  getTrackPublication.mockReturnValue(undefined);
+  setMicrophoneEnabled.mockImplementation(async (enabled: boolean, captureOptions: unknown, publishOptions: unknown) => {
+    let publication = localPublications.get("microphone");
+    if (enabled) {
+      if (publication) {
+        publication.isMuted = false;
+        return publication;
+      }
+      const track = createMockLocalTrack("audio", "microphone", captureOptions, publishOptions);
+      publication = { source: "microphone", isMuted: false, track, audioTrack: track };
+      localPublications.set("microphone", publication);
+      return publication;
+    }
+    if (publication) publication.isMuted = true;
+    return publication;
+  });
+  setCameraEnabled.mockImplementation(async (enabled: boolean, captureOptions: unknown, publishOptions: unknown) => {
+    let publication = localPublications.get("camera");
+    if (enabled) {
+      if (publication) {
+        publication.isMuted = false;
+        return publication;
+      }
+      const track = createMockLocalTrack("video", "camera", captureOptions, publishOptions);
+      publication = { source: "camera", isMuted: false, track };
+      localPublications.set("camera", publication);
+      return publication;
+    }
+    if (publication) publication.isMuted = true;
+    return publication;
+  });
+  getTrackPublication.mockImplementation((source: string) => localPublications.get(source));
+  unpublishTrack.mockImplementation(async (track: MockLocalTrack, stopOnUnpublish = true) => {
+    const publication = [...localPublications.values()].find((candidate) => candidate.track === track);
+    if (!publication) return undefined;
+    if (stopOnUnpublish) track.stop();
+    localPublications.delete(publication.source);
+    publication.track = undefined;
+    publication.audioTrack = undefined;
+    return publication;
+  });
   const videoTrack = {
     kind: "video",
     attach: vi.fn(() => document.createElement("video")),
@@ -118,7 +197,6 @@ beforeEach(() => {
     stop: vi.fn(),
   };
   const screenAudioTrack = { kind: "audio", stop: vi.fn() };
-  setCameraEnabled.mockResolvedValue({ track: videoTrack });
   setScreenShareEnabled.mockResolvedValue({ track: videoTrack });
   createScreenTracks.mockResolvedValue([videoTrack, screenAudioTrack]);
   publishTrack.mockImplementation((track) => Promise.resolve({ track }));
@@ -269,6 +347,40 @@ describe("VoiceView", () => {
     await user.click(screen.getByRole("button", { name: "Settings" }));
 
     expect(screen.getByText("Device choices load after you join the voice channel.")).toBeInTheDocument();
+  });
+
+  it("reports an empty device enumeration after connecting instead of showing the pre-join hint", async () => {
+    await renderView();
+    const user = userEvent.setup();
+    await screen.findByRole("button", { name: "Mute microphone" });
+
+    await user.click(screen.getByRole("button", { name: "Settings" }));
+
+    expect(screen.getByText("No audio or video devices were found.")).toBeInTheDocument();
+    expect(screen.queryByText("Device choices load after you join the voice channel.")).not.toBeInTheDocument();
+  });
+
+  it("clears enumerated devices after leaving a joined room", async () => {
+    getLocalDevices.mockResolvedValue([{
+      deviceId: "mic-1",
+      groupId: "group-1",
+      kind: "audioinput",
+      label: "Studio microphone",
+      toJSON: () => ({}),
+    } satisfies MediaDeviceInfo]);
+    await renderView();
+    const user = userEvent.setup();
+    await screen.findByRole("button", { name: "Mute microphone" });
+    await user.click(screen.getByRole("button", { name: "Settings" }));
+    expect(screen.getByLabelText("Microphone")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Close settings" }));
+
+    await user.click(screen.getByRole("button", { name: "Leave" }));
+    await screen.findByRole("button", { name: "Join" });
+    await user.click(screen.getByRole("button", { name: "Settings" }));
+
+    expect(screen.getByText("Device choices load after you join the voice channel.")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Microphone")).not.toBeInTheDocument();
   });
 
   it("hides the screen share audio quality selector until advanced mode is turned on", async () => {
@@ -422,6 +534,177 @@ describe("VoiceView", () => {
     fireEvent.keyUp(window, { code: "Space", key: " " });
   });
 
+  it("recreates a stale microphone publication once on the next push-to-talk press", async () => {
+    await renderView({}, { join: false });
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Settings" }));
+    await user.click(screen.getByRole("switch", { name: "Advanced mode" }));
+    await user.selectOptions(screen.getByLabelText("Audio"), "custom");
+    await user.click(screen.getByRole("radio", { name: /Push-to-talk/ }));
+    await user.click(screen.getByRole("button", { name: "Close settings" }));
+    await user.click(screen.getByRole("button", { name: "Join" }));
+    await screen.findByRole("button", { name: "Hold Space" });
+
+    fireEvent.keyDown(window, { code: "Space", key: " " });
+    await screen.findByRole("button", { name: "You're talking…" });
+    const firstPublication = localPublications.get("microphone");
+    const firstTrack = firstPublication?.track;
+    expect(firstTrack?.publishOptions).toMatchObject({ audioPreset: { maxBitrate: 48_000 } });
+    fireEvent.keyUp(window, { code: "Space", key: " " });
+    await screen.findByRole("button", { name: "Hold Space" });
+
+    await user.click(screen.getByRole("button", { name: "Settings" }));
+    fireEvent.change(screen.getByRole("spinbutton", { name: "Microphone bitrate (kb/s)" }), { target: { value: "88" } });
+    expect(localPublications.get("microphone")?.track).toBe(firstTrack);
+    expect(firstTrack?.stop).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "Close settings" }));
+
+    fireEvent.keyDown(window, { code: "Space", key: " " });
+    await waitFor(() => expect(localPublications.get("microphone")?.track?.publishOptions).toMatchObject({
+      audioPreset: { maxBitrate: 88_000 },
+    }));
+    const refreshedTrack = localPublications.get("microphone")?.track;
+    expect(refreshedTrack).not.toBe(firstTrack);
+    expect(unpublishTrack).toHaveBeenCalledWith(firstTrack, true);
+    expect(firstTrack?.stop).toHaveBeenCalledOnce();
+    fireEvent.keyUp(window, { code: "Space", key: " " });
+    await screen.findByRole("button", { name: "Hold Space" });
+
+    fireEvent.keyDown(window, { code: "Space", key: " " });
+    await screen.findByRole("button", { name: "You're talking…" });
+    expect(localPublications.get("microphone")?.track).toBe(refreshedTrack);
+    expect(unpublishTrack).toHaveBeenCalledTimes(1);
+    fireEvent.keyUp(window, { code: "Space", key: " " });
+  });
+
+  it("stays muted when push-to-talk is released while a stale publication is rebuilding", async () => {
+    const onSelfMediaStatusChange = vi.fn();
+    await renderView({ onSelfMediaStatusChange }, { join: false });
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Settings" }));
+    await user.click(screen.getByRole("switch", { name: "Advanced mode" }));
+    await user.selectOptions(screen.getByLabelText("Audio"), "custom");
+    await user.click(screen.getByRole("radio", { name: /Push-to-talk/ }));
+    await user.click(screen.getByRole("button", { name: "Close settings" }));
+    await user.click(screen.getByRole("button", { name: "Join" }));
+    await screen.findByRole("button", { name: "Hold Space" });
+    fireEvent.keyDown(window, { code: "Space", key: " " });
+    await screen.findByRole("button", { name: "You're talking…" });
+    fireEvent.keyUp(window, { code: "Space", key: " " });
+    await screen.findByRole("button", { name: "Hold Space" });
+    await user.click(screen.getByRole("button", { name: "Settings" }));
+    fireEvent.change(screen.getByRole("spinbutton", { name: "Microphone bitrate (kb/s)" }), { target: { value: "88" } });
+    await user.click(screen.getByRole("button", { name: "Close settings" }));
+
+    let finishUnpublish!: () => void;
+    const pendingUnpublish = new Promise<void>((resolve) => { finishUnpublish = resolve; });
+    unpublishTrack.mockImplementationOnce(async (track: MockLocalTrack, stopOnUnpublish = true) => {
+      const publication = localPublications.get("microphone");
+      if (stopOnUnpublish) track.stop();
+      if (publication) {
+        localPublications.delete("microphone");
+        publication.track = undefined;
+        publication.audioTrack = undefined;
+      }
+      await pendingUnpublish;
+      return publication;
+    });
+    setMicrophoneEnabled.mockClear();
+    onSelfMediaStatusChange.mockClear();
+
+    fireEvent.keyDown(window, { code: "Space", key: " " });
+    await waitFor(() => expect(unpublishTrack).toHaveBeenCalledOnce());
+    fireEvent.keyUp(window, { code: "Space", key: " " });
+    await act(async () => {
+      finishUnpublish();
+      await pendingUnpublish;
+    });
+
+    expect(localPublications.get("microphone")?.isMuted ?? true).toBe(true);
+    expect(screen.getByRole("button", { name: "Hold Space" })).toBeInTheDocument();
+    expect(setMicrophoneEnabled).toHaveBeenLastCalledWith(false, expect.any(Object), expect.any(Object));
+    expect(setMicrophoneEnabled.mock.calls.filter(([enabled]) => enabled)).toHaveLength(0);
+    expect(onSelfMediaStatusChange).toHaveBeenLastCalledWith("c2", { microphoneMuted: true, deafened: false });
+    expect(onSelfMediaStatusChange).not.toHaveBeenCalledWith("c2", { microphoneMuted: false, deafened: false });
+  });
+
+  it("keeps held push-to-talk active through a valid edit and applies it after release", async () => {
+    await renderView({}, { join: false });
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Settings" }));
+    await user.click(screen.getByRole("switch", { name: "Advanced mode" }));
+    await user.selectOptions(screen.getByLabelText("Audio"), "custom");
+    await user.click(screen.getByRole("radio", { name: /Push-to-talk/ }));
+    await user.click(screen.getByRole("button", { name: "Close settings" }));
+    await user.click(screen.getByRole("button", { name: "Join" }));
+    await screen.findByRole("button", { name: "Hold Space" });
+    await user.click(screen.getByRole("button", { name: "Settings" }));
+
+    fireEvent.keyDown(window, { code: "Space", key: " " });
+    await screen.findByRole("button", { name: "You're talking…" });
+    const originalTrack = localPublications.get("microphone")?.track;
+    setMicrophoneEnabled.mockClear();
+    const bitrate = screen.getByRole("spinbutton", { name: "Microphone bitrate (kb/s)" });
+    fireEvent.focus(bitrate);
+    fireEvent.change(bitrate, { target: { value: "88" } });
+    await act(async () => undefined);
+
+    expect(screen.getByRole("button", { name: "You're talking…" })).toBeInTheDocument();
+    expect(setMicrophoneEnabled).not.toHaveBeenCalled();
+    expect(localPublications.get("microphone")?.track).toBe(originalTrack);
+    expect(unpublishTrack).not.toHaveBeenCalled();
+
+    fireEvent.keyUp(bitrate, { code: "Space", key: " " });
+    await screen.findByRole("button", { name: "Hold Space" });
+    expect(setMicrophoneEnabled).toHaveBeenLastCalledWith(false, expect.any(Object), expect.any(Object));
+    await user.click(screen.getByRole("button", { name: "Close settings" }));
+
+    fireEvent.keyDown(window, { code: "Space", key: " " });
+    await waitFor(() => expect(localPublications.get("microphone")?.track?.publishOptions).toMatchObject({
+      audioPreset: { maxBitrate: 88_000 },
+    }));
+    expect(localPublications.get("microphone")?.track).not.toBe(originalTrack);
+    expect(unpublishTrack).toHaveBeenCalledTimes(1);
+    fireEvent.keyUp(window, { code: "Space", key: " " });
+  });
+
+  it("releases held push-to-talk from an invalid focused draft without rebuilding next press", async () => {
+    await renderView({}, { join: false });
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Settings" }));
+    await user.click(screen.getByRole("switch", { name: "Advanced mode" }));
+    await user.selectOptions(screen.getByLabelText("Audio"), "custom");
+    await user.click(screen.getByRole("radio", { name: /Push-to-talk/ }));
+    await user.click(screen.getByRole("button", { name: "Close settings" }));
+    await user.click(screen.getByRole("button", { name: "Join" }));
+    await screen.findByRole("button", { name: "Hold Space" });
+    await user.click(screen.getByRole("button", { name: "Settings" }));
+
+    fireEvent.keyDown(window, { code: "Space", key: " " });
+    await screen.findByRole("button", { name: "You're talking…" });
+    const originalTrack = localPublications.get("microphone")?.track;
+    setMicrophoneEnabled.mockClear();
+    const bitrate = screen.getByRole("spinbutton", { name: "Microphone bitrate (kb/s)" });
+    fireEvent.focus(bitrate);
+    fireEvent.change(bitrate, { target: { value: "" } });
+    await act(async () => undefined);
+    expect(screen.getByRole("button", { name: "You're talking…" })).toBeInTheDocument();
+    expect(setMicrophoneEnabled).not.toHaveBeenCalled();
+
+    fireEvent.keyUp(bitrate, { code: "Space", key: " " });
+    await screen.findByRole("button", { name: "Hold Space" });
+    fireEvent.blur(bitrate);
+    await user.click(screen.getByRole("button", { name: "Close settings" }));
+    unpublishTrack.mockClear();
+
+    fireEvent.keyDown(window, { code: "Space", key: " " });
+    await screen.findByRole("button", { name: "You're talking…" });
+    expect(localPublications.get("microphone")?.track).toBe(originalTrack);
+    expect(localPublications.get("microphone")?.track?.publishOptions).toMatchObject({ audioPreset: { maxBitrate: 48_000 } });
+    expect(unpublishTrack).not.toHaveBeenCalled();
+    fireEvent.keyUp(window, { code: "Space", key: " " });
+  });
+
   it("uses custom microphone options for manual and push-to-talk mode toggles", async () => {
     await renderView({}, { join: false });
     const user = userEvent.setup();
@@ -494,6 +777,43 @@ describe("VoiceView", () => {
 
     expect(screen.getAllByText(message)).toHaveLength(toastCount + 1);
     expect(setCameraEnabled).not.toHaveBeenCalled();
+  });
+
+  it("recreates a stale camera publication once on its next enable", async () => {
+    await renderView({}, { join: false });
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Settings" }));
+    await user.click(screen.getByRole("switch", { name: "Advanced mode" }));
+    await user.selectOptions(screen.getByLabelText("Webcam"), "custom");
+    await user.click(screen.getByRole("button", { name: "Close settings" }));
+    await user.click(screen.getByRole("button", { name: "Join" }));
+    await screen.findByRole("button", { name: "Mute microphone" });
+    await user.click(screen.getByRole("button", { name: "Turn on camera" }));
+    const firstPublication = localPublications.get("camera");
+    const firstTrack = firstPublication?.track;
+    expect(firstTrack?.publishOptions).toMatchObject({ videoEncoding: { maxBitrate: 1_700_000 } });
+
+    await user.click(screen.getByRole("button", { name: "Settings" }));
+    fireEvent.change(screen.getByRole("spinbutton", { name: "Webcam bitrate (kb/s)" }), { target: { value: "4200" } });
+    expect(localPublications.get("camera")?.track).toBe(firstTrack);
+    expect(firstTrack?.stop).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "Close settings" }));
+    await user.click(screen.getByRole("button", { name: "Stop camera" }));
+    expect(unpublishTrack).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("button", { name: "Turn on camera" }));
+    expect(localPublications.get("camera")?.track?.publishOptions).toMatchObject({
+      videoEncoding: { maxBitrate: 4_200_000 },
+    });
+    const refreshedTrack = localPublications.get("camera")?.track;
+    expect(refreshedTrack).not.toBe(firstTrack);
+    expect(unpublishTrack).toHaveBeenCalledWith(firstTrack, true);
+    expect(firstTrack?.stop).toHaveBeenCalledOnce();
+
+    await user.click(screen.getByRole("button", { name: "Stop camera" }));
+    await user.click(screen.getByRole("button", { name: "Turn on camera" }));
+    expect(localPublications.get("camera")?.track).toBe(refreshedTrack);
+    expect(unpublishTrack).toHaveBeenCalledTimes(1);
   });
 
   it("preserves custom screen capture settings when retrying without audio", async () => {
