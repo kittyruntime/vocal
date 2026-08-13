@@ -5,6 +5,7 @@ import * as api from "../api/client";
 import { previewSound } from "../audio/sounds";
 import { ACCENT_PRESET_LABELS, ACCENT_SWATCH_COLORS } from "../theme/accent";
 import { Icon } from "../ui/Icon";
+import { Switch, TextField } from "../ui/form";
 
 const CAPABILITY_LABEL: Record<Capability, string> = {
   manage_channels: "Manage channels",
@@ -31,6 +32,8 @@ export function AdminPanel({ currentUser, onClose }: {
   const [totalUsers, setTotalUsers] = useState(0);
   const [roles, setRoles] = useState<Role[]>([]);
   const [settings, setSettings] = useState<ServerSettings>({ registrationOpen: true, maxImageSizeMb: 5, maxFileSizeMb: 10, maxMessageLength: 4000 });
+  const [savingLimits, setSavingLimits] = useState(false);
+  const [savingLength, setSavingLength] = useState(false);
   const [soundSettings, setSoundSettings] = useState<SoundSettings>(() => Object.fromEntries(
     SOUND_EVENTS.map((event) => [event, { enabled: true, hasCustom: false }]),
   ) as SoundSettings);
@@ -117,9 +120,22 @@ export function AdminPanel({ currentUser, onClose }: {
     } catch { setError("Could not change registration settings."); }
   }
 
-  async function saveUploadLimits(next: ServerSettings) {
-    try { setSettings(await api.updateAdminSettings(next)); }
+  async function saveAttachmentLimits(event: FormEvent) {
+    event.preventDefault();
+    setSavingLimits(true);
+    setError("");
+    try { setSettings(await api.updateAdminSettings(settings)); }
     catch { setError("Could not change attachment limits."); }
+    finally { setSavingLimits(false); }
+  }
+
+  async function saveMessageLength(event: FormEvent) {
+    event.preventDefault();
+    setSavingLength(true);
+    setError("");
+    try { setSettings(await api.updateAdminSettings(settings)); }
+    catch { setError("Could not change the message length limit."); }
+    finally { setSavingLength(false); }
   }
 
   async function toggleVoiceMute(user: AdminUser) {
@@ -156,23 +172,25 @@ export function AdminPanel({ currentUser, onClose }: {
           {error ? <p className="admin-error" role="alert">{error}</p> : null}
           {activeTab === "general" && canManageServer ? <><div className="settings-section admin-setting-row">
             <div><h3>Public registration</h3><p>Invitations remain usable even when registration is closed.</p></div>
-            <button type="button" className={`setting-switch ${settings.registrationOpen ? "active" : ""}`} aria-pressed={settings.registrationOpen} onClick={() => void toggleRegistration()}>{settings.registrationOpen ? "Open" : "Closed"}</button>
+            <Switch label="Public registration" checked={settings.registrationOpen} onChange={() => void toggleRegistration()} />
           </div>
-          <div className="settings-section">
+          <form className="settings-section" onSubmit={saveAttachmentLimits}>
             <h3>Attachment limits</h3>
             <p className="admin-setting-description">Maximum size accepted for each uploaded item. The hard server limit is 50 MB.</p>
             <div className="attachment-limit-grid">
-              <label>Images (MB)<input type="number" min="1" max="50" value={settings.maxImageSizeMb} onChange={(event) => setSettings({ ...settings, maxImageSizeMb: Number(event.target.value) })} onBlur={() => void saveUploadLimits(settings)} /></label>
-              <label>Other files (MB)<input type="number" min="1" max="50" value={settings.maxFileSizeMb} onChange={(event) => setSettings({ ...settings, maxFileSizeMb: Number(event.target.value) })} onBlur={() => void saveUploadLimits(settings)} /></label>
+              <TextField label="Images (MB)" type="number" min="1" max="50" value={settings.maxImageSizeMb} onChange={(event) => setSettings({ ...settings, maxImageSizeMb: Number(event.target.value) })} />
+              <TextField label="Other files (MB)" type="number" min="1" max="50" value={settings.maxFileSizeMb} onChange={(event) => setSettings({ ...settings, maxFileSizeMb: Number(event.target.value) })} />
             </div>
-          </div>
-          <div className="settings-section">
+            <button type="submit" disabled={savingLimits}>{savingLimits ? "Saving…" : "Save changes"}</button>
+          </form>
+          <form className="settings-section" onSubmit={saveMessageLength}>
             <h3>Message length</h3>
             <p className="admin-setting-description">Maximum number of characters allowed in a single message.</p>
             <div className="attachment-limit-grid single-setting">
-              <label>Characters per message<input type="number" min="100" max="10000" step="100" value={settings.maxMessageLength} onChange={(event) => setSettings({ ...settings, maxMessageLength: Number(event.target.value) })} onBlur={() => void saveUploadLimits(settings)} /></label>
+              <TextField label="Characters per message" type="number" min="100" max="10000" step="100" value={settings.maxMessageLength} onChange={(event) => setSettings({ ...settings, maxMessageLength: Number(event.target.value) })} />
             </div>
-          </div>
+            <button type="submit" disabled={savingLength}>{savingLength ? "Saving…" : "Save length"}</button>
+          </form>
           <p className="admin-hint">Channel-specific access and voice quality remain under the <Icon name="settings" size={13} /> icon beside each channel.</p></> : null}
           {activeTab === "sounds" && canManageServer ? <SoundSettingsManager soundSettings={soundSettings} onChange={setSoundSettings} onError={setError} /> : null}
           {activeTab === "roles" && canManageServer ? <RoleManager roles={roles} onChange={setRoles} onError={setError} /> : null}
