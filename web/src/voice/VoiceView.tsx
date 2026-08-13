@@ -31,8 +31,23 @@ import { playAppSound } from "../audio/sounds";
 import { useToast } from "../toast/ToastContext";
 import { Icon } from "../ui/Icon";
 import { RadioGroup, RangeSlider, Select, Switch } from "../ui/form";
-import { audioProfiles, cameraProfiles, screenProfiles, type MediaQuality, type QualityProfile, type ScreenQuality } from "./quality";
-import { loadVoiceSettings, SETTINGS_KEY } from "./settings";
+import { CustomNumberField } from "./CustomNumberField";
+import {
+  audioProfiles,
+  cameraProfiles,
+  customQualityLimits,
+  resolveAudioProfile,
+  resolveCameraProfile,
+  resolveScreenProfile,
+  screenProfiles,
+  type CustomMediaQuality,
+  type CustomScreenQuality,
+  type CustomVideoSettings,
+  type MediaQuality,
+  type QualityProfile,
+  type ScreenQuality,
+} from "./quality";
+import { loadVoiceSettings, SETTINGS_KEY, type VoiceSettings } from "./settings";
 import { shouldOpenVoiceGate, VoiceGateProcessor } from "./VoiceGateProcessor";
 
 type VoiceStatus = "idle" | "connecting" | "connected" | "reconnecting";
@@ -40,6 +55,9 @@ type NetworkQuality = "good" | "poor" | "lost";
 type NetworkStats = { rttMs: number | null; packetLossPercent: number | null };
 type ScreenAudioParticipant = { identity: string; name: string; trackSid: string };
 type MediaKind = "microphone" | "camera" | "screen";
+type CustomQualityUpdate =
+  | { kind: "audio" | "screenAudio"; key: "bitrateKbps"; value: number }
+  | { kind: "camera" | "screen"; key: keyof CustomVideoSettings; value: number };
 type CallParticipant = {
   identity: string;
   name: string;
@@ -234,7 +252,7 @@ export function VoiceView({
   const [cameraEnabled, setCameraEnabled] = useState(false);
   const [screenShareEnabled, setScreenShareEnabled] = useState(false);
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
-  const [settings, setSettings] = useState(() => ({
+  const [settings, setSettings] = useState<VoiceSettings>(() => ({
     ...loadVoiceSettings(),
     audioQuality: channel.defaultAudioQuality ?? "standard",
     cameraQuality: channel.defaultCameraQuality ?? "standard",
@@ -668,7 +686,7 @@ export function VoiceView({
       for (const [kind, deviceId] of Object.entries(settings.devices)) {
         if (deviceId) await room.switchActiveDevice(kind as MediaDeviceKind, deviceId, false);
       }
-      const audioProfile = audioProfiles[settings.audioQuality];
+      const audioProfile = resolveAudioProfile(settings.audioQuality, settings.customAudio, "microphone");
       const microphone = await room.localParticipant.setMicrophoneEnabled(!settings.pushToTalk, audioProfile.capture, audioProfile.publish);
       setMicrophoneEnabled(!settings.pushToTalk);
       void room.localParticipant.setAttributes({ [DEAFENED_ATTRIBUTE]: "false" }).catch(() => {
@@ -711,7 +729,7 @@ export function VoiceView({
     saveSettings({ ...settings, pushToTalk: enabled });
     pttPressedRef.current = false;
     try {
-      const profile = audioProfiles[settings.audioQuality];
+      const profile = resolveAudioProfile(settings.audioQuality, settings.customAudio, "microphone");
       const publication = await room.localParticipant.setMicrophoneEnabled(!enabled, profile.capture, profile.publish);
       if (enabled) {
         voiceGateRef.current = null;
@@ -734,7 +752,7 @@ export function VoiceView({
       pttPressedRef.current = pressed;
       const room = roomRef.current;
       if (!room) return;
-      const profile = audioProfiles[settings.audioQuality];
+      const profile = resolveAudioProfile(settings.audioQuality, settings.customAudio, "microphone");
       void room.localParticipant.setMicrophoneEnabled(pressed, profile.capture, profile.publish).then(() => {
         setMicrophoneEnabled(pressed);
         refreshParticipantsRef.current?.({ microphoneMuted: !pressed, deafened });
@@ -768,14 +786,14 @@ export function VoiceView({
       window.removeEventListener("blur", onBlur);
       setPressed(false);
     };
-  }, [deafened, onSelfMediaStatusChange, settings.audioQuality, settings.pushToTalk, showToast, status]);
+  }, [deafened, onSelfMediaStatusChange, settings.audioQuality, settings.customAudio, settings.pushToTalk, showToast, status]);
 
   async function toggleMicrophone() {
     const room = roomRef.current;
     if (!room || (status !== "connected" && status !== "reconnecting")) return;
     const enabled = !microphoneEnabled;
     try {
-      const profile = audioProfiles[settings.audioQuality];
+      const profile = resolveAudioProfile(settings.audioQuality, settings.customAudio, "microphone");
       await room.localParticipant.setMicrophoneEnabled(enabled, profile.capture, profile.publish);
       setMicrophoneEnabled(enabled);
       refreshParticipantsRef.current?.({ microphoneMuted: !enabled, deafened });
@@ -812,7 +830,7 @@ export function VoiceView({
     const enabled = !cameraEnabled;
     const previousTrack = room.localParticipant.getTrackPublication(Track.Source.Camera)?.track;
     try {
-      const profile = cameraProfiles[settings.cameraQuality];
+      const profile = resolveCameraProfile(settings.cameraQuality, settings.customCamera);
       const publication = await room.localParticipant.setCameraEnabled(enabled, profile.capture, profile.publish);
       localCameraRef.current?.replaceChildren();
       if (enabled && publication?.track) {
@@ -842,7 +860,7 @@ export function VoiceView({
     const enabled = !screenShareEnabled;
     const previousTrack = room.localParticipant.getTrackPublication(Track.Source.ScreenShare)?.track;
     try {
-      const profile = screenProfiles[settings.screenQuality];
+      const profile = resolveScreenProfile(settings.screenQuality, settings.customScreen);
       const audioSupported = supportsScreenShareAudio();
       const captureOptions = enabled
         ? { ...profile.capture, audio: audioSupported, ...(audioSupported ? { systemAudio: "include" as const } : {}) }
@@ -893,7 +911,8 @@ export function VoiceView({
         }
         if (audioTrack) {
           try {
-            await room.localParticipant.publishTrack(audioTrack, audioProfiles[settings.screenAudioQuality === "custom" ? "high" : settings.screenAudioQuality].publish);
+            const audioProfile = resolveAudioProfile(settings.screenAudioQuality, settings.customScreenAudio, "screenShare");
+            await room.localParticipant.publishTrack(audioTrack, audioProfile.publish);
             console.log("[screen-share] audio track published");
           } catch (publishError) {
             console.error("[screen-share] audio track publish failed", publishError);
@@ -935,13 +954,29 @@ export function VoiceView({
     }
   }
 
-  function selectQuality(kind: "audio" | "camera" | "screenAudio", quality: MediaQuality): void;
-  function selectQuality(kind: "screen", quality: ScreenQuality): void;
-  function selectQuality(kind: "audio" | "camera" | "screen" | "screenAudio", quality: ScreenQuality) {
+  function selectQuality(kind: "audio" | "camera" | "screenAudio", quality: CustomMediaQuality): void;
+  function selectQuality(kind: "screen", quality: CustomScreenQuality): void;
+  function selectQuality(kind: "audio" | "camera" | "screen" | "screenAudio", quality: CustomScreenQuality) {
     const key = `${kind}Quality` as const;
     saveSettings({ ...settings, [key]: quality });
     const active = kind === "audio" ? microphoneEnabled : kind === "camera" ? cameraEnabled : screenShareEnabled;
     const label = kind === "audio" ? "audio" : kind === "camera" ? "webcam" : kind === "screenAudio" ? "screen share audio" : "screen share";
+    if (active) showToast(`The new ${label} quality will apply the next time it's turned on.`);
+  }
+
+  function updateCustomQuality(update: CustomQualityUpdate) {
+    const key = {
+      audio: "customAudio",
+      camera: "customCamera",
+      screen: "customScreen",
+      screenAudio: "customScreenAudio",
+    }[update.kind] as "customAudio" | "customCamera" | "customScreen" | "customScreenAudio";
+    saveSettings({
+      ...settings,
+      [key]: { ...settings[key], [update.key]: update.value },
+    });
+    const active = update.kind === "audio" ? microphoneEnabled : update.kind === "camera" ? cameraEnabled : screenShareEnabled;
+    const label = update.kind === "audio" ? "audio" : update.kind === "camera" ? "webcam" : update.kind === "screenAudio" ? "screen share audio" : "screen share";
     if (active) showToast(`The new ${label} quality will apply the next time it's turned on.`);
   }
 
@@ -1079,9 +1114,14 @@ export function VoiceView({
           </div>
         ) : null}
         {status === "idle" ? (
-          <button type="button" className="voice-primary" onClick={() => void joinRoom()}>
-            Join
-          </button>
+          <div className="voice-idle-actions">
+            <button type="button" className="voice-primary" onClick={() => void joinRoom()}>
+              Join
+            </button>
+            <button type="button" className="voice-idle-settings" aria-label="Settings" aria-haspopup="dialog" onClick={() => setSettingsOpen(true)}>
+              <Icon name="settings" size={18} /> Settings
+            </button>
+          </div>
         ) : status === "connecting" ? (
           <button type="button" className="voice-primary connecting" disabled>Connecting<span className="connecting-dots" aria-hidden="true"><i /><i /><i /></span></button>
         ) : (
@@ -1142,11 +1182,45 @@ export function VoiceView({
               <div className="settings-section">
                 <h3>Streaming quality</h3>
                 <div className="voice-settings">
-                  <QualitySelect label="Audio" value={settings.audioQuality} profiles={audioProfiles} onChange={(quality) => selectQuality("audio", quality)} />
-                  <QualitySelect label="Webcam" value={settings.cameraQuality} profiles={cameraProfiles} onChange={(quality) => selectQuality("camera", quality)} />
-                  <QualitySelect<ScreenQuality> label="Screen share" value={settings.screenQuality} profiles={screenProfiles} onChange={(quality) => selectQuality("screen", quality)} />
-                  {settings.advancedMode ? (
-                    <QualitySelect label="Screen share audio" value={settings.screenAudioQuality === "custom" ? "high" : settings.screenAudioQuality} profiles={audioProfiles} onChange={(quality) => selectQuality("screenAudio", quality)} />
+                  <div className="quality-setting">
+                    <QualitySelect label="Audio" value={settings.audioQuality} profiles={audioProfiles} allowCustom={settings.advancedMode} onChange={(quality) => selectQuality("audio", quality)} />
+                    {settings.advancedMode && settings.audioQuality === "custom" ? (
+                      <div className="custom-quality-fields">
+                        <CustomQualityField label="Microphone bitrate (kb/s)" value={settings.customAudio.bitrateKbps} limits={customQualityLimits.audio.bitrateKbps} onCommit={(value) => updateCustomQuality({ kind: "audio", key: "bitrateKbps", value })} />
+                      </div>
+                    ) : null}
+                  </div>
+                  <div className="quality-setting">
+                    <QualitySelect label="Webcam" value={settings.cameraQuality} profiles={cameraProfiles} allowCustom={settings.advancedMode} onChange={(quality) => selectQuality("camera", quality)} />
+                    {settings.advancedMode && settings.cameraQuality === "custom" ? (
+                      <div className="custom-quality-fields">
+                        <CustomQualityField label="Webcam width (px)" value={settings.customCamera.width} limits={customQualityLimits.camera.width} onCommit={(value) => updateCustomQuality({ kind: "camera", key: "width", value })} />
+                        <CustomQualityField label="Webcam height (px)" value={settings.customCamera.height} limits={customQualityLimits.camera.height} onCommit={(value) => updateCustomQuality({ kind: "camera", key: "height", value })} />
+                        <CustomQualityField label="Webcam frame rate (fps)" value={settings.customCamera.frameRate} limits={customQualityLimits.camera.frameRate} onCommit={(value) => updateCustomQuality({ kind: "camera", key: "frameRate", value })} />
+                        <CustomQualityField label="Webcam bitrate (kb/s)" value={settings.customCamera.bitrateKbps} limits={customQualityLimits.camera.bitrateKbps} onCommit={(value) => updateCustomQuality({ kind: "camera", key: "bitrateKbps", value })} />
+                      </div>
+                    ) : null}
+                  </div>
+                  <div className="quality-setting">
+                    <QualitySelect<ScreenQuality> label="Screen share" value={settings.screenQuality} profiles={screenProfiles} allowCustom={settings.advancedMode} onChange={(quality) => selectQuality("screen", quality)} />
+                    {settings.advancedMode && settings.screenQuality === "custom" ? (
+                      <div className="custom-quality-fields">
+                        <CustomQualityField label="Screen width (px)" value={settings.customScreen.width} limits={customQualityLimits.screen.width} onCommit={(value) => updateCustomQuality({ kind: "screen", key: "width", value })} />
+                        <CustomQualityField label="Screen height (px)" value={settings.customScreen.height} limits={customQualityLimits.screen.height} onCommit={(value) => updateCustomQuality({ kind: "screen", key: "height", value })} />
+                        <CustomQualityField label="Screen frame rate (fps)" value={settings.customScreen.frameRate} limits={customQualityLimits.screen.frameRate} onCommit={(value) => updateCustomQuality({ kind: "screen", key: "frameRate", value })} />
+                        <CustomQualityField label="Screen bitrate (kb/s)" value={settings.customScreen.bitrateKbps} limits={customQualityLimits.screen.bitrateKbps} onCommit={(value) => updateCustomQuality({ kind: "screen", key: "bitrateKbps", value })} />
+                      </div>
+                    ) : null}
+                  </div>
+                  {settings.advancedMode || settings.screenAudioQuality === "custom" ? (
+                    <div className="quality-setting">
+                      <QualitySelect label="Screen share audio" value={settings.screenAudioQuality} profiles={audioProfiles} allowCustom={settings.advancedMode} onChange={(quality) => selectQuality("screenAudio", quality)} />
+                      {settings.advancedMode && settings.screenAudioQuality === "custom" ? (
+                        <div className="custom-quality-fields">
+                          <CustomQualityField label="Screen audio bitrate (kb/s)" value={settings.customScreenAudio.bitrateKbps} limits={customQualityLimits.screenAudio.bitrateKbps} onCommit={(value) => updateCustomQuality({ kind: "screenAudio", key: "bitrateKbps", value })} />
+                        </div>
+                      ) : null}
+                    </div>
                   ) : null}
                   <p className="form-hint">To share game, tab, or system audio, enable audio in your browser's sharing picker.</p>
                 </div>
@@ -1202,20 +1276,37 @@ function QualitySelect<TQuality extends string = MediaQuality>({
   label,
   value,
   profiles,
+  allowCustom,
   onChange,
 }: {
   label: string;
-  value: TQuality;
+  value: TQuality | "custom";
   profiles: Record<TQuality, QualityProfile<unknown>>;
-  onChange(value: TQuality): void;
+  allowCustom: boolean;
+  onChange(value: TQuality | "custom"): void;
 }) {
   return (
-    <Select label={label} value={value} onChange={(event) => onChange(event.target.value as TQuality)}>
+    <Select label={label} value={value} onChange={(event) => onChange(event.target.value as TQuality | "custom")}>
       {(Object.entries(profiles) as [TQuality, QualityProfile<unknown>][]).map(([key, profile]) => (
         <option key={key} value={key}>{profile.label} — {profile.detail}</option>
       ))}
+      {allowCustom || value === "custom" ? <option value="custom">Custom</option> : null}
     </Select>
   );
+}
+
+function CustomQualityField({
+  label,
+  value,
+  limits,
+  onCommit,
+}: {
+  label: string;
+  value: number;
+  limits: { min: number; max: number; step: number };
+  onCommit(value: number): void;
+}) {
+  return <CustomNumberField label={label} value={value} min={limits.min} max={limits.max} step={limits.step} onCommit={onCommit} />;
 }
 
 function DeviceSelect({
