@@ -577,6 +577,23 @@ describe("VoiceView", () => {
     expect(playAppSound).toHaveBeenCalledWith("screenShare");
   });
 
+  it("retries without audio when Chrome/Edge throws NotFoundError for screen audio on unsupported sources", async () => {
+    const videoOnlyTrack = { kind: "video", attach: vi.fn(() => document.createElement("video")), detach: vi.fn(() => []), stop: vi.fn() };
+    createScreenTracks
+      .mockRejectedValueOnce(Object.assign(new Error("no audio device for this source"), { name: "NotFoundError" }))
+      .mockResolvedValueOnce([videoOnlyTrack]);
+    await renderView();
+    await userEvent.setup().click(await screen.findByRole("button", { name: "Share screen" }));
+
+    expect(createScreenTracks).toHaveBeenCalledTimes(2);
+    expect(createScreenTracks).toHaveBeenNthCalledWith(1, expect.objectContaining({ audio: true, systemAudio: "include" }));
+    expect(createScreenTracks.mock.calls[1][0]).toMatchObject({ audio: false });
+    expect(createScreenTracks.mock.calls[1][0]).not.toHaveProperty("systemAudio");
+    expect(await screen.findByText("Could not share this screen's audio here. Sharing video only.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Stop sharing" })).toBeInTheDocument();
+    expect(playAppSound).toHaveBeenCalledWith("screenShare");
+  });
+
   it("configures push-to-talk from voice settings", async () => {
     await renderView();
     const user = userEvent.setup();

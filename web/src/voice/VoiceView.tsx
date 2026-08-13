@@ -964,16 +964,18 @@ export function VoiceView({
           });
           // getDisplayMedia rejects the WHOLE call (not just the audio part) when
           // the platform/browser combination can't satisfy the audio constraint at
-          // all -- e.g. `systemAudio` capture is only available on some Chrome
-          // versions/platforms (Windows first, macOS from Chrome 141). That shows
-          // up as NotSupportedError, distinct from the video track publishing fine
-          // and only its *publish to LiveKit* failing (handled below) or from the
-          // user dismissing the OS picker entirely (NotAllowedError, where retrying
-          // would just reopen a picker the user just closed). Only retry for the
-          // audio-capability-gap case.
-          if (errorName !== "NotSupportedError") throw captureError;
+          // all. This surfaces under different error names depending on the browser:
+          //  - NotSupportedError: Chrome on platforms without system audio support
+          //    (e.g. certain Linux distros, or macOS before system audio is enabled)
+          //  - NotFoundError: Chrome/Edge on macOS when the user selects "Entire Screen"
+          //    — Firefox isn't the only browser that throws NotFound; Chrome can too
+          //    when the requested source can't capture audio.
+          // Retry without audio only for these capability-gap errors, never for
+          // NotAllowedError (user dismissed the picker — retrying would just reopen
+          // the OS dialog the user just closed).
+          if (errorName !== "NotSupportedError" && errorName !== "NotFoundError") throw captureError;
           capturedWithAudio = false;
-          console.warn("[screen-share] retrying capture without audio after NotSupportedError");
+          console.warn("[screen-share] retrying capture without audio after", { errorName });
           // profile.capture hardcodes audio: true for every screen-share quality
           // preset (see quality.ts) -- it must be explicitly overridden here, not
           // just omitted, or the retry would ask for audio again and fail the
