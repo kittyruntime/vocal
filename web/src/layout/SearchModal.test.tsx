@@ -29,7 +29,7 @@ describe("SearchModal", () => {
     expect(onClose).toHaveBeenCalled();
   });
 
-  it("TextField wrapper has correct flex layout structure and styles", () => {
+  it("renders the search input inside a form-field wrapper directly under .search-input", () => {
     const { container } = render(
       <SearchModal onClose={vi.fn()} onSelectChannel={vi.fn()} onViewProfile={vi.fn()} />
     );
@@ -45,7 +45,7 @@ describe("SearchModal", () => {
     expect(input).toBeTruthy();
     expect(label).toBeTruthy();
 
-    // Verify form-field is a direct child of search-input (CSS selector .search-input > .form-field will match)
+    // The .search-input > .form-field CSS selector (index.css) depends on this exact nesting
     expect(formField!.parentElement?.className).toContain("search-input");
 
     // Verify input has form-input class and is inside form-field
