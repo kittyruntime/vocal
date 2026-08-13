@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { AdminPanel } from "./AdminPanel";
 import * as api from "../api/client";
 import { ACCENT_PRESETS } from "../api/client";
-import type { AccentPreset, AdminUser, AppearanceSettings, CurrentUser, SoundSettings } from "../api/client";
+import type { AccentPreset, AdminUser, AppearanceSettings, CurrentUser, Role, SoundSettings } from "../api/client";
 import { ACCENT_PRESET_LABELS } from "../theme/accent";
 
 vi.mock("../api/client", async () => {
@@ -39,10 +39,10 @@ const DEFAULT_SOUND_SETTINGS: SoundSettings = {
 
 const DEFAULT_APPEARANCE: AppearanceSettings = { enabledPresets: [...ACCENT_PRESETS], defaultPreset: "amber" };
 
-function renderPanel(users: AdminUser[] = [alice], openMembers = true, soundSettings: SoundSettings = DEFAULT_SOUND_SETTINGS, appearance: AppearanceSettings = DEFAULT_APPEARANCE, currentUser: CurrentUser = admin) {
+function renderPanel(users: AdminUser[] = [alice], openMembers = true, soundSettings: SoundSettings = DEFAULT_SOUND_SETTINGS, appearance: AppearanceSettings = DEFAULT_APPEARANCE, currentUser: CurrentUser = admin, roles: Role[] = []) {
   mockListUsers(users);
   vi.mocked(api.getAdminSettings).mockResolvedValue({ registrationOpen: true, maxImageSizeMb: 5, maxFileSizeMb: 10, maxMessageLength: 4000 });
-  vi.mocked(api.listRoles).mockResolvedValue([]);
+  vi.mocked(api.listRoles).mockResolvedValue(roles);
   vi.mocked(api.getSoundSettings).mockResolvedValue(soundSettings);
   vi.mocked(api.getAppearance).mockResolvedValue(appearance);
   const result = render(
@@ -329,5 +329,30 @@ describe("AdminPanel appearance", () => {
     await user.click(within(glacierRow).getByRole("button", { name: `Set ${ACCENT_PRESET_LABELS.glacier} as default` }));
     await waitFor(() => expect(api.updateAppearance).toHaveBeenCalledWith({ defaultPreset: "glacier" }));
     expect(await within(glacierRow).findByRole("button", { name: `Set ${ACCENT_PRESET_LABELS.glacier} as default` })).toBeDisabled();
+  });
+});
+
+describe("AdminPanel roles", () => {
+  const moderatorRole: Role = { id: "r1", name: "Moderator", color: "#ff0000", position: 0, capabilities: ["moderate"], memberCount: 2 };
+
+  it("creates a role using the primitive-based name, color, and permission fields", async () => {
+    vi.mocked(api.createRole).mockResolvedValue({ id: "r2", name: "Support", color: "#00ff00", position: 0, capabilities: ["moderate"], memberCount: 0 });
+    renderPanel([], false);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: /Roles/ }));
+    await user.type(screen.getByLabelText("Role name"), "Support");
+    await user.click(screen.getByRole("checkbox", { name: "Moderate" }));
+    await user.click(screen.getByRole("button", { name: "Create role" }));
+    await waitFor(() => expect(api.createRole).toHaveBeenCalledWith({ name: "Support", color: "#5865f2", capabilities: ["moderate"] }));
+  });
+
+  it("reflects an existing role's color and checked capabilities when editing", async () => {
+    renderPanel([], false, undefined, undefined, undefined, [moderatorRole]);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: /Roles/ }));
+    await user.click(await screen.findByRole("button", { name: /Moderator/ }));
+    expect(screen.getByLabelText("Color")).toHaveValue("#ff0000");
+    expect(screen.getByRole("checkbox", { name: "Moderate" })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "Manage channels" })).not.toBeChecked();
   });
 });
