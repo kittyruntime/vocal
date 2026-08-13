@@ -1173,11 +1173,15 @@ export function VoiceView({
               </div>
               <div className="settings-section">
                 <h3>Devices</h3>
-                <div className="voice-settings">
-                  <DeviceSelect label="Microphone" kind="audioinput" devices={devices} value={settings.devices.audioinput} onChange={selectDevice} />
-                  <DeviceSelect label="Audio output" kind="audiooutput" devices={devices} value={settings.devices.audiooutput} onChange={selectDevice} />
-                  <DeviceSelect label="Camera" kind="videoinput" devices={devices} value={settings.devices.videoinput} onChange={selectDevice} />
-                </div>
+                {devices.length === 0 ? (
+                  <p className="form-hint">Device choices load after you join the voice channel.</p>
+                ) : (
+                  <div className="voice-settings">
+                    <DeviceSelect label="Microphone" kind="audioinput" devices={devices} value={settings.devices.audioinput} onChange={selectDevice} />
+                    <DeviceSelect label="Audio output" kind="audiooutput" devices={devices} value={settings.devices.audiooutput} onChange={selectDevice} />
+                    <DeviceSelect label="Camera" kind="videoinput" devices={devices} value={settings.devices.videoinput} onChange={selectDevice} />
+                  </div>
+                )}
               </div>
               <div className="settings-section">
                 <h3>Streaming quality</h3>
