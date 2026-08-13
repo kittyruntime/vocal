@@ -78,9 +78,10 @@ function isScreenQuality(value: unknown): value is CustomScreenQuality {
   return isMediaQuality(value) || value === "game";
 }
 
-export function loadVoiceSettings(storage: Pick<Storage, "getItem"> = localStorage): VoiceSettings {
+export function loadVoiceSettings(storage?: Pick<Storage, "getItem">): VoiceSettings {
   try {
-    const value = JSON.parse(storage.getItem(SETTINGS_KEY) ?? "{}") as unknown;
+    const resolvedStorage = storage ?? localStorage;
+    const value = JSON.parse(resolvedStorage.getItem(SETTINGS_KEY) ?? "{}") as unknown;
     const parsed = isRecord(value) ? value : {};
     return {
       devices: isRecord(parsed.devices) ? parsed.devices as DeviceSelections : {},

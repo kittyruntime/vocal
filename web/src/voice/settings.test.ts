@@ -48,6 +48,33 @@ describe("loadVoiceSettings", () => {
     expect(settings.customScreen).toEqual({ width: 640, height: 360, frameRate: 60, bitrateKbps: 30000 });
   });
 
+  it("falls back when access to the global localStorage property is denied", () => {
+    const descriptor = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
+    Object.defineProperty(globalThis, "localStorage", {
+      configurable: true,
+      get() {
+        throw new DOMException("denied", "SecurityError");
+      },
+    });
+
+    try {
+      expect(loadVoiceSettings()).toEqual(DEFAULT_VOICE_SETTINGS);
+    } finally {
+      if (descriptor) Object.defineProperty(globalThis, "localStorage", descriptor);
+      else Reflect.deleteProperty(globalThis, "localStorage");
+    }
+  });
+
+  it("falls back for finite-range fields whose JSON numbers parse as non-finite", () => {
+    const settings = loadVoiceSettings(storageFor(`{
+      "customAudio": { "bitrateKbps": 1e400 },
+      "customCamera": { "width": -1e400 }
+    }`));
+
+    expect(settings.customAudio.bitrateKbps).toBe(DEFAULT_VOICE_SETTINGS.customAudio.bitrateKbps);
+    expect(settings.customCamera.width).toBe(DEFAULT_VOICE_SETTINGS.customCamera.width);
+  });
+
   it("returns all defaults for invalid JSON", () => {
     expect(loadVoiceSettings(storageFor("{"))).toEqual(DEFAULT_VOICE_SETTINGS);
   });

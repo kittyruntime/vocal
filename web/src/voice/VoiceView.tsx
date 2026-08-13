@@ -69,6 +69,10 @@ type CallParticipant = {
 
 const DEAFENED_ATTRIBUTE = "vocal.deafened";
 
+function profileKey(profile: Pick<QualityProfile<unknown>, "capture" | "publish">): string {
+  return JSON.stringify([profile.capture, profile.publish]);
+}
+
 function loadLiveKit() {
   return import("livekit-client");
 }
@@ -287,6 +291,8 @@ export function VoiceView({
   const pttPressedRef = useRef(false);
   const voiceGateRef = useRef<VoiceGateProcessor | null>(null);
   const settingsRef = useRef(settings);
+  const appliedMicrophoneProfileRef = useRef<string | null>(null);
+  const appliedCameraProfileRef = useRef<string | null>(null);
   const lastVoiceActivityRef = useRef(0);
   const reconnectingRef = useRef(false);
   const videoDowngradedRef = useRef(false);
@@ -344,6 +350,53 @@ export function VoiceView({
     }
   }
 
+  async function setMicrophoneProfileEnabled(
+    room: Room,
+    enabled: boolean,
+    profile: ReturnType<typeof resolveAudioProfile>,
+    shouldRemainEnabled: () => boolean = () => true,
+  ): Promise<{ publication: LocalTrackPublication | undefined; recreated: boolean }> {
+    const desiredProfile = profileKey(profile);
+    let recreated = false;
+    if (enabled) {
+      const existing = room.localParticipant.getTrackPublication("microphone" as Track.Source);
+      if (!existing?.track) {
+        recreated = true;
+      } else if (appliedMicrophoneProfileRef.current !== desiredProfile) {
+        await room.localParticipant.unpublishTrack(existing.track, true);
+        appliedMicrophoneProfileRef.current = null;
+        recreated = true;
+      }
+      if (!shouldRemainEnabled()) return { publication: undefined, recreated };
+    }
+    const publication = await room.localParticipant.setMicrophoneEnabled(enabled, profile.capture, profile.publish);
+    if (enabled) {
+      appliedMicrophoneProfileRef.current = desiredProfile;
+      if (!shouldRemainEnabled()) {
+        await room.localParticipant.setMicrophoneEnabled(false, profile.capture, profile.publish);
+      }
+    }
+    return { publication, recreated };
+  }
+
+  async function setCameraProfileEnabled(
+    room: Room,
+    enabled: boolean,
+    profile: ReturnType<typeof resolveCameraProfile>,
+  ): Promise<LocalTrackPublication | undefined> {
+    const desiredProfile = profileKey(profile);
+    if (enabled) {
+      const existing = room.localParticipant.getTrackPublication("camera" as Track.Source);
+      if (existing?.track && appliedCameraProfileRef.current !== desiredProfile) {
+        await room.localParticipant.unpublishTrack(existing.track, true);
+        appliedCameraProfileRef.current = null;
+      }
+    }
+    const publication = await room.localParticipant.setCameraEnabled(enabled, profile.capture, profile.publish);
+    if (enabled) appliedCameraProfileRef.current = desiredProfile;
+    return publication;
+  }
+
   function updateSpeakingTiles(activeIds: Set<string>) {
     activeSpeakersRef.current = activeIds;
     const containers = [remoteVideoRef.current, localCameraRef.current, localScreenRef.current];
@@ -386,6 +439,7 @@ export function VoiceView({
     deafenedRef.current = false;
     setCameraEnabled(false);
     setScreenShareEnabled(false);
+    setDevices([]);
     setRemoteVideoCount(0);
     setRemoteScreenCount(0);
     setActiveSpeakerIds(new Set());
@@ -397,6 +451,8 @@ export function VoiceView({
     activeSpeakersRef.current.clear();
     videoDowngradedRef.current = false;
     goodQualityStreakRef.current = 0;
+    appliedMicrophoneProfileRef.current = null;
+    appliedCameraProfileRef.current = null;
     stopMeter();
     onSpeakingChange?.([]);
     onSelfPresenceChange?.(false);
@@ -687,7 +743,7 @@ export function VoiceView({
         if (deviceId) await room.switchActiveDevice(kind as MediaDeviceKind, deviceId, false);
       }
       const audioProfile = resolveAudioProfile(settings.audioQuality, settings.customAudio, "microphone");
-      const microphone = await room.localParticipant.setMicrophoneEnabled(!settings.pushToTalk, audioProfile.capture, audioProfile.publish);
+      const { publication: microphone } = await setMicrophoneProfileEnabled(room, !settings.pushToTalk, audioProfile);
       setMicrophoneEnabled(!settings.pushToTalk);
       void room.localParticipant.setAttributes({ [DEAFENED_ATTRIBUTE]: "false" }).catch(() => {
         showToast("Could not share your sound status");
@@ -730,11 +786,15 @@ export function VoiceView({
     pttPressedRef.current = false;
     try {
       const profile = resolveAudioProfile(settings.audioQuality, settings.customAudio, "microphone");
-      const publication = await room.localParticipant.setMicrophoneEnabled(!enabled, profile.capture, profile.publish);
+      const { publication, recreated } = await setMicrophoneProfileEnabled(room, !enabled, profile);
       if (enabled) {
         voiceGateRef.current = null;
         if (publication?.audioTrack?.getProcessor()) await publication.audioTrack.stopProcessor();
       } else if (publication?.audioTrack) {
+        if (recreated) {
+          const { createAudioAnalyser } = await loadLiveKit();
+          startMeter(createAudioAnalyser, publication.audioTrack);
+        }
         await installVoiceGate(publication.audioTrack);
       }
       setMicrophoneEnabled(!enabled);
@@ -752,12 +812,15 @@ export function VoiceView({
       pttPressedRef.current = pressed;
       const room = roomRef.current;
       if (!room) return;
-      const profile = resolveAudioProfile(settings.audioQuality, settings.customAudio, "microphone");
-      void room.localParticipant.setMicrophoneEnabled(pressed, profile.capture, profile.publish).then(() => {
+      const currentSettings = settingsRef.current;
+      const profile = resolveAudioProfile(currentSettings.audioQuality, currentSettings.customAudio, "microphone");
+      void setMicrophoneProfileEnabled(room, pressed, profile, () => pttPressedRef.current === pressed).then(() => {
+        if (roomRef.current !== room || pttPressedRef.current !== pressed) return;
         setMicrophoneEnabled(pressed);
         refreshParticipantsRef.current?.({ microphoneMuted: !pressed, deafened });
         onSelfMediaStatusChange?.(channel.id, { microphoneMuted: !pressed, deafened });
       }).catch(async (error) => {
+        if (roomRef.current !== room || pttPressedRef.current !== pressed) return;
         const { MediaDeviceFailure } = await loadLiveKit();
         showToast(describeMediaError(MediaDeviceFailure, error, "microphone"));
       });
@@ -772,7 +835,7 @@ export function VoiceView({
       setPressed(true);
     };
     const onKeyUp = (event: KeyboardEvent) => {
-      if (event.code !== "Space" || isTyping(event.target)) return;
+      if (event.code !== "Space" || !pttPressedRef.current) return;
       event.preventDefault();
       setPressed(false);
     };
@@ -786,7 +849,7 @@ export function VoiceView({
       window.removeEventListener("blur", onBlur);
       setPressed(false);
     };
-  }, [deafened, onSelfMediaStatusChange, settings.audioQuality, settings.customAudio, settings.pushToTalk, showToast, status]);
+  }, [deafened, onSelfMediaStatusChange, settings.pushToTalk, showToast, status]);
 
   async function toggleMicrophone() {
     const room = roomRef.current;
@@ -794,7 +857,12 @@ export function VoiceView({
     const enabled = !microphoneEnabled;
     try {
       const profile = resolveAudioProfile(settings.audioQuality, settings.customAudio, "microphone");
-      await room.localParticipant.setMicrophoneEnabled(enabled, profile.capture, profile.publish);
+      const { publication, recreated } = await setMicrophoneProfileEnabled(room, enabled, profile);
+      if (enabled && recreated && publication?.audioTrack && !settingsRef.current.pushToTalk) {
+        const { createAudioAnalyser } = await loadLiveKit();
+        startMeter(createAudioAnalyser, publication.audioTrack);
+        await installVoiceGate(publication.audioTrack);
+      }
       setMicrophoneEnabled(enabled);
       refreshParticipantsRef.current?.({ microphoneMuted: !enabled, deafened });
       onSelfMediaStatusChange?.(channel.id, { microphoneMuted: !enabled, deafened });
@@ -831,7 +899,7 @@ export function VoiceView({
     const previousTrack = room.localParticipant.getTrackPublication(Track.Source.Camera)?.track;
     try {
       const profile = resolveCameraProfile(settings.cameraQuality, settings.customCamera);
-      const publication = await room.localParticipant.setCameraEnabled(enabled, profile.capture, profile.publish);
+      const publication = await setCameraProfileEnabled(room, enabled, profile);
       localCameraRef.current?.replaceChildren();
       if (enabled && publication?.track) {
         const element = publication.track.attach();
@@ -1173,8 +1241,10 @@ export function VoiceView({
               </div>
               <div className="settings-section">
                 <h3>Devices</h3>
-                {devices.length === 0 ? (
+                {status !== "connected" && status !== "reconnecting" ? (
                   <p className="form-hint">Device choices load after you join the voice channel.</p>
+                ) : devices.length === 0 ? (
+                  <p className="form-hint">No audio or video devices were found.</p>
                 ) : (
                   <div className="voice-settings">
                     <DeviceSelect label="Microphone" kind="audioinput" devices={devices} value={settings.devices.audioinput} onChange={selectDevice} />
