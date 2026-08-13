@@ -10,6 +10,7 @@ import { useEffect, useRef, useState, type CSSProperties } from "react";
 // nothing and doesn't conflict with the same names being used as local
 // values (different namespaces) inside those functions.
 import type {
+  AudioCaptureOptions,
   ConnectionError,
   ConnectionErrorReason,
   ConnectionQuality,
@@ -71,6 +72,39 @@ function supportsScreenShareAudio(): boolean {
   // audio tracks. Asking LiveKit to publish audio can make the whole operation
   // fail instead of returning the usable video track.
   return !/Firefox\//i.test(navigator.userAgent);
+}
+
+function isFirefox(): boolean {
+  return /Firefox\//i.test(navigator.userAgent);
+}
+
+// Firefox doesn't recognize 'default' as a deviceId; LiveKit's default
+// deviceId constraint ({ ideal: 'default' }) causes NotFoundError on Firefox
+// even when a microphone is present. Resolve 'default' to an actual device ID.
+async function resolveFirefoxDeviceId(
+  liveKit: Awaited<ReturnType<typeof loadLiveKit>>,
+  kind: MediaDeviceKind,
+): Promise<string | undefined> {
+  if (!isFirefox()) return undefined;
+  try {
+    const devices = await liveKit.Room.getLocalDevices(kind, false);
+    return devices.find((d) => d.deviceId && d.deviceId !== "default")?.deviceId;
+  } catch {
+    return undefined;
+  }
+}
+
+// Merges base audio capture constraints with a resolved Firefox device ID
+// (if applicable) so getUserMedia doesn't fail with NotFoundError on Firefox
+// due to the unrecognized 'default' deviceId ideal.
+async function buildMicrophoneCapture(
+  liveKit: Awaited<ReturnType<typeof loadLiveKit>>,
+  baseCapture: AudioCaptureOptions,
+): Promise<AudioCaptureOptions> {
+  const capture = { ...baseCapture };
+  const deviceId = await resolveFirefoxDeviceId(liveKit, "audioinput");
+  if (deviceId) capture.deviceId = { exact: deviceId };
+  return capture;
 }
 
 function isQuality(value: unknown): value is MediaQuality {
@@ -714,8 +748,16 @@ export function VoiceView({
         if (deviceId) await room.switchActiveDevice(kind as MediaDeviceKind, deviceId, false);
       }
       const audioProfile = audioProfiles[settings.audioQuality];
-      const microphone = await room.localParticipant.setMicrophoneEnabled(!settings.pushToTalk, audioProfile.capture, audioProfile.publish);
-      setMicrophoneEnabled(!settings.pushToTalk);
+      const captureOptions = await buildMicrophoneCapture(liveKit, audioProfile.capture);
+      let microphone;
+      let microphoneFailed = false;
+      try {
+        microphone = await room.localParticipant.setMicrophoneEnabled(!settings.pushToTalk, captureOptions, audioProfile.publish);
+      } catch (err) {
+        microphoneFailed = true;
+        console.warn("[voice] microphone setup failed, joining without mic", err);
+      }
+      setMicrophoneEnabled(!!microphone?.audioTrack && !settings.pushToTalk);
       void room.localParticipant.setAttributes({ [DEAFENED_ATTRIBUTE]: "false" }).catch(() => {
         showToast("Could not share your sound status");
       });
@@ -725,9 +767,12 @@ export function VoiceView({
       }
       setDevices(await Room.getLocalDevices(undefined, false));
       refreshParticipants({ microphoneMuted: settings.pushToTalk, deafened: false });
-      onSelfMediaStatusChange?.(channel.id, { microphoneMuted: settings.pushToTalk, deafened: false });
+      onSelfMediaStatusChange?.(channel.id, { microphoneMuted: settings.pushToTalk || microphoneFailed, deafened: false });
       setStatus("connected");
       onSelfPresenceChange?.(true);
+      if (microphoneFailed) {
+        showToast("Could not enable the microphone. You've joined the call — connect one and try again.");
+      }
     } catch (error) {
       await room.disconnect();
       if (roomRef.current === room) roomRef.current = null;
@@ -756,8 +801,10 @@ export function VoiceView({
     saveSettings({ ...settings, pushToTalk: enabled });
     pttPressedRef.current = false;
     try {
+      const liveKit = await loadLiveKit();
       const profile = audioProfiles[settings.audioQuality];
-      const publication = await room.localParticipant.setMicrophoneEnabled(!enabled, profile.capture, profile.publish);
+      const captureOptions = await buildMicrophoneCapture(liveKit, profile.capture);
+      const publication = await room.localParticipant.setMicrophoneEnabled(!enabled, captureOptions, profile.publish);
       if (enabled) {
         voiceGateRef.current = null;
         if (publication?.audioTrack?.getProcessor()) await publication.audioTrack.stopProcessor();
@@ -779,8 +826,11 @@ export function VoiceView({
       pttPressedRef.current = pressed;
       const room = roomRef.current;
       if (!room) return;
-      const profile = audioProfiles[settings.audioQuality];
-      void room.localParticipant.setMicrophoneEnabled(pressed, profile.capture, profile.publish).then(() => {
+      void loadLiveKit().then(async (liveKit) => {
+        const profile = audioProfiles[settings.audioQuality];
+        const captureOptions = await buildMicrophoneCapture(liveKit, profile.capture);
+        return room.localParticipant.setMicrophoneEnabled(pressed, captureOptions, profile.publish);
+      }).then(() => {
         setMicrophoneEnabled(pressed);
         refreshParticipantsRef.current?.({ microphoneMuted: !pressed, deafened });
         onSelfMediaStatusChange?.(channel.id, { microphoneMuted: !pressed, deafened });
@@ -820,8 +870,10 @@ export function VoiceView({
     if (!room || (status !== "connected" && status !== "reconnecting")) return;
     const enabled = !microphoneEnabled;
     try {
+      const liveKit = await loadLiveKit();
       const profile = audioProfiles[settings.audioQuality];
-      await room.localParticipant.setMicrophoneEnabled(enabled, profile.capture, profile.publish);
+      const captureOptions = await buildMicrophoneCapture(liveKit, profile.capture);
+      await room.localParticipant.setMicrophoneEnabled(enabled, captureOptions, profile.publish);
       setMicrophoneEnabled(enabled);
       refreshParticipantsRef.current?.({ microphoneMuted: !enabled, deafened });
       onSelfMediaStatusChange?.(channel.id, { microphoneMuted: !enabled, deafened });
