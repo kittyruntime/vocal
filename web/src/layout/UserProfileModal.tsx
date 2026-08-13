@@ -19,7 +19,7 @@ export function UserProfileModal({ userId, onClose }: { userId: string; onClose(
   return <div className="voice-modal-backdrop public-profile-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
     <section className="public-profile-modal" role="dialog" aria-modal="true" aria-label={profile ? `Profile of ${profile.username}` : "User profile"}>
       <button type="button" className="modal-close public-profile-close" aria-label="Close user profile" onClick={onClose}><Icon name="close" size={18} /></button>
-      {error ? <p className="admin-error" role="alert">{error}</p> : profile ? <>
+      {error ? <p className="form-error" role="alert">{error}</p> : profile ? <>
         <div className="public-profile-banner" style={profile.bannerUrl ? { backgroundImage: `url(${profile.bannerUrl})` } : undefined} />
         <div className="public-profile-body">
           <span className="public-profile-avatar">{profile.avatarUrl ? <img src={profile.avatarUrl} alt="" /> : profile.username.slice(0, 1).toUpperCase()}</span>

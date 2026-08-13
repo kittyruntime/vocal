@@ -169,7 +169,7 @@ export function AdminPanel({ currentUser, onClose }: {
           <button type="button" className={activeTab === "members" ? "active" : ""} aria-pressed={activeTab === "members"} onClick={() => setActiveTab("members")}><Icon name="users" size={17} /> Members <span className="settings-tab-count">{totalUsers}</span></button>
         </nav>
         <div className="voice-settings-content admin-settings-content">
-          {error ? <p className="admin-error" role="alert">{error}</p> : null}
+          {error ? <p className="form-error" role="alert">{error}</p> : null}
           {activeTab === "general" && canManageServer ? <><div className="settings-section admin-setting-row">
             <div><h3>Public registration</h3><p>Invitations remain usable even when registration is closed.</p></div>
             <Switch label="Public registration" checked={settings.registrationOpen} onChange={() => void toggleRegistration()} />

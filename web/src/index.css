@@ -691,7 +691,6 @@ textarea.form-input { resize: vertical; }
 .settings-tabs button.active { background: #404249; color: #fff; }
 .settings-tab-count { min-width: 22px; margin-left: auto; padding: 1px 6px; border-radius: 10px; background: rgb(255 255 255 / 7%); font-size: 11px; text-align: center; }
 .admin-settings-content { flex: 1; min-width: 0; min-height: 0; }
-.admin-error { padding: 10px 12px; border-radius: 5px; background: rgb(218 55 60 / 14%); color: #ffb4b7; }
 .admin-setting-row { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
 .admin-setting-row h3 { margin-bottom: 5px; }
 .admin-setting-row p { margin: 0; color: #949ba4; font-size: 13px; }
