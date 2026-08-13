@@ -13,12 +13,10 @@ type CustomNumberFieldProps = {
 export function CustomNumberField({ label, value, min, max, step, onCommit }: CustomNumberFieldProps) {
   const [draft, setDraft] = useState(String(value));
   const [error, setError] = useState<string>();
-  const [lastValidValue, setLastValidValue] = useState(value);
   const message = `${label} must be between ${min} and ${max}.`;
 
   useEffect(() => {
     setDraft(String(value));
-    setLastValidValue(value);
     setError(undefined);
   }, [value]);
 
@@ -38,20 +36,19 @@ export function CustomNumberField({ label, value, min, max, step, onCommit }: Cu
     }
 
     setError(undefined);
-    setLastValidValue(nextValue);
     onCommit(nextValue);
   };
 
   const handleBlur = () => {
     if (draft.trim() === "") {
-      setDraft(String(lastValidValue));
+      setDraft(String(value));
       setError(undefined);
       return;
     }
 
     const parsedValue = Number(draft);
     if (!Number.isFinite(parsedValue)) {
-      setDraft(String(lastValidValue));
+      setDraft(String(value));
       setError(undefined);
       return;
     }
@@ -59,7 +56,6 @@ export function CustomNumberField({ label, value, min, max, step, onCommit }: Cu
     const clampedValue = Math.min(max, Math.max(min, parsedValue));
     if (clampedValue !== parsedValue) {
       setDraft(String(clampedValue));
-      setLastValidValue(clampedValue);
       setError(undefined);
       onCommit(clampedValue);
     }

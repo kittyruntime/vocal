@@ -44,4 +44,16 @@ describe("CustomNumberField", () => {
     expect(input).toHaveValue(1280);
     expect(onCommit).not.toHaveBeenCalled();
   });
+
+  it("restores the current external value after a valid draft is not reflected externally", () => {
+    const onCommit = vi.fn();
+    render(<CustomNumberField label="Frame rate (fps)" value={30} min={5} max={60} step={1} onCommit={onCommit} />);
+    const input = screen.getByRole("spinbutton", { name: "Frame rate (fps)" });
+    fireEvent.change(input, { target: { value: "40" } });
+    fireEvent.change(input, { target: { value: "" } });
+    fireEvent.blur(input);
+    expect(input).toHaveValue(30);
+    expect(onCommit).toHaveBeenCalledTimes(1);
+    expect(onCommit).toHaveBeenCalledWith(40);
+  });
 });
