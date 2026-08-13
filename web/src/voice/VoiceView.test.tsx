@@ -287,6 +287,215 @@ describe("VoiceView", () => {
     expect(stored.advancedMode).toBe(true);
   });
 
+  it("offers and preserves Custom only through Advanced mode", async () => {
+    await renderView({}, { join: false });
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Settings" }));
+    expect(screen.queryByRole("option", { name: "Custom" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("switch", { name: "Advanced mode" }));
+    expect(screen.getAllByRole("option", { name: "Custom" })).toHaveLength(4);
+    await user.selectOptions(screen.getByLabelText("Webcam"), "custom");
+    expect(screen.getByRole("spinbutton", { name: "Webcam width (px)" })).toHaveValue(1280);
+    await user.click(screen.getByRole("switch", { name: "Advanced mode" }));
+    expect(screen.queryByRole("spinbutton", { name: "Webcam width (px)" })).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Webcam")).toHaveValue("custom");
+    expect(screen.getAllByRole("option", { name: "Custom" })).toHaveLength(1);
+  });
+
+  it("renders every custom stream field when its Custom option is selected", async () => {
+    await renderView({}, { join: false });
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Settings" }));
+    await user.click(screen.getByRole("switch", { name: "Advanced mode" }));
+    await user.selectOptions(screen.getByLabelText("Audio"), "custom");
+    await user.selectOptions(screen.getByLabelText("Webcam"), "custom");
+    await user.selectOptions(screen.getByLabelText("Screen share"), "custom");
+    await user.selectOptions(screen.getByLabelText("Screen share audio"), "custom");
+
+    for (const label of [
+      "Microphone bitrate (kb/s)",
+      "Webcam width (px)",
+      "Webcam height (px)",
+      "Webcam frame rate (fps)",
+      "Webcam bitrate (kb/s)",
+      "Screen width (px)",
+      "Screen height (px)",
+      "Screen frame rate (fps)",
+      "Screen bitrate (kb/s)",
+      "Screen audio bitrate (kb/s)",
+    ]) {
+      expect(screen.getByRole("spinbutton", { name: label })).toBeInTheDocument();
+    }
+  });
+
+  it("persists valid custom webcam values", async () => {
+    await renderView({}, { join: false });
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Settings" }));
+    await user.click(screen.getByRole("switch", { name: "Advanced mode" }));
+    await user.selectOptions(screen.getByLabelText("Webcam"), "custom");
+    fireEvent.change(screen.getByRole("spinbutton", { name: "Webcam bitrate (kb/s)" }), { target: { value: "4200" } });
+    expect(JSON.parse(localStorage.getItem("vocal.voice-settings.v1") ?? "{}").customCamera.bitrateKbps).toBe(4200);
+  });
+
+  it("passes exact custom settings to every LiveKit activation boundary", async () => {
+    await renderView({}, { join: false });
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Settings" }));
+    await user.click(screen.getByRole("switch", { name: "Advanced mode" }));
+    await user.selectOptions(screen.getByLabelText("Audio"), "custom");
+    await user.selectOptions(screen.getByLabelText("Webcam"), "custom");
+    await user.selectOptions(screen.getByLabelText("Screen share"), "custom");
+    await user.selectOptions(screen.getByLabelText("Screen share audio"), "custom");
+    fireEvent.change(screen.getByRole("spinbutton", { name: "Microphone bitrate (kb/s)" }), { target: { value: "72" } });
+    fireEvent.change(screen.getByRole("spinbutton", { name: "Webcam width (px)" }), { target: { value: "1920" } });
+    fireEvent.change(screen.getByRole("spinbutton", { name: "Webcam height (px)" }), { target: { value: "1080" } });
+    fireEvent.change(screen.getByRole("spinbutton", { name: "Webcam frame rate (fps)" }), { target: { value: "48" } });
+    fireEvent.change(screen.getByRole("spinbutton", { name: "Webcam bitrate (kb/s)" }), { target: { value: "7500" } });
+    fireEvent.change(screen.getByRole("spinbutton", { name: "Screen width (px)" }), { target: { value: "2560" } });
+    fireEvent.change(screen.getByRole("spinbutton", { name: "Screen height (px)" }), { target: { value: "1440" } });
+    fireEvent.change(screen.getByRole("spinbutton", { name: "Screen frame rate (fps)" }), { target: { value: "30" } });
+    fireEvent.change(screen.getByRole("spinbutton", { name: "Screen bitrate (kb/s)" }), { target: { value: "12000" } });
+    fireEvent.change(screen.getByRole("spinbutton", { name: "Screen audio bitrate (kb/s)" }), { target: { value: "160" } });
+    await user.click(screen.getByRole("button", { name: "Close settings" }));
+    await user.click(screen.getByRole("button", { name: "Join" }));
+    await screen.findByRole("button", { name: "Mute microphone" });
+    await user.click(screen.getByRole("button", { name: "Turn on camera" }));
+    await user.click(screen.getByRole("button", { name: "Share screen" }));
+
+    expect(setMicrophoneEnabled).toHaveBeenCalledWith(
+      true,
+      expect.objectContaining({ channelCount: 1 }),
+      expect.objectContaining({ audioPreset: expect.objectContaining({ maxBitrate: 72_000 }) }),
+    );
+    expect(setCameraEnabled).toHaveBeenCalledWith(
+      true,
+      expect.objectContaining({ resolution: { width: 1920, height: 1080, frameRate: 48 } }),
+      expect.objectContaining({ videoEncoding: { maxBitrate: 7_500_000, maxFramerate: 48 }, simulcast: true }),
+    );
+    expect(createScreenTracks).toHaveBeenCalledWith(expect.objectContaining({
+      audio: true,
+      resolution: { width: 2560, height: 1440, frameRate: 30 },
+      contentHint: "motion",
+    }));
+    expect(publishTrack).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: "video" }),
+      expect.objectContaining({ screenShareEncoding: { maxBitrate: 12_000_000, maxFramerate: 30 } }),
+    );
+    expect(publishTrack).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: "audio" }),
+      expect.objectContaining({ audioPreset: expect.objectContaining({ maxBitrate: 160_000 }), forceStereo: true }),
+    );
+  });
+
+  it("uses an edited custom microphone bitrate on the next push-to-talk press", async () => {
+    await renderView({}, { join: false });
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Settings" }));
+    await user.click(screen.getByRole("switch", { name: "Advanced mode" }));
+    await user.selectOptions(screen.getByLabelText("Audio"), "custom");
+    await user.click(screen.getByRole("button", { name: "Close settings" }));
+    await user.click(screen.getByRole("button", { name: "Join" }));
+    await screen.findByRole("button", { name: "Mute microphone" });
+    await user.click(screen.getByRole("button", { name: "Settings" }));
+    fireEvent.change(screen.getByRole("spinbutton", { name: "Microphone bitrate (kb/s)" }), { target: { value: "88" } });
+    await user.click(screen.getByRole("radio", { name: /Push-to-talk/ }));
+    await user.click(screen.getByRole("button", { name: "Close settings" }));
+    setMicrophoneEnabled.mockClear();
+
+    fireEvent.keyDown(window, { code: "Space", key: " " });
+
+    await waitFor(() => expect(setMicrophoneEnabled).toHaveBeenCalledWith(
+      true,
+      expect.objectContaining({ channelCount: 1 }),
+      expect.objectContaining({ audioPreset: expect.objectContaining({ maxBitrate: 88_000 }) }),
+    ));
+    fireEvent.keyUp(window, { code: "Space", key: " " });
+  });
+
+  it("uses custom microphone options for manual and push-to-talk mode toggles", async () => {
+    await renderView({}, { join: false });
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Settings" }));
+    await user.click(screen.getByRole("switch", { name: "Advanced mode" }));
+    await user.selectOptions(screen.getByLabelText("Audio"), "custom");
+    fireEvent.change(screen.getByRole("spinbutton", { name: "Microphone bitrate (kb/s)" }), { target: { value: "80" } });
+    await user.click(screen.getByRole("button", { name: "Close settings" }));
+    await user.click(screen.getByRole("button", { name: "Join" }));
+    await screen.findByRole("button", { name: "Mute microphone" });
+    setMicrophoneEnabled.mockClear();
+
+    await user.click(screen.getByRole("button", { name: "Mute microphone" }));
+    expect(setMicrophoneEnabled).toHaveBeenLastCalledWith(
+      false,
+      expect.objectContaining({ channelCount: 1 }),
+      expect.objectContaining({ audioPreset: expect.objectContaining({ maxBitrate: 80_000 }) }),
+    );
+    await user.click(screen.getByRole("button", { name: "Unmute microphone" }));
+    expect(setMicrophoneEnabled).toHaveBeenLastCalledWith(
+      true,
+      expect.objectContaining({ channelCount: 1 }),
+      expect.objectContaining({ audioPreset: expect.objectContaining({ maxBitrate: 80_000 }) }),
+    );
+
+    await user.click(screen.getByRole("button", { name: "Settings" }));
+    await user.click(screen.getByRole("radio", { name: /Push-to-talk/ }));
+    expect(setMicrophoneEnabled).toHaveBeenLastCalledWith(
+      false,
+      expect.objectContaining({ channelCount: 1 }),
+      expect.objectContaining({ audioPreset: expect.objectContaining({ maxBitrate: 80_000 }) }),
+    );
+    await user.click(screen.getByRole("radio", { name: /Voice detection/ }));
+    expect(setMicrophoneEnabled).toHaveBeenLastCalledWith(
+      true,
+      expect.objectContaining({ channelCount: 1 }),
+      expect.objectContaining({ audioPreset: expect.objectContaining({ maxBitrate: 80_000 }) }),
+    );
+  });
+
+  it("defers an active stream custom edit without republishing it", async () => {
+    await renderView();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Turn on camera" }));
+    await user.click(screen.getByRole("button", { name: "Settings" }));
+    await user.click(screen.getByRole("switch", { name: "Advanced mode" }));
+    await user.selectOptions(screen.getByLabelText("Webcam"), "custom");
+    setCameraEnabled.mockClear();
+    const message = "The new webcam quality will apply the next time it's turned on.";
+    const toastCount = screen.getAllByText(message).length;
+
+    fireEvent.change(screen.getByRole("spinbutton", { name: "Webcam bitrate (kb/s)" }), { target: { value: "4200" } });
+
+    expect(screen.getAllByText(message)).toHaveLength(toastCount + 1);
+    expect(setCameraEnabled).not.toHaveBeenCalled();
+  });
+
+  it("preserves custom screen capture settings when retrying without audio", async () => {
+    const videoOnlyTrack = { kind: "video", attach: vi.fn(() => document.createElement("video")), detach: vi.fn(() => []), stop: vi.fn() };
+    createScreenTracks
+      .mockRejectedValueOnce(Object.assign(new Error("not supported"), { name: "NotSupportedError" }))
+      .mockResolvedValueOnce([videoOnlyTrack]);
+    await renderView({}, { join: false });
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Settings" }));
+    await user.click(screen.getByRole("switch", { name: "Advanced mode" }));
+    await user.selectOptions(screen.getByLabelText("Screen share"), "custom");
+    fireEvent.change(screen.getByRole("spinbutton", { name: "Screen width (px)" }), { target: { value: "2560" } });
+    fireEvent.change(screen.getByRole("spinbutton", { name: "Screen height (px)" }), { target: { value: "1440" } });
+    fireEvent.change(screen.getByRole("spinbutton", { name: "Screen frame rate (fps)" }), { target: { value: "30" } });
+    await user.click(screen.getByRole("button", { name: "Close settings" }));
+    await user.click(screen.getByRole("button", { name: "Join" }));
+    await screen.findByRole("button", { name: "Mute microphone" });
+    await user.click(screen.getByRole("button", { name: "Share screen" }));
+
+    expect(createScreenTracks).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      audio: false,
+      resolution: { width: 2560, height: 1440, frameRate: 30 },
+      contentHint: "motion",
+    }));
+    expect(createScreenTracks.mock.calls[1][0]).not.toHaveProperty("systemAudio");
+  });
+
   it("publishes screen share audio at the selected quality once advanced mode is on", async () => {
     await renderView();
     const user = userEvent.setup();
