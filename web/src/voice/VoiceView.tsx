@@ -78,17 +78,21 @@ function isFirefox(): boolean {
   return /Firefox\//i.test(navigator.userAgent);
 }
 
-// Firefox doesn't recognize 'default' as a deviceId; LiveKit's default
-// deviceId constraint ({ ideal: 'default' }) causes NotFoundError on Firefox
-// even when a microphone is present. Resolve 'default' to an actual device ID.
-async function resolveFirefoxDeviceId(
-  liveKit: Awaited<ReturnType<typeof loadLiveKit>>,
-  kind: MediaDeviceKind,
-): Promise<string | undefined> {
+// Firefox doesn't support 'default' as a deviceId value; LiveKit passes
+// deviceId: { ideal: 'default' } (or the string 'default') to getUserMedia,
+// which Firefox rejects with NotFoundError even when a microphone is present.
+// On Firefox, pre-acquire a short-lived audio stream with no deviceId
+// constraint to trigger the permission prompt and resolve the real device
+// ID. The resolved ID is then passed to LiveKit to avoid the 'default' issue.
+async function resolveFirefoxDeviceId(): Promise<string | undefined> {
   if (!isFirefox()) return undefined;
   try {
-    const devices = await liveKit.Room.getLocalDevices(kind, false);
-    return devices.find((d) => d.deviceId && d.deviceId !== "default")?.deviceId;
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const track = stream.getAudioTracks()[0];
+    const deviceId = track?.getSettings()?.deviceId;
+    stream.getTracks().forEach((t) => t.stop());
+    if (deviceId && deviceId !== "default") return deviceId;
+    return undefined;
   } catch {
     return undefined;
   }
@@ -98,13 +102,15 @@ async function resolveFirefoxDeviceId(
 // (if applicable) so getUserMedia doesn't fail with NotFoundError on Firefox
 // due to the unrecognized 'default' deviceId ideal.
 async function buildMicrophoneCapture(
-  liveKit: Awaited<ReturnType<typeof loadLiveKit>>,
   baseCapture: AudioCaptureOptions,
 ): Promise<AudioCaptureOptions> {
-  const capture = { ...baseCapture };
-  const deviceId = await resolveFirefoxDeviceId(liveKit, "audioinput");
-  if (deviceId) capture.deviceId = { exact: deviceId };
-  return capture;
+  if (!isFirefox()) return baseCapture;
+  const deviceId = await resolveFirefoxDeviceId();
+  if (deviceId) return { ...baseCapture, deviceId: { exact: deviceId } };
+  // Could not resolve a real device ID (e.g. user denied permission);
+  // return base constraints and rely on the caller's try/catch to handle
+  // the resulting getUserMedia failure gracefully.
+  return baseCapture;
 }
 
 function isQuality(value: unknown): value is MediaQuality {
@@ -748,7 +754,7 @@ export function VoiceView({
         if (deviceId) await room.switchActiveDevice(kind as MediaDeviceKind, deviceId, false);
       }
       const audioProfile = audioProfiles[settings.audioQuality];
-      const captureOptions = await buildMicrophoneCapture(liveKit, audioProfile.capture);
+      const captureOptions = await buildMicrophoneCapture(audioProfile.capture);
       let microphone;
       let microphoneFailed = false;
       try {
@@ -801,9 +807,8 @@ export function VoiceView({
     saveSettings({ ...settings, pushToTalk: enabled });
     pttPressedRef.current = false;
     try {
-      const liveKit = await loadLiveKit();
       const profile = audioProfiles[settings.audioQuality];
-      const captureOptions = await buildMicrophoneCapture(liveKit, profile.capture);
+      const captureOptions = await buildMicrophoneCapture(profile.capture);
       const publication = await room.localParticipant.setMicrophoneEnabled(!enabled, captureOptions, profile.publish);
       if (enabled) {
         voiceGateRef.current = null;
@@ -826,11 +831,11 @@ export function VoiceView({
       pttPressedRef.current = pressed;
       const room = roomRef.current;
       if (!room) return;
-      void loadLiveKit().then(async (liveKit) => {
+      void (async () => {
         const profile = audioProfiles[settings.audioQuality];
-        const captureOptions = await buildMicrophoneCapture(liveKit, profile.capture);
+        const captureOptions = await buildMicrophoneCapture(profile.capture);
         return room.localParticipant.setMicrophoneEnabled(pressed, captureOptions, profile.publish);
-      }).then(() => {
+      })().then(() => {
         setMicrophoneEnabled(pressed);
         refreshParticipantsRef.current?.({ microphoneMuted: !pressed, deafened });
         onSelfMediaStatusChange?.(channel.id, { microphoneMuted: !pressed, deafened });
@@ -870,9 +875,8 @@ export function VoiceView({
     if (!room || (status !== "connected" && status !== "reconnecting")) return;
     const enabled = !microphoneEnabled;
     try {
-      const liveKit = await loadLiveKit();
       const profile = audioProfiles[settings.audioQuality];
-      const captureOptions = await buildMicrophoneCapture(liveKit, profile.capture);
+      const captureOptions = await buildMicrophoneCapture(profile.capture);
       await room.localParticipant.setMicrophoneEnabled(enabled, captureOptions, profile.publish);
       setMicrophoneEnabled(enabled);
       refreshParticipantsRef.current?.({ microphoneMuted: !enabled, deafened });

@@ -499,17 +499,30 @@ describe("VoiceView", () => {
 
   it("resolves Firefox default deviceId to real deviceId before enabling microphone", async () => {
     vi.spyOn(window.navigator, "userAgent", "get").mockReturnValue("Mozilla/5.0 Firefox/142.0");
-    getLocalDevices.mockResolvedValue([{ deviceId: "real-mic-id", kind: "audioinput", label: "Built-in Microphone", groupId: "g1" }]);
+    const audioTrack = { getSettings: () => ({ deviceId: "real-mic-id" }), stop: vi.fn() };
+    const mockGetUserMedia = vi.fn().mockResolvedValue({
+      getAudioTracks: () => [audioTrack],
+      getTracks: () => [audioTrack],
+    });
+    vi.stubGlobal("navigator", {
+      ...window.navigator,
+      mediaDevices: { ...window.navigator.mediaDevices, getUserMedia: mockGetUserMedia },
+    });
     await renderView();
-    expect(getLocalDevices).toHaveBeenCalledWith("audioinput", false);
+    expect(mockGetUserMedia).toHaveBeenCalledWith({ audio: true });
     expect(setMicrophoneEnabled).toHaveBeenCalledWith(true, expect.objectContaining({ deviceId: { exact: "real-mic-id" } }), expect.any(Object));
     expect(screen.getByRole("button", { name: "Mute microphone" })).toBeInTheDocument();
   });
 
   it("does not resolve Firefox deviceId on non-Firefox browsers", async () => {
     vi.spyOn(window.navigator, "userAgent", "get").mockReturnValue("Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0");
+    const mockGetUserMedia = vi.fn();
+    vi.stubGlobal("navigator", {
+      ...window.navigator,
+      mediaDevices: { ...window.navigator.mediaDevices, getUserMedia: mockGetUserMedia },
+    });
     await renderView();
-    expect(getLocalDevices).not.toHaveBeenCalledWith("audioinput", false);
+    expect(mockGetUserMedia).not.toHaveBeenCalled();
     expect(setMicrophoneEnabled).toHaveBeenCalledWith(true, expect.not.objectContaining({ deviceId: { exact: expect.anything() } }), expect.any(Object));
   });
 
