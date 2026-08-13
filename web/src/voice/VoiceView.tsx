@@ -32,6 +32,7 @@ import { useToast } from "../toast/ToastContext";
 import { Icon } from "../ui/Icon";
 import { RadioGroup, RangeSlider, Select, Switch } from "../ui/form";
 import { audioProfiles, cameraProfiles, screenProfiles, type MediaQuality, type QualityProfile, type ScreenQuality } from "./quality";
+import { loadVoiceSettings, SETTINGS_KEY } from "./settings";
 import { shouldOpenVoiceGate, VoiceGateProcessor } from "./VoiceGateProcessor";
 
 type VoiceStatus = "idle" | "connecting" | "connected" | "reconnecting";
@@ -39,7 +40,6 @@ type NetworkQuality = "good" | "poor" | "lost";
 type NetworkStats = { rttMs: number | null; packetLossPercent: number | null };
 type ScreenAudioParticipant = { identity: string; name: string; trackSid: string };
 type MediaKind = "microphone" | "camera" | "screen";
-type DeviceSelections = Partial<Record<MediaDeviceKind, string>>;
 type CallParticipant = {
   identity: string;
   name: string;
@@ -48,18 +48,7 @@ type CallParticipant = {
   microphoneMuted: boolean;
   deafened: boolean;
 };
-type VoiceSettings = {
-  devices: DeviceSelections;
-  vadThreshold: number;
-  pushToTalk: boolean;
-  audioQuality: MediaQuality;
-  cameraQuality: MediaQuality;
-  screenQuality: ScreenQuality;
-  screenAudioQuality: MediaQuality;
-  advancedMode: boolean;
-};
 
-const SETTINGS_KEY = "vocal.voice-settings.v1";
 const DEAFENED_ATTRIBUTE = "vocal.deafened";
 
 function loadLiveKit() {
@@ -71,40 +60,6 @@ function supportsScreenShareAudio(): boolean {
   // audio tracks. Asking LiveKit to publish audio can make the whole operation
   // fail instead of returning the usable video track.
   return !/Firefox\//i.test(navigator.userAgent);
-}
-
-function isQuality(value: unknown): value is MediaQuality {
-  return value === "low" || value === "standard" || value === "high";
-}
-
-function isScreenQuality(value: unknown): value is ScreenQuality {
-  return isQuality(value) || value === "game";
-}
-
-function loadSettings(): VoiceSettings {
-  try {
-    const parsed = JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? "{}") as {
-      devices?: DeviceSelections; vadThreshold?: number; pushToTalk?: boolean;
-      audioQuality?: unknown; cameraQuality?: unknown; screenQuality?: unknown;
-      screenAudioQuality?: unknown; advancedMode?: unknown;
-    };
-    return {
-      devices: parsed.devices ?? {},
-      vadThreshold: typeof parsed.vadThreshold === "number" ? parsed.vadThreshold : 0.15,
-      pushToTalk: parsed.pushToTalk === true,
-      audioQuality: isQuality(parsed.audioQuality) ? parsed.audioQuality : "standard",
-      cameraQuality: isQuality(parsed.cameraQuality) ? parsed.cameraQuality : "standard",
-      screenQuality: isScreenQuality(parsed.screenQuality) ? parsed.screenQuality : "standard",
-      screenAudioQuality: isQuality(parsed.screenAudioQuality) ? parsed.screenAudioQuality : "high",
-      advancedMode: parsed.advancedMode === true,
-    };
-  } catch {
-    return {
-      devices: {}, vadThreshold: 0.15, pushToTalk: false,
-      audioQuality: "standard", cameraQuality: "standard", screenQuality: "standard",
-      screenAudioQuality: "high", advancedMode: false,
-    };
-  }
 }
 
 // Keyed by the string literal values of the real MediaDeviceFailure enum
@@ -280,7 +235,7 @@ export function VoiceView({
   const [screenShareEnabled, setScreenShareEnabled] = useState(false);
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
   const [settings, setSettings] = useState(() => ({
-    ...loadSettings(),
+    ...loadVoiceSettings(),
     audioQuality: channel.defaultAudioQuality ?? "standard",
     cameraQuality: channel.defaultCameraQuality ?? "standard",
     screenQuality: channel.defaultScreenQuality ?? "standard",
@@ -938,7 +893,7 @@ export function VoiceView({
         }
         if (audioTrack) {
           try {
-            await room.localParticipant.publishTrack(audioTrack, audioProfiles[settings.screenAudioQuality].publish);
+            await room.localParticipant.publishTrack(audioTrack, audioProfiles[settings.screenAudioQuality === "custom" ? "high" : settings.screenAudioQuality].publish);
             console.log("[screen-share] audio track published");
           } catch (publishError) {
             console.error("[screen-share] audio track publish failed", publishError);
@@ -1191,7 +1146,7 @@ export function VoiceView({
                   <QualitySelect label="Webcam" value={settings.cameraQuality} profiles={cameraProfiles} onChange={(quality) => selectQuality("camera", quality)} />
                   <QualitySelect<ScreenQuality> label="Screen share" value={settings.screenQuality} profiles={screenProfiles} onChange={(quality) => selectQuality("screen", quality)} />
                   {settings.advancedMode ? (
-                    <QualitySelect label="Screen share audio" value={settings.screenAudioQuality} profiles={audioProfiles} onChange={(quality) => selectQuality("screenAudio", quality)} />
+                    <QualitySelect label="Screen share audio" value={settings.screenAudioQuality === "custom" ? "high" : settings.screenAudioQuality} profiles={audioProfiles} onChange={(quality) => selectQuality("screenAudio", quality)} />
                   ) : null}
                   <p className="form-hint">To share game, tab, or system audio, enable audio in your browser's sharing picker.</p>
                 </div>
