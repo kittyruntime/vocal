@@ -12,14 +12,16 @@ export function Switch({
   onChange(next: boolean): void;
 }) {
   const id = useId();
+  const labelId = `${id}-label`;
   return (
     <div className="switch-row">
-      <label htmlFor={id} className={visuallyHiddenLabel ? "sr-only" : undefined}>{label}</label>
+      <label id={labelId} htmlFor={id} className={visuallyHiddenLabel ? "sr-only" : undefined}>{label}</label>
       <button
         type="button"
         id={id}
         role="switch"
         aria-checked={checked}
+        aria-labelledby={labelId}
         className={`switch ${checked ? "on" : ""}`}
         onClick={() => onChange(!checked)}
       >
