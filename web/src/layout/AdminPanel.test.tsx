@@ -9,7 +9,7 @@ import { ACCENT_PRESET_LABELS } from "../theme/accent";
 
 vi.mock("../api/client", async () => {
   const actual = await vi.importActual<typeof import("../api/client")>("../api/client");
-  return { ...actual, listAdminUsers: vi.fn(), getAdminSettings: vi.fn(), listRoles: vi.fn(), createRole: vi.fn(), updateRole: vi.fn(), deleteRole: vi.fn(), setUserRoles: vi.fn(), kickUser: vi.fn(), banUser: vi.fn(), unbanUser: vi.fn(), setUserVoiceMuted: vi.fn(), getSoundSettings: vi.fn(), updateSoundSetting: vi.fn(), getAppearance: vi.fn(), updateAppearance: vi.fn() };
+  return { ...actual, listAdminUsers: vi.fn(), getAdminSettings: vi.fn(), updateAdminSettings: vi.fn(), listRoles: vi.fn(), createRole: vi.fn(), updateRole: vi.fn(), deleteRole: vi.fn(), setUserRoles: vi.fn(), kickUser: vi.fn(), banUser: vi.fn(), unbanUser: vi.fn(), setUserVoiceMuted: vi.fn(), getSoundSettings: vi.fn(), updateSoundSetting: vi.fn(), getAppearance: vi.fn(), updateAppearance: vi.fn() };
 });
 
 const admin: CurrentUser = { id: "u1", username: "theo", capabilities: ["manage_channels", "manage_server", "moderate", "publish_voice"] };
@@ -58,6 +58,7 @@ beforeEach(() => {
   vi.mocked(api.unbanUser).mockReset();
   vi.mocked(api.setUserVoiceMuted).mockReset();
   vi.mocked(api.updateAppearance).mockReset();
+  vi.mocked(api.updateAdminSettings).mockReset();
   vi.spyOn(window, "confirm").mockReturnValue(true);
 });
 
@@ -147,6 +148,50 @@ describe("AdminPanel moderation", () => {
     const rows = screen.getAllByText(/theo|alice/).map((el) => el.closest(".admin-user"));
     const theoRow = rows.find((row) => row?.textContent?.includes("theo"));
     expect(theoRow?.querySelector(".admin-user-actions")).toBeNull();
+  });
+});
+
+describe("AdminPanel general", () => {
+  it("toggles public registration via the Switch primitive", async () => {
+    vi.mocked(api.updateAdminSettings).mockResolvedValue({ registrationOpen: false, maxImageSizeMb: 5, maxFileSizeMb: 10, maxMessageLength: 4000 });
+    renderPanel([], false);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("switch", { name: "Public registration" }));
+    await waitFor(() => expect(api.updateAdminSettings).toHaveBeenCalledWith(expect.objectContaining({ registrationOpen: false })));
+  });
+
+  it("saves attachment limits via an explicit Save button, not onBlur", async () => {
+    vi.mocked(api.updateAdminSettings).mockResolvedValue({ registrationOpen: true, maxImageSizeMb: 8, maxFileSizeMb: 10, maxMessageLength: 4000 });
+    renderPanel([], false);
+    const user = userEvent.setup();
+    const imageInput = await screen.findByLabelText("Images (MB)");
+    await user.clear(imageInput);
+    await user.type(imageInput, "8");
+    expect(api.updateAdminSettings).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
+    await waitFor(() => expect(api.updateAdminSettings).toHaveBeenCalledWith(expect.objectContaining({ maxImageSizeMb: 8 })));
+  });
+
+  it("shows Saving… and disables the button while the attachment-limits save is in flight", async () => {
+    let resolveSave: (value: api.ServerSettings) => void = () => {};
+    vi.mocked(api.updateAdminSettings).mockReturnValue(new Promise<api.ServerSettings>((resolve) => { resolveSave = resolve; }));
+    renderPanel([], false);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
+    expect(screen.getByRole("button", { name: "Saving…" })).toBeDisabled();
+    resolveSave({ registrationOpen: true, maxImageSizeMb: 5, maxFileSizeMb: 10, maxMessageLength: 4000 });
+    await waitFor(() => expect(screen.getByRole("button", { name: "Save changes" })).toBeEnabled());
+  });
+
+  it("saves the message-length limit via its own separate Save button", async () => {
+    vi.mocked(api.updateAdminSettings).mockResolvedValue({ registrationOpen: true, maxImageSizeMb: 5, maxFileSizeMb: 10, maxMessageLength: 2000 });
+    renderPanel([], false);
+    const user = userEvent.setup();
+    const lengthInput = await screen.findByLabelText("Characters per message");
+    await user.clear(lengthInput);
+    await user.type(lengthInput, "2000");
+    await user.click(screen.getByRole("button", { name: "Save length" }));
+    await waitFor(() => expect(api.updateAdminSettings).toHaveBeenCalledWith(expect.objectContaining({ maxMessageLength: 2000 })));
   });
 });
 
