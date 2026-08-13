@@ -39,4 +39,12 @@ describe("Switch", () => {
     expect(label.className).toContain("sr-only");
     expect(screen.getByRole("switch", { name: "Screen sharing enabled" })).toBeInTheDocument();
   });
+
+  it("associates its label via both a native label/for link and an explicit aria-labelledby", () => {
+    render(<Switch label="Public registration" checked={true} onChange={() => {}} />);
+    const toggle = screen.getByRole("switch", { name: "Public registration" });
+    const label = screen.getByText("Public registration");
+    expect(toggle).toHaveAttribute("aria-labelledby", label.id);
+    expect(label.id).not.toBe("");
+  });
 });
