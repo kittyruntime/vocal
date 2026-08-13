@@ -134,9 +134,14 @@ textarea.form-input { resize: vertical; }
 .radio-option-icon { flex-shrink: 0; display: flex; color: var(--text-muted); }
 .radio-option.active .radio-option-icon { color: var(--brand); }
 .radio-option:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--brand-glow); }
+.checkbox-option { display: inline-flex; align-items: center; gap: 7px; color: var(--text-normal); cursor: pointer; }
+.checkbox-input { width: 16px; height: 16px; flex: 0 0 auto; accent-color: var(--brand); cursor: pointer; }
+.checkbox-input:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--brand-glow); }
+.color-field { width: 100%; height: 40px; padding: 3px; border: 1px solid rgb(255 255 255 / 10%); border-radius: var(--radius-sm); background: var(--bg-sunken); cursor: pointer; }
+.color-field:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--brand-glow); }
 
 @media (prefers-reduced-motion: reduce) {
-  .form-input, .switch, .switch-thumb, .radio-option { transition: none; }
+  .form-input, .switch, .switch-thumb, .radio-option, .color-field { transition: none; }
 }
 
 /* Authentication */
