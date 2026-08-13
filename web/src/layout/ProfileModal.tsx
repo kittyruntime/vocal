@@ -225,7 +225,8 @@ export function ProfileModal({ currentUser, onClose, onSaved }: {
               {SOUND_EVENTS.map((event) => (
                 <RangeSlider
                   key={event}
-                  label={`${SOUND_EVENT_LABEL[event]} — ${soundVolumes[event]}%`}
+                  label={SOUND_EVENT_LABEL[event]}
+                  hint={`${soundVolumes[event]}%`}
                   min={0}
                   max={100}
                   step={5}

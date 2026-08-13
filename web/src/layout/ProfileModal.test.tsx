@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import * as api from "../api/client";
 import { ACCENT_PRESETS, type AccentPreset } from "../api/client";
@@ -74,17 +74,28 @@ describe("ProfileModal", () => {
   it("adjusts and saves a per-sound volume", async () => {
     vi.mocked(api.updateMySoundVolume).mockResolvedValue({ message: 80, userJoin: 55, userLeave: 55, muteToggle: 55, forceMuted: 55, screenShare: 55 });
     render(<ProfileModal currentUser={{ id: "u1", username: "theo", capabilities: [] }} onSaved={vi.fn()} onClose={vi.fn()} />);
-    const slider = await screen.findByLabelText("Message received — 55%");
+    const slider = await screen.findByLabelText("Message received");
     fireEvent.change(slider, { target: { value: "80" } });
     fireEvent.pointerUp(slider);
     await waitFor(() => expect(api.updateMySoundVolume).toHaveBeenCalledWith("message", 80));
+  });
+
+  it("keeps the sound-volume slider's accessible name stable while showing the live percentage as a hint", async () => {
+    render(<ProfileModal currentUser={{ id: "u1", username: "theo", capabilities: [] }} onSaved={vi.fn()} onClose={vi.fn()} />);
+    const slider = await screen.findByLabelText("Message received");
+    const field = slider.closest<HTMLElement>(".form-field");
+    expect(field).not.toBeNull();
+    expect(within(field!).getByText("55%")).toBeInTheDocument();
+    fireEvent.change(slider, { target: { value: "80" } });
+    expect(screen.getByLabelText("Message received")).toBe(slider);
+    expect(within(field!).getByText("80%")).toBeInTheDocument();
   });
 
   it("applies a saved volume to the live sound engine immediately, without a reload", async () => {
     const freshVolumes = { message: 80, userJoin: 55, userLeave: 55, muteToggle: 55, forceMuted: 55, screenShare: 55 };
     vi.mocked(api.updateMySoundVolume).mockResolvedValue(freshVolumes);
     render(<ProfileModal currentUser={{ id: "u1", username: "theo", capabilities: [] }} onSaved={vi.fn()} onClose={vi.fn()} />);
-    const slider = await screen.findByLabelText("Message received — 55%");
+    const slider = await screen.findByLabelText("Message received");
     fireEvent.change(slider, { target: { value: "80" } });
     fireEvent.pointerUp(slider);
     await waitFor(() => expect(sounds.configureSounds).toHaveBeenCalledWith(
