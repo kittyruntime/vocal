@@ -201,12 +201,18 @@ describe("AdminPanel sounds", () => {
     renderPanel([], false);
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: "Sounds" }));
-    // Every sound row starts "On" by default, so the accessible name alone
-    // doesn't uniquely identify a row; SOUND_EVENTS[0] is "message", so the
-    // first match is its toggle, matching the assertion below.
-    const onButtons = await screen.findAllByRole("button", { name: "On" });
-    await user.click(onButtons[0]);
+    await user.click(await screen.findByRole("switch", { name: "Message received enabled" }));
     await waitFor(() => expect(api.updateSoundSetting).toHaveBeenCalledWith("message", { enabled: false }));
+  });
+
+  it("renders the sound toggle as a Switch, not a text-label button", async () => {
+    renderPanel([], false);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Sounds" }));
+    const toggles = await screen.findAllByRole("switch");
+    expect(toggles.length).toBeGreaterThan(0);
+    expect(screen.queryAllByRole("button", { name: "On" })).toHaveLength(0);
+    expect(screen.queryAllByRole("button", { name: "Off" })).toHaveLength(0);
   });
 
   it("uploads a valid audio file and sends it as a base64 data URL", async () => {

@@ -369,7 +369,7 @@ function SoundSettingsManager({ soundSettings, onChange, onError }: {
               <div><h4>{label.title}</h4><p>{label.description}</p></div>
               <div className="sound-setting-actions">
                 <button type="button" aria-label={`Preview ${label.title}`} onClick={() => previewSound(event, setting.hasCustom)}><Icon name="volume" size={15} /></button>
-                <button type="button" className={`setting-switch ${setting.enabled ? "active" : ""}`} aria-pressed={setting.enabled} onClick={() => void toggle(event)}>{setting.enabled ? "On" : "Off"}</button>
+                <Switch label={`${label.title} enabled`} checked={setting.enabled} onChange={() => void toggle(event)} />
                 <input
                   ref={(el) => { fileInputRefs.current[event] = el; }}
                   className="sr-only"
