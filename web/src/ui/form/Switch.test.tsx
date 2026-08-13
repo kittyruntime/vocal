@@ -32,4 +32,11 @@ describe("Switch", () => {
     await userEvent.setup().click(screen.getByText("Public registration"));
     expect(onChange).toHaveBeenCalledWith(true);
   });
+
+  it("hides the visible label when visuallyHiddenLabel is set, while remaining reachable by accessible name", () => {
+    render(<Switch label="Screen sharing enabled" visuallyHiddenLabel checked={true} onChange={() => {}} />);
+    const label = screen.getByText("Screen sharing enabled");
+    expect(label.className).toContain("sr-only");
+    expect(screen.getByRole("switch", { name: "Screen sharing enabled" })).toBeInTheDocument();
+  });
 });

@@ -703,6 +703,9 @@ textarea.form-input { resize: vertical; }
 .attachment-limit-grid label { display: grid; gap: 6px; color: #b5bac1; font-size: 11px; font-weight: 700; text-transform: uppercase; }
 .attachment-limit-grid input { min-width: 0; padding: 9px 10px; border: 1px solid #1e1f22; border-radius: 4px; background: #1e1f22; color: #dbdee1; }
 .attachment-limit-grid.single-setting { grid-template-columns: minmax(180px, 280px); }
+.settings-section > button[type="submit"] { min-height: 36px; padding: 9px 14px; border: 0; border-radius: var(--radius-sm); background: var(--brand); color: var(--brand-contrast); font-weight: 600; cursor: pointer; }
+.settings-section > button[type="submit"]:hover { background: var(--brand-hover); }
+.settings-section > button[type="submit"]:disabled { opacity: .6; cursor: default; }
 .admin-user-list, .admin-channel-list { display: flex; flex-direction: column; gap: 8px; }
 .admin-members-section { padding-top: 16px; }
 .admin-members-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; margin-bottom: 14px; }
@@ -756,6 +759,7 @@ textarea.form-input { resize: vertical; }
 .admin-role-editor > div button { padding: 8px 12px; border: 0; border-radius: 4px; background: var(--brand); color: var(--brand-contrast); font-weight: 600; }
 .admin-role-editor > div .danger-link { background: transparent; color: #fa777c; }
 .invite-create-form { display: grid; grid-template-columns: 1fr 1fr auto; align-items: end; gap: 12px; padding: 14px; border-radius: 8px; background: #2b2d31; }
+.invite-create-form .form-input { min-height: 40px; }
 .invite-created input { min-width: 0; min-height: 40px; padding: 8px 10px; border: 1px solid #1e1f22; border-radius: 4px; background: #1e1f22; color: #fff; }
 .invite-create-form button, .invite-created button { min-height: 40px; padding: 8px 13px; border: 0; border-radius: 4px; background: var(--brand); color: var(--brand-contrast); font-weight: 600; }
 .invite-created { display: flex; gap: 8px; margin-top: 12px; }
@@ -777,7 +781,7 @@ textarea.form-input { resize: vertical; }
 .sound-setting-row h4 { margin: 0 0 3px; color: #f2f3f5; font-size: 13px; }
 .sound-setting-row p { margin: 0; color: #949ba4; font-size: 12px; }
 .sound-setting-actions { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; }
-.sound-setting-actions > button:not(.switch) { padding: 6px 9px; border: 0; border-radius: 4px; background: #4e5058; color: #f2f3f5; font-size: 12px; cursor: pointer; }
+.sound-setting-actions > button { padding: 6px 9px; border: 0; border-radius: 4px; background: #4e5058; color: #f2f3f5; font-size: 12px; cursor: pointer; }
 .sound-setting-actions .danger-link { background: transparent; color: #fa777c; }
 .sound-volume-list { display: flex; flex-direction: column; gap: 16px; }
 

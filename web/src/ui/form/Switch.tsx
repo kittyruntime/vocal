@@ -3,16 +3,18 @@ import { useId } from "react";
 export function Switch({
   label,
   checked,
+  visuallyHiddenLabel,
   onChange,
 }: {
   label: string;
   checked: boolean;
+  visuallyHiddenLabel?: boolean;
   onChange(next: boolean): void;
 }) {
   const id = useId();
   return (
     <div className="switch-row">
-      <label htmlFor={id}>{label}</label>
+      <label htmlFor={id} className={visuallyHiddenLabel ? "sr-only" : undefined}>{label}</label>
       <button
         type="button"
         id={id}

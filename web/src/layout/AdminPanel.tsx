@@ -34,6 +34,9 @@ export function AdminPanel({ currentUser, onClose }: {
   const [settings, setSettings] = useState<ServerSettings>({ registrationOpen: true, maxImageSizeMb: 5, maxFileSizeMb: 10, maxMessageLength: 4000 });
   const [savingLimits, setSavingLimits] = useState(false);
   const [savingLength, setSavingLength] = useState(false);
+  const [imageLimitDraft, setImageLimitDraft] = useState(settings.maxImageSizeMb);
+  const [fileLimitDraft, setFileLimitDraft] = useState(settings.maxFileSizeMb);
+  const [messageLengthDraft, setMessageLengthDraft] = useState(settings.maxMessageLength);
   const [soundSettings, setSoundSettings] = useState<SoundSettings>(() => Object.fromEntries(
     SOUND_EVENTS.map((event) => [event, { enabled: true, hasCustom: false }]),
   ) as SoundSettings);
@@ -70,6 +73,10 @@ export function AdminPanel({ currentUser, onClose }: {
       })
       .catch(() => setError("Could not load server settings."));
   }, [canManageServer]);
+
+  useEffect(() => { setImageLimitDraft(settings.maxImageSizeMb); }, [settings.maxImageSizeMb]);
+  useEffect(() => { setFileLimitDraft(settings.maxFileSizeMb); }, [settings.maxFileSizeMb]);
+  useEffect(() => { setMessageLengthDraft(settings.maxMessageLength); }, [settings.maxMessageLength]);
 
   useEffect(() => {
     void api.listAdminUsers({ search: debouncedMemberSearch || undefined, page: memberPage, limit: MEMBERS_PER_PAGE })
@@ -124,7 +131,7 @@ export function AdminPanel({ currentUser, onClose }: {
     event.preventDefault();
     setSavingLimits(true);
     setError("");
-    try { setSettings(await api.updateAdminSettings(settings)); }
+    try { setSettings(await api.updateAdminSettings({ ...settings, maxImageSizeMb: imageLimitDraft, maxFileSizeMb: fileLimitDraft })); }
     catch { setError("Could not change attachment limits."); }
     finally { setSavingLimits(false); }
   }
@@ -133,7 +140,7 @@ export function AdminPanel({ currentUser, onClose }: {
     event.preventDefault();
     setSavingLength(true);
     setError("");
-    try { setSettings(await api.updateAdminSettings(settings)); }
+    try { setSettings(await api.updateAdminSettings({ ...settings, maxMessageLength: messageLengthDraft })); }
     catch { setError("Could not change the message length limit."); }
     finally { setSavingLength(false); }
   }
@@ -172,14 +179,14 @@ export function AdminPanel({ currentUser, onClose }: {
           {error ? <p className="form-error" role="alert">{error}</p> : null}
           {activeTab === "general" && canManageServer ? <><div className="settings-section admin-setting-row">
             <div><h3>Public registration</h3><p>Invitations remain usable even when registration is closed.</p></div>
-            <Switch label="Public registration" checked={settings.registrationOpen} onChange={() => void toggleRegistration()} />
+            <Switch label="Public registration" visuallyHiddenLabel checked={settings.registrationOpen} onChange={() => void toggleRegistration()} />
           </div>
           <form className="settings-section" onSubmit={saveAttachmentLimits}>
             <h3>Attachment limits</h3>
             <p className="admin-setting-description">Maximum size accepted for each uploaded item. The hard server limit is 50 MB.</p>
             <div className="attachment-limit-grid">
-              <TextField label="Images (MB)" type="number" min="1" max="50" value={settings.maxImageSizeMb} onChange={(event) => setSettings({ ...settings, maxImageSizeMb: Number(event.target.value) })} />
-              <TextField label="Other files (MB)" type="number" min="1" max="50" value={settings.maxFileSizeMb} onChange={(event) => setSettings({ ...settings, maxFileSizeMb: Number(event.target.value) })} />
+              <TextField label="Images (MB)" type="number" min="1" max="50" value={imageLimitDraft} onChange={(event) => setImageLimitDraft(Number(event.target.value))} />
+              <TextField label="Other files (MB)" type="number" min="1" max="50" value={fileLimitDraft} onChange={(event) => setFileLimitDraft(Number(event.target.value))} />
             </div>
             <button type="submit" disabled={savingLimits}>{savingLimits ? "Saving…" : "Save changes"}</button>
           </form>
@@ -187,7 +194,7 @@ export function AdminPanel({ currentUser, onClose }: {
             <h3>Message length</h3>
             <p className="admin-setting-description">Maximum number of characters allowed in a single message.</p>
             <div className="attachment-limit-grid single-setting">
-              <TextField label="Characters per message" type="number" min="100" max="10000" step="100" value={settings.maxMessageLength} onChange={(event) => setSettings({ ...settings, maxMessageLength: Number(event.target.value) })} />
+              <TextField label="Characters per message" type="number" min="100" max="10000" step="100" value={messageLengthDraft} onChange={(event) => setMessageLengthDraft(Number(event.target.value))} />
             </div>
             <button type="submit" disabled={savingLength}>{savingLength ? "Saving…" : "Save length"}</button>
           </form>
@@ -417,7 +424,7 @@ function SoundSettingsManager({ soundSettings, onChange, onError }: {
               <div><h4>{label.title}</h4><p>{label.description}</p></div>
               <div className="sound-setting-actions">
                 <button type="button" aria-label={`Preview ${label.title}`} onClick={() => previewSound(event, setting.hasCustom)}><Icon name="volume" size={15} /></button>
-                <Switch label={`${label.title} enabled`} checked={setting.enabled} onChange={() => void toggle(event)} />
+                <Switch label={`${label.title} enabled`} visuallyHiddenLabel checked={setting.enabled} onChange={() => void toggle(event)} />
                 <input
                   ref={(el) => { fileInputRefs.current[event] = el; }}
                   className="sr-only"
