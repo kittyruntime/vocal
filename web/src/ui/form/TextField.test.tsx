@@ -25,6 +25,14 @@ describe("TextField", () => {
     expect(input.getAttribute("aria-describedby")).toBe(screen.getByRole("alert").id);
   });
 
+  it("wires aria-describedby to the hint message", () => {
+    render(<TextField label="Username" value="" onChange={() => {}} hint="2-32 characters" />);
+    const input = screen.getByLabelText("Username");
+    const hint = screen.getByText("2-32 characters");
+    expect(hint.id).not.toBe("");
+    expect(input).toHaveAttribute("aria-describedby", hint.id);
+  });
+
   it("does not set aria-invalid when there is no error", () => {
     render(<TextField label="Username" value="" onChange={() => {}} />);
     expect(screen.getByLabelText("Username")).not.toHaveAttribute("aria-invalid");
