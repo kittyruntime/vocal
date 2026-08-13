@@ -9,7 +9,7 @@ import { ACCENT_PRESET_LABELS } from "../theme/accent";
 
 vi.mock("../api/client", async () => {
   const actual = await vi.importActual<typeof import("../api/client")>("../api/client");
-  return { ...actual, listAdminUsers: vi.fn(), getAdminSettings: vi.fn(), updateAdminSettings: vi.fn(), listRoles: vi.fn(), createRole: vi.fn(), updateRole: vi.fn(), deleteRole: vi.fn(), setUserRoles: vi.fn(), kickUser: vi.fn(), banUser: vi.fn(), unbanUser: vi.fn(), setUserVoiceMuted: vi.fn(), getSoundSettings: vi.fn(), updateSoundSetting: vi.fn(), getAppearance: vi.fn(), updateAppearance: vi.fn(), listInvites: vi.fn(), createInvite: vi.fn(), revokeInvite: vi.fn() };
+  return { ...actual, listAdminUsers: vi.fn(), getAdminSettings: vi.fn(), updateAdminSettings: vi.fn(), listRoles: vi.fn(), createRole: vi.fn(), updateRole: vi.fn(), deleteRole: vi.fn(), setUserRoles: vi.fn(), updateUserCapabilities: vi.fn(), kickUser: vi.fn(), banUser: vi.fn(), unbanUser: vi.fn(), setUserVoiceMuted: vi.fn(), getSoundSettings: vi.fn(), updateSoundSetting: vi.fn(), getAppearance: vi.fn(), updateAppearance: vi.fn(), listInvites: vi.fn(), createInvite: vi.fn(), revokeInvite: vi.fn() };
 });
 
 const admin: CurrentUser = { id: "u1", username: "theo", capabilities: ["manage_channels", "manage_server", "moderate", "publish_voice"] };
@@ -148,6 +148,35 @@ describe("AdminPanel moderation", () => {
     const rows = screen.getAllByText(/theo|alice/).map((el) => el.closest(".admin-user"));
     const theoRow = rows.find((row) => row?.textContent?.includes("theo"));
     expect(theoRow?.querySelector(".admin-user-actions")).toBeNull();
+  });
+});
+
+describe("AdminPanel members checkboxes", () => {
+  it("toggles a member's role via an accessible checkbox", async () => {
+    const role: Role = { id: "r1", name: "Moderator", color: "#ff0000", position: 0, capabilities: ["moderate"], memberCount: 1 };
+    vi.mocked(api.setUserRoles).mockResolvedValue({ ...alice, roles: [role] });
+    renderPanel([alice], true, undefined, undefined, undefined, [role]);
+    const user = userEvent.setup();
+    const checkbox = await screen.findByRole("checkbox", { name: "Moderator" });
+    expect(checkbox).not.toBeChecked();
+    await user.click(checkbox);
+    await waitFor(() => expect(api.setUserRoles).toHaveBeenCalledWith(alice.id, ["r1"]));
+  });
+
+  it("toggles a member's capability via an accessible checkbox", async () => {
+    vi.mocked(api.updateUserCapabilities).mockResolvedValue({ ...alice, capabilities: ["moderate"] });
+    renderPanel([alice], true);
+    const user = userEvent.setup();
+    const checkbox = await screen.findByRole("checkbox", { name: "Moderate" });
+    await user.click(checkbox);
+    await waitFor(() => expect(api.updateUserCapabilities).toHaveBeenCalled());
+  });
+
+  it("searches members via the accessible search field", async () => {
+    renderPanel([alice], true);
+    const user = userEvent.setup();
+    await user.type(await screen.findByLabelText("Search members"), "ali");
+    await waitFor(() => expect(api.listAdminUsers).toHaveBeenCalledWith(expect.objectContaining({ search: "ali" })), { timeout: 500 });
   });
 });
 
