@@ -262,6 +262,15 @@ describe("VoiceView", () => {
     expect(content?.firstElementChild).toBe(advancedSection);
   });
 
+  it("explains that device choices load after joining when settings open before a room", async () => {
+    await renderView({}, { join: false });
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: "Settings" }));
+
+    expect(screen.getByText("Device choices load after you join the voice channel.")).toBeInTheDocument();
+  });
+
   it("hides the screen share audio quality selector until advanced mode is turned on", async () => {
     await renderView();
     const user = userEvent.setup();
