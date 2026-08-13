@@ -248,6 +248,20 @@ describe("VoiceView", () => {
     expect(screen.getByRole("button", { name: "Stop sharing" })).toBeInTheDocument();
   });
 
+  it("keeps the Advanced mode switch inside the padded settings content", async () => {
+    await renderView();
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "Settings" }));
+    const dialog = await screen.findByRole("dialog", { name: "Voice & Video" });
+    const content = dialog.querySelector<HTMLElement>(".voice-settings-content");
+    const advancedSection = screen.getByRole("switch", { name: "Advanced mode" }).closest<HTMLElement>(".settings-section");
+
+    expect(content).not.toBeNull();
+    expect(advancedSection).not.toBeNull();
+    expect(content).toContainElement(advancedSection);
+    expect(content?.firstElementChild).toBe(advancedSection);
+  });
+
   it("hides the screen share audio quality selector until advanced mode is turned on", async () => {
     await renderView();
     const user = userEvent.setup();
