@@ -453,6 +453,23 @@ describe("VoiceView", () => {
     );
   });
 
+  it("persists push-to-talk before joining and starts the microphone muted", async () => {
+    await renderView({}, { join: false });
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Settings" }));
+
+    await user.click(screen.getByRole("radio", { name: /Push-to-talk/ }));
+
+    expect(screen.getByRole("radio", { name: /Push-to-talk/ })).toHaveAttribute("aria-checked", "true");
+    expect(JSON.parse(localStorage.getItem("vocal.voice-settings.v1") ?? "{}").pushToTalk).toBe(true);
+    expect(setMicrophoneEnabled).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("button", { name: "Close settings" }));
+    await user.click(screen.getByRole("button", { name: "Join" }));
+    await screen.findByRole("button", { name: "Hold Space" });
+    expect(setMicrophoneEnabled).toHaveBeenCalledWith(false, expect.any(Object), expect.any(Object));
+  });
+
   it("defers an active stream custom edit without republishing it", async () => {
     await renderView();
     const user = userEvent.setup();

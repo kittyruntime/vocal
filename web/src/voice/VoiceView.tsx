@@ -723,10 +723,10 @@ export function VoiceView({
   }
 
   async function togglePushToTalk() {
-    const room = roomRef.current;
-    if (!room) return;
     const enabled = !settings.pushToTalk;
     saveSettings({ ...settings, pushToTalk: enabled });
+    const room = roomRef.current;
+    if (!room) return;
     pttPressedRef.current = false;
     try {
       const profile = resolveAudioProfile(settings.audioQuality, settings.customAudio, "microphone");
