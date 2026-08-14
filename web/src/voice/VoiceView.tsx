@@ -103,7 +103,11 @@ async function resolveFirefoxDeviceId(): Promise<string | undefined> {
 // due to the unrecognized 'default' deviceId ideal.
 async function buildMicrophoneCapture(
   baseCapture: AudioCaptureOptions,
+  preferredDeviceId?: string,
 ): Promise<AudioCaptureOptions> {
+  if (preferredDeviceId && preferredDeviceId !== "default") {
+    return { ...baseCapture, deviceId: { exact: preferredDeviceId } };
+  }
   if (!isFirefox()) return baseCapture;
   const deviceId = await resolveFirefoxDeviceId();
   if (deviceId) return { ...baseCapture, deviceId: { exact: deviceId } };
@@ -343,6 +347,7 @@ export function VoiceView({
   const voiceViewRef = useRef<HTMLElement>(null);
   const audioRef = useRef<HTMLDivElement>(null);
   const screenAudioVolumesRef = useRef<Record<string, number>>({});
+  const screenAudioFallbackRef = useRef(false);
   const refreshParticipantsRef = useRef<((localState?: { microphoneMuted?: boolean; deafened?: boolean }) => void) | null>(null);
   const remoteVideoRef = useRef<HTMLDivElement>(null);
   const localCameraRef = useRef<HTMLDivElement>(null);
@@ -352,6 +357,7 @@ export function VoiceView({
   const meterCleanupRef = useRef<(() => Promise<void>) | null>(null);
   const meterFrameRef = useRef<number | null>(null);
   const pttPressedRef = useRef(false);
+  const pttOperationRef = useRef(0);
   const voiceGateRef = useRef<VoiceGateProcessor | null>(null);
   const settingsRef = useRef(settings);
   const lastVoiceActivityRef = useRef(0);
@@ -754,7 +760,9 @@ export function VoiceView({
         if (deviceId) await room.switchActiveDevice(kind as MediaDeviceKind, deviceId, false);
       }
       const audioProfile = audioProfiles[settings.audioQuality];
-      const captureOptions = await buildMicrophoneCapture(audioProfile.capture);
+      const captureOptions = settings.pushToTalk
+        ? audioProfile.capture
+        : await buildMicrophoneCapture(audioProfile.capture, settings.devices.audioinput);
       let microphone;
       let microphoneFailed = false;
       try {
@@ -772,7 +780,7 @@ export function VoiceView({
         if (!settings.pushToTalk) await installVoiceGate(microphone.audioTrack);
       }
       setDevices(await Room.getLocalDevices(undefined, false));
-      refreshParticipants({ microphoneMuted: settings.pushToTalk, deafened: false });
+      refreshParticipants({ microphoneMuted: settings.pushToTalk || microphoneFailed, deafened: false });
       onSelfMediaStatusChange?.(channel.id, { microphoneMuted: settings.pushToTalk || microphoneFailed, deafened: false });
       setStatus("connected");
       onSelfPresenceChange?.(true);
@@ -808,7 +816,9 @@ export function VoiceView({
     pttPressedRef.current = false;
     try {
       const profile = audioProfiles[settings.audioQuality];
-      const captureOptions = await buildMicrophoneCapture(profile.capture);
+      const captureOptions = enabled
+        ? profile.capture
+        : await buildMicrophoneCapture(profile.capture, settings.devices.audioinput);
       const publication = await room.localParticipant.setMicrophoneEnabled(!enabled, captureOptions, profile.publish);
       if (enabled) {
         voiceGateRef.current = null;
@@ -829,17 +839,23 @@ export function VoiceView({
     const setPressed = (pressed: boolean) => {
       if (pttPressedRef.current === pressed) return;
       pttPressedRef.current = pressed;
+      const operation = ++pttOperationRef.current;
       const room = roomRef.current;
       if (!room) return;
       void (async () => {
         const profile = audioProfiles[settings.audioQuality];
-        const captureOptions = await buildMicrophoneCapture(profile.capture);
+        const captureOptions = pressed
+          ? await buildMicrophoneCapture(profile.capture, settings.devices.audioinput)
+          : profile.capture;
+        if (operation !== pttOperationRef.current || pttPressedRef.current !== pressed) return;
         return room.localParticipant.setMicrophoneEnabled(pressed, captureOptions, profile.publish);
       })().then(() => {
+        if (operation !== pttOperationRef.current || pttPressedRef.current !== pressed) return;
         setMicrophoneEnabled(pressed);
         refreshParticipantsRef.current?.({ microphoneMuted: !pressed, deafened });
         onSelfMediaStatusChange?.(channel.id, { microphoneMuted: !pressed, deafened });
       }).catch(async (error) => {
+        if (operation !== pttOperationRef.current || pttPressedRef.current !== pressed) return;
         const { MediaDeviceFailure } = await loadLiveKit();
         showToast(describeMediaError(MediaDeviceFailure, error, "microphone"));
       });
@@ -866,6 +882,7 @@ export function VoiceView({
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("keyup", onKeyUp);
       window.removeEventListener("blur", onBlur);
+      pttOperationRef.current += 1;
       setPressed(false);
     };
   }, [deafened, onSelfMediaStatusChange, settings.audioQuality, settings.pushToTalk, showToast, status]);
@@ -876,7 +893,9 @@ export function VoiceView({
     const enabled = !microphoneEnabled;
     try {
       const profile = audioProfiles[settings.audioQuality];
-      const captureOptions = await buildMicrophoneCapture(profile.capture);
+      const captureOptions = enabled
+        ? await buildMicrophoneCapture(profile.capture, settings.devices.audioinput)
+        : profile.capture;
       await room.localParticipant.setMicrophoneEnabled(enabled, captureOptions, profile.publish);
       setMicrophoneEnabled(enabled);
       refreshParticipantsRef.current?.({ microphoneMuted: !enabled, deafened });
@@ -945,14 +964,14 @@ export function VoiceView({
     try {
       const profile = screenProfiles[settings.screenQuality];
       const audioSupported = supportsScreenShareAudio();
+      const audioRequested = enabled && audioSupported && !screenAudioFallbackRef.current;
       const captureOptions = enabled
-        ? { ...profile.capture, audio: audioSupported, ...(audioSupported ? { systemAudio: "include" as const } : {}) }
+        ? { ...profile.capture, audio: audioRequested, ...(audioRequested ? { systemAudio: "include" as const } : {}) }
         : profile.capture;
       console.log("[screen-share] toggle", { enabled, audioSupported, quality: settings.screenQuality, captureOptions });
       let publication;
-      if (enabled && audioSupported) {
+      if (enabled && audioRequested) {
         let tracks;
-        let capturedWithAudio = true;
         try {
           tracks = await room.localParticipant.createScreenTracks(captureOptions);
         } catch (captureError) {
@@ -970,21 +989,16 @@ export function VoiceView({
           //  - NotFoundError: Chrome/Edge on macOS when the user selects "Entire Screen"
           //    — Firefox isn't the only browser that throws NotFound; Chrome can too
           //    when the requested source can't capture audio.
-          // Retry without audio only for these capability-gap errors, never for
-          // NotAllowedError (user dismissed the picker — retrying would just reopen
-          // the OS dialog the user just closed).
+          // Defer the audio-free fallback to an explicit second click. A second
+          // getDisplayMedia call here would have lost the user's transient activation.
           if (errorName !== "NotSupportedError" && errorName !== "NotFoundError") throw captureError;
-          capturedWithAudio = false;
-          console.warn("[screen-share] retrying capture without audio after", { errorName });
-          // profile.capture hardcodes audio: true for every screen-share quality
-          // preset (see quality.ts) -- it must be explicitly overridden here, not
-          // just omitted, or the retry would ask for audio again and fail the
-          // same way.
-          tracks = await room.localParticipant.createScreenTracks({ ...profile.capture, audio: false });
+          screenAudioFallbackRef.current = true;
+          showToast("Screen audio is unavailable here. Click Share screen again to share video only.");
+          return;
         }
         const videoTrack = tracks.find((track) => track.kind === Track.Kind.Video);
         const audioTrack = tracks.find((track) => track.kind === Track.Kind.Audio);
-        console.log("[screen-share] captured tracks", { hasVideo: Boolean(videoTrack), hasAudio: Boolean(audioTrack), capturedWithAudio });
+        console.log("[screen-share] captured tracks", { hasVideo: Boolean(videoTrack), hasAudio: Boolean(audioTrack), capturedWithAudio: Boolean(audioTrack) });
         if (!videoTrack) throw new Error("Screen capture did not provide a video track");
         try {
           publication = await room.localParticipant.publishTrack(videoTrack, profile.publish);
@@ -1003,13 +1017,14 @@ export function VoiceView({
             audioTrack.stop();
             showToast("The screen is shared, but its audio could not be published.");
           }
-        } else if (!capturedWithAudio) {
+        } else {
           showToast("Could not share this screen's audio here. Sharing video only.");
         }
       } else {
         publication = await room.localParticipant.setScreenShareEnabled(enabled, captureOptions, profile.publish);
         console.log("[screen-share] setScreenShareEnabled", { enabled, hasTrack: Boolean(publication?.track) });
       }
+      screenAudioFallbackRef.current = false;
       localScreenRef.current?.replaceChildren();
       if (enabled && publication?.track) {
         const element = publication.track.attach();

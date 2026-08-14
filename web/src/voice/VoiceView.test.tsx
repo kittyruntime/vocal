@@ -103,6 +103,7 @@ const currentUser: CurrentUser = { id: "u1", username: "theo", capabilities: [] 
 
 beforeEach(() => {
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
   vi.clearAllMocks();
   roomHandlers.clear();
   remoteParticipants.clear();
@@ -497,8 +498,18 @@ describe("VoiceView", () => {
     expect(screen.getByRole("button", { name: "Unmute microphone" })).toBeInTheDocument();
   });
 
+  it("reports a failed join microphone as muted in participant state", async () => {
+    const onParticipantsChange = vi.fn();
+    setMicrophoneEnabled.mockRejectedValueOnce(Object.assign(new Error("missing"), { name: "NotFoundError" }));
+    await renderView({ onParticipantsChange });
+    expect(onParticipantsChange).toHaveBeenLastCalledWith([
+      { userId: "u1", username: "theo", avatarUrl: null, microphoneMuted: true, deafened: false },
+    ]);
+  });
+
   it("resolves Firefox default deviceId to real deviceId before enabling microphone", async () => {
     vi.spyOn(window.navigator, "userAgent", "get").mockReturnValue("Mozilla/5.0 Firefox/142.0");
+    localStorage.setItem("vocal.voice-settings.v1", JSON.stringify({ devices: { audioinput: "selected-mic-id" } }));
     const audioTrack = { getSettings: () => ({ deviceId: "real-mic-id" }), stop: vi.fn() };
     const mockGetUserMedia = vi.fn().mockResolvedValue({
       getAudioTracks: () => [audioTrack],
@@ -509,8 +520,8 @@ describe("VoiceView", () => {
       mediaDevices: { ...window.navigator.mediaDevices, getUserMedia: mockGetUserMedia },
     });
     await renderView();
-    expect(mockGetUserMedia).toHaveBeenCalledWith({ audio: true });
-    expect(setMicrophoneEnabled).toHaveBeenCalledWith(true, expect.objectContaining({ deviceId: { exact: "real-mic-id" } }), expect.any(Object));
+    expect(mockGetUserMedia).not.toHaveBeenCalled();
+    expect(setMicrophoneEnabled).toHaveBeenCalledWith(true, expect.objectContaining({ deviceId: { exact: "selected-mic-id" } }), expect.any(Object));
     expect(screen.getByRole("button", { name: "Mute microphone" })).toBeInTheDocument();
   });
 
@@ -524,6 +535,19 @@ describe("VoiceView", () => {
     await renderView();
     expect(mockGetUserMedia).not.toHaveBeenCalled();
     expect(setMicrophoneEnabled).toHaveBeenCalledWith(true, expect.not.objectContaining({ deviceId: { exact: expect.anything() } }), expect.any(Object));
+  });
+
+  it("does not request microphone permission on join when push-to-talk is enabled", async () => {
+    vi.spyOn(window.navigator, "userAgent", "get").mockReturnValue("Mozilla/5.0 Firefox/142.0");
+    const mockGetUserMedia = vi.fn().mockResolvedValue({ getAudioTracks: () => [], getTracks: () => [] });
+    vi.stubGlobal("navigator", {
+      ...window.navigator,
+      mediaDevices: { ...window.navigator.mediaDevices, getUserMedia: mockGetUserMedia },
+    });
+    localStorage.setItem("vocal.voice-settings.v1", JSON.stringify({ pushToTalk: true }));
+    await renderView();
+    expect(mockGetUserMedia).not.toHaveBeenCalled();
+    expect(setMicrophoneEnabled).toHaveBeenCalledWith(false, expect.any(Object), expect.any(Object));
   });
 
   it("shows a network-loss toast when the initial connection is unreachable", async () => {
@@ -560,36 +584,21 @@ describe("VoiceView", () => {
     expect(createScreenTracks).toHaveBeenCalledTimes(1);
   });
 
-  it("retries without audio and shares video-only when the platform can't satisfy the audio request (NotSupportedError)", async () => {
+  it("asks the user to retry explicitly when screen audio capture is unsupported", async () => {
     const videoOnlyTrack = { kind: "video", attach: vi.fn(() => document.createElement("video")), detach: vi.fn(() => []), stop: vi.fn() };
     createScreenTracks
-      .mockRejectedValueOnce(Object.assign(new Error("not supported"), { name: "NotSupportedError" }))
-      .mockResolvedValueOnce([videoOnlyTrack]);
+      .mockRejectedValueOnce(Object.assign(new Error("not supported"), { name: "NotSupportedError" }));
     await renderView();
     await userEvent.setup().click(await screen.findByRole("button", { name: "Share screen" }));
 
-    expect(createScreenTracks).toHaveBeenCalledTimes(2);
+    expect(createScreenTracks).toHaveBeenCalledTimes(1);
     expect(createScreenTracks).toHaveBeenNthCalledWith(1, expect.objectContaining({ audio: true, systemAudio: "include" }));
-    expect(createScreenTracks.mock.calls[1][0]).toMatchObject({ audio: false });
-    expect(createScreenTracks.mock.calls[1][0]).not.toHaveProperty("systemAudio");
-    expect(await screen.findByText("Could not share this screen's audio here. Sharing video only.")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Stop sharing" })).toBeInTheDocument();
-    expect(playAppSound).toHaveBeenCalledWith("screenShare");
-  });
+    expect(await screen.findByText("Screen audio is unavailable here. Click Share screen again to share video only.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Share screen" })).toBeInTheDocument();
 
-  it("retries without audio when Chrome/Edge throws NotFoundError for screen audio on unsupported sources", async () => {
-    const videoOnlyTrack = { kind: "video", attach: vi.fn(() => document.createElement("video")), detach: vi.fn(() => []), stop: vi.fn() };
-    createScreenTracks
-      .mockRejectedValueOnce(Object.assign(new Error("no audio device for this source"), { name: "NotFoundError" }))
-      .mockResolvedValueOnce([videoOnlyTrack]);
-    await renderView();
-    await userEvent.setup().click(await screen.findByRole("button", { name: "Share screen" }));
-
-    expect(createScreenTracks).toHaveBeenCalledTimes(2);
-    expect(createScreenTracks).toHaveBeenNthCalledWith(1, expect.objectContaining({ audio: true, systemAudio: "include" }));
-    expect(createScreenTracks.mock.calls[1][0]).toMatchObject({ audio: false });
-    expect(createScreenTracks.mock.calls[1][0]).not.toHaveProperty("systemAudio");
-    expect(await screen.findByText("Could not share this screen's audio here. Sharing video only.")).toBeInTheDocument();
+    createScreenTracks.mockResolvedValueOnce([videoOnlyTrack]);
+    await userEvent.setup().click(screen.getByRole("button", { name: "Share screen" }));
+    expect(setScreenShareEnabled).toHaveBeenCalledWith(true, expect.objectContaining({ audio: false }), expect.any(Object));
     expect(screen.getByRole("button", { name: "Stop sharing" })).toBeInTheDocument();
     expect(playAppSound).toHaveBeenCalledWith("screenShare");
   });

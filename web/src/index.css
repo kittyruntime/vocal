@@ -925,6 +925,15 @@ textarea.form-input { resize: vertical; }
   transition: opacity 180ms ease-in, transform 180ms ease-in;
 }
 .toast.is-leaving { opacity: 0; transform: translateX(12px); }
+.version-badge { margin: 8px 12px 12px; border: 0; background: transparent; color: var(--muted); font-size: 11px; cursor: pointer; text-align: left; }
+.version-badge:hover { color: var(--text); }
+.about-backdrop { position: fixed; inset: 0; z-index: 30; display: grid; place-items: center; padding: 16px; background: rgb(0 0 0 / 62%); }
+.about-modal { position: relative; width: min(680px, 100%); max-height: min(760px, 90vh); overflow: auto; padding: 28px; border: 1px solid var(--divider); border-radius: 12px; background: var(--panel); color: var(--text); box-shadow: 0 18px 60px rgb(0 0 0 / 45%); }
+.about-modal .modal-close { position: absolute; top: 10px; right: 10px; }
+.version-meta { color: var(--muted); font-size: 13px; }
+.markdown h1, .markdown h2, .markdown h3 { margin: 22px 0 8px; }
+.markdown h1 { font-size: 22px; }.markdown h2 { font-size: 18px; }.markdown h3 { font-size: 15px; }
+.markdown p { margin: 8px 0; line-height: 1.5; }.markdown ul { padding-left: 22px; line-height: 1.5; }.markdown code { padding: 2px 4px; border-radius: 4px; background: var(--surface); }
 
 @media (hover: none) {
   .channel-settings-button, .tile-fullscreen-button { opacity: 1; }

@@ -21,6 +21,7 @@ import { registerRoleRoutes } from "./routes/roles.js";
 import { registerSearchRoutes } from "./routes/search.js";
 import { registerSoundRoutes } from "./routes/sounds.js";
 import { registerAppearanceRoutes } from "./routes/appearance.js";
+import { registerVersionRoutes } from "./routes/version.js";
 
 export async function buildApp(
   opts: { pool: pg.Pool; voiceAdmin?: VoiceAdminService },
@@ -50,6 +51,7 @@ export async function buildApp(
   });
   registerAuthGuard(app, opts.pool);
   app.get("/api/health", async () => ({ status: "ok" }));
+  registerVersionRoutes(app);
   registerAuthRoutes(app, opts.pool);
   registerAdminRoutes(app, opts.pool, hub, voicePresence, voiceAdmin);
   registerRoleRoutes(app, opts.pool, hub);

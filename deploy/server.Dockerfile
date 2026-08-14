@@ -14,6 +14,8 @@ FROM node:22-alpine AS runtime
 ENV NODE_ENV=production
 WORKDIR /app
 RUN corepack enable
+COPY VERSION ./VERSION
+COPY CHANGELOG.md ./CHANGELOG.md
 COPY --from=dependencies /app/node_modules ./node_modules
 COPY --from=dependencies /app/server/node_modules ./server/node_modules
 COPY --from=build /app/server/dist ./server/dist
