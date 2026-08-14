@@ -16,7 +16,6 @@ import { ProfileModal } from "./ProfileModal";
 import { UserProfileModal } from "./UserProfileModal";
 import { SearchModal } from "./SearchModal";
 import { AboutModal } from "./AboutModal";
-import { VersionBadge } from "./VersionBadge";
 
 const VoiceView = lazy(() => import("../voice/VoiceView").then((module) => ({ default: module.VoiceView })));
 
@@ -185,6 +184,8 @@ export function MainLayout({ currentUser }: { currentUser: CurrentUser }) {
             mentionChannelIds={state.mentionChannelIds}
             onViewProfile={setViewedProfileId}
             onOpenSearch={() => setSearchOpen(true)}
+            version={version}
+            onOpenAbout={() => setAboutOpen(true)}
             currentUser={currentUser}
             onSelectChannel={selectChannel}
             onChannelCreated={(channel) => dispatch({ type: "channel/added", channel })}
@@ -192,7 +193,6 @@ export function MainLayout({ currentUser }: { currentUser: CurrentUser }) {
             onChannelDeleted={(channelId) => dispatch({ type: "channel/removed", channelId })}
           />
           <UserBar currentUser={currentUser} onOpenProfile={() => setProfileOpen(true)} onSignOut={signOut} />
-          <VersionBadge version={version} onClick={() => setAboutOpen(true)} />
         </aside>
         <div className="main-content">
           {selectedChannel?.type === "text" ? (

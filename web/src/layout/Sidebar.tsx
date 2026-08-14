@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import type { Capability, Channel, CurrentUser } from "../api/client";
+import type { Capability, Channel, CurrentUser, VersionInfo } from "../api/client";
 import * as api from "../api/client";
 import { useToast } from "../toast/ToastContext";
 import type { VoiceParticipant } from "../ws/protocol";
@@ -8,6 +8,7 @@ import { RadioGroup, Select, TextField } from "../ui/form";
 import { Wordmark } from "../ui/Wordmark";
 import { AdminPanel } from "./AdminPanel";
 import { ChannelSettingsModal } from "./ChannelSettingsModal";
+import { VersionBadge } from "./VersionBadge";
 
 const CAPABILITY_LABEL: Record<Capability, string> = {
   manage_channels: "Channel managers only",
@@ -32,6 +33,8 @@ export function Sidebar({
   onChannelDeleted,
   onViewProfile,
   onOpenSearch,
+  version,
+  onOpenAbout,
 }: {
   channels: Channel[];
   selectedChannelId: string | null;
@@ -48,6 +51,8 @@ export function Sidebar({
   onChannelDeleted?(channelId: string): void;
   onViewProfile?(userId: string): void;
   onOpenSearch?(): void;
+  version?: VersionInfo | null;
+  onOpenAbout?(): void;
 }) {
   const { showToast } = useToast();
   const textChannels = channels.filter((c) => c.type === "text");
@@ -63,8 +68,9 @@ export function Sidebar({
   return (
     <nav className="sidebar" aria-label="Channels">
       <div className="sidebar-server-name">
-        <Wordmark />
+          <Wordmark />
         <div className="sidebar-server-actions">
+          <VersionBadge version={version ?? null} onClick={() => onOpenAbout?.()} />
           <button type="button" className="server-settings-button" aria-label="Search" title="Search" onClick={onOpenSearch}><Icon name="search" size={17} /></button>
           <span className="online-dot" aria-label={`${onlineUserIds.length} members online`} />
           {(canManageServer || canModerate) ? <button type="button" className="server-settings-button" aria-label={canManageServer ? "Server settings" : "Moderation"} title={canManageServer ? "Server settings" : "Moderation"} onClick={() => setAdminOpen(true)}><Icon name="settings" size={17} /></button> : null}
