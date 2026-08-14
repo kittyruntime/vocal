@@ -581,6 +581,9 @@ textarea.form-input { resize: vertical; }
 .voice-primary { min-width: 130px; border-radius: 4px; }
 .voice-primary:hover { background: var(--brand-hover); }
 .voice-primary:disabled { opacity: .65; cursor: wait; }
+.voice-idle-actions { display: flex; align-items: center; gap: 8px; }
+.voice-idle-settings { display: inline-flex; align-items: center; gap: 7px; padding: 9px 13px; border: 1px solid var(--divider); border-radius: var(--radius-sm); background: var(--bg-panel); color: var(--text-normal); }
+.voice-idle-settings:hover { background: var(--bg-hover); }
 .connecting-dots { display: inline-flex; align-items: center; gap: 3px; margin-left: 6px; }
 .connecting-dots i { width: 4px; height: 4px; border-radius: 50%; background: currentColor; animation: connecting-dot 900ms ease-in-out infinite; }
 .connecting-dots i:nth-child(2) { animation-delay: 120ms; }
@@ -679,6 +682,9 @@ textarea.form-input { resize: vertical; }
 .settings-section-heading p { margin: 0; color: #949ba4; font-size: 13px; }
 .settings-section-heading strong { color: #f2f3f5; font-size: 13px; }
 .voice-settings { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.quality-setting { min-width: 0; display: grid; align-content: start; gap: 10px; }
+.custom-quality-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.custom-quality-fields > .form-field:only-child { grid-column: 1 / -1; }
 .voice-meter { position: relative; width: 100%; height: 10px; overflow: hidden; margin: 18px 0 12px; border-radius: 5px; background: #1e1f22; }
 .voice-meter span { display: block; height: 100%; background: #23a55a; transition: width 80ms linear; }
 .voice-meter i { position: absolute; top: 0; bottom: 0; width: 2px; background: #f0b232; }
@@ -964,6 +970,7 @@ textarea.form-input { resize: vertical; }
   .main-content { width: 100%; }
   .voice-controls { max-width: calc(100% - 16px); overflow-x: auto; justify-content: flex-start; }
   .voice-settings { grid-template-columns: 1fr; }
+  .custom-quality-fields { grid-template-columns: 1fr; }
   .admin-channel-head, .admin-quality-row { grid-template-columns: 1fr; }
   .admin-user {
     grid-template-columns: 28px 1fr;
