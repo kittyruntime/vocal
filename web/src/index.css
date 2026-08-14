@@ -934,9 +934,14 @@ textarea.form-input { resize: vertical; }
 .version-badge { margin: 8px 12px 12px; border: 0; background: transparent; color: var(--muted); font-size: 11px; cursor: pointer; text-align: left; }
 .version-badge:hover { color: var(--text); }
 .about-backdrop { position: fixed; inset: 0; z-index: 30; display: grid; place-items: center; padding: 16px; background: rgb(0 0 0 / 62%); }
-.about-modal { position: relative; width: min(680px, 100%); max-height: min(760px, 90vh); overflow: auto; padding: 28px; border: 1px solid var(--divider); border-radius: 12px; background: var(--panel); color: var(--text); box-shadow: 0 18px 60px rgb(0 0 0 / 45%); }
+.about-modal { position: relative; width: min(680px, 100%); max-height: min(760px, 90vh); overflow: auto; padding: 30px 32px 34px; border: 1px solid var(--divider); border-radius: 16px; background: var(--panel); color: var(--text); box-shadow: 0 18px 60px rgb(0 0 0 / 45%); }
 .about-modal .modal-close { position: absolute; top: 10px; right: 10px; }
-.version-meta { color: var(--muted); font-size: 13px; }
+.about-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-right: 34px; }
+.about-heading h2 { margin: 0; font-size: 26px; letter-spacing: -.02em; }
+.about-eyebrow { margin: 0 0 4px; color: var(--brand); font-size: 10px; font-weight: 700; letter-spacing: .12em; }
+.about-version { padding: 7px 11px; border: 1px solid color-mix(in srgb, var(--brand) 45%, var(--divider)); border-radius: 999px; color: var(--brand-contrast); background: var(--brand); font-size: 12px; font-weight: 700; }
+.version-meta { margin: 4px 0 22px; color: var(--muted); font-size: 12px; }
+.markdown { padding-top: 2px; border-top: 1px solid var(--divider); }
 .markdown h1, .markdown h2, .markdown h3 { margin: 22px 0 8px; }
 .markdown h1 { font-size: 22px; }.markdown h2 { font-size: 18px; }.markdown h3 { font-size: 15px; }
 .markdown p { margin: 8px 0; line-height: 1.5; }.markdown ul { padding-left: 22px; line-height: 1.5; }.markdown code { padding: 2px 4px; border-radius: 4px; background: var(--surface); }

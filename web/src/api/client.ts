@@ -88,6 +88,13 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return body as T;
 }
 
+async function requestText(path: string, init?: RequestInit): Promise<string> {
+  const res = await fetch(path, { ...init, credentials: "include" });
+  const text = await res.text();
+  if (!res.ok) throw new ApiError(res.status, text || `request failed (${res.status})`);
+  return text;
+}
+
 export function getSetupStatus(): Promise<{ done: boolean }> {
   return request("/api/setup");
 }
@@ -236,4 +243,4 @@ export function updateMyAccent(accentPreset: AccentPreset | null): Promise<{ acc
 
 export type VersionInfo = { version: string; build: string };
 export function getVersion(): Promise<VersionInfo> { return request("/api/version"); }
-export function getChangelog(): Promise<{ content: string }> { return request("/api/changelog"); }
+export function getChangelog(): Promise<string> { return requestText("/api/changelog"); }
