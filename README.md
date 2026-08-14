@@ -30,6 +30,13 @@ automatically on startup (see `server/src/db/migrate.ts`) — there is no
 separate migration command to run. The first account created via the app's
 setup screen is granted every capability.
 
+### Versioning
+
+The running version is read from the root `VERSION` file and is available at
+`/api/version`. Update that file to bump the deployed version. `CHANGELOG.md`
+is also served at `/api/changelog` and can be opened from the sidebar version
+badge in the web app.
+
 ### Tests, typecheck, build
 
 ```bash

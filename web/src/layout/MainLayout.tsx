@@ -15,6 +15,8 @@ import { Icon } from "../ui/Icon";
 import { ProfileModal } from "./ProfileModal";
 import { UserProfileModal } from "./UserProfileModal";
 import { SearchModal } from "./SearchModal";
+import { AboutModal } from "./AboutModal";
+import { VersionBadge } from "./VersionBadge";
 
 const VoiceView = lazy(() => import("../voice/VoiceView").then((module) => ({ default: module.VoiceView })));
 
@@ -27,6 +29,8 @@ export function MainLayout({ currentUser }: { currentUser: CurrentUser }) {
   const [profileOpen, setProfileOpen] = useState(false);
   const [viewedProfileId, setViewedProfileId] = useState<string | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [aboutOpen, setAboutOpen] = useState(false);
+  const [version, setVersion] = useState<api.VersionInfo | null>(null);
   const [chatSettings, setChatSettings] = useState<ChatSettings>({ maxImageSizeMb: 5, maxFileSizeMb: 10, maxMessageLength: 4000 });
   const [notificationLevels, setNotificationLevels] = useState<Record<string, "all" | "mentions" | "none">>(() => {
     try { return JSON.parse(localStorage.getItem("vocal.notification-levels") ?? "{}"); } catch { return {}; }
@@ -55,6 +59,7 @@ export function MainLayout({ currentUser }: { currentUser: CurrentUser }) {
   }, [showToast]);
 
   useEffect(() => { void api.getChatSettings().then(setChatSettings).catch(() => {}); }, []);
+  useEffect(() => { void api.getVersion().then(setVersion).catch(() => {}); }, []);
 
   useEffect(() => {
     void Promise.all([api.getSoundSettings(), api.getMySoundVolumes(), api.getMySoundSettings()])
@@ -187,6 +192,7 @@ export function MainLayout({ currentUser }: { currentUser: CurrentUser }) {
             onChannelDeleted={(channelId) => dispatch({ type: "channel/removed", channelId })}
           />
           <UserBar currentUser={currentUser} onOpenProfile={() => setProfileOpen(true)} onSignOut={signOut} />
+          <VersionBadge version={version} onClick={() => setAboutOpen(true)} />
         </aside>
         <div className="main-content">
           {selectedChannel?.type === "text" ? (
@@ -252,6 +258,7 @@ export function MainLayout({ currentUser }: { currentUser: CurrentUser }) {
         {profileOpen ? <ProfileModal currentUser={currentUser} onClose={() => setProfileOpen(false)} onSaved={refresh} /> : null}
         {viewedProfileId ? <UserProfileModal userId={viewedProfileId} onClose={() => setViewedProfileId(null)} /> : null}
         {searchOpen ? <SearchModal onClose={() => setSearchOpen(false)} onSelectChannel={selectChannel} onViewProfile={setViewedProfileId} /> : null}
+        {aboutOpen && version ? <AboutModal version={version} onClose={() => setAboutOpen(false)} /> : null}
       </div>
     </div>
   );

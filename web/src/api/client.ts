@@ -233,3 +233,7 @@ export function getMyAccent(): Promise<{ accentPreset: AccentPreset | null }> { 
 export function updateMyAccent(accentPreset: AccentPreset | null): Promise<{ accentPreset: AccentPreset | null }> {
   return request("/api/me/accent", { method: "PATCH", body: JSON.stringify({ accentPreset }) });
 }
+
+export type VersionInfo = { version: string; build: string };
+export function getVersion(): Promise<VersionInfo> { return request("/api/version"); }
+export function getChangelog(): Promise<{ content: string }> { return request("/api/changelog"); }
