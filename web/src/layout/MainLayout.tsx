@@ -73,10 +73,10 @@ export function MainLayout({ currentUser }: { currentUser: CurrentUser }) {
       onEvent(event) {
         switch (event.type) {
           case "presence.sync":
-            dispatch({ type: "presence/sync", userIds: event.userIds });
+            dispatch({ type: "presence/sync", userIds: event.userIds, users: event.users });
             break;
           case "presence.online":
-            dispatch({ type: "presence/online", userId: event.userId });
+            dispatch({ type: "presence/online", userId: event.userId, user: event.user });
             break;
           case "presence.offline":
             dispatch({ type: "presence/offline", userId: event.userId });
@@ -177,6 +177,7 @@ export function MainLayout({ currentUser }: { currentUser: CurrentUser }) {
             channels={state.channels}
             selectedChannelId={state.selectedChannelId}
             onlineUserIds={state.onlineUserIds}
+            onlineUsers={state.onlineUsers}
             voiceOccupancy={state.voiceOccupancy}
             voiceSpeakingUserIds={state.voiceSpeakingUserIds}
             unreadChannelIds={state.unreadChannelIds}

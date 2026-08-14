@@ -33,10 +33,11 @@ export type ChannelPayload = {
 };
 
 export type VoiceParticipantPayload = { userId: string; username: string; avatarUrl?: string | null; microphoneMuted?: boolean; deafened?: boolean };
+export type PresenceUserPayload = { id: string; username: string; avatarUrl: string | null };
 
 export type ServerEvent =
-  | { type: "presence.sync"; userIds: string[] }
-  | { type: "presence.online"; userId: string }
+  | { type: "presence.sync"; userIds: string[]; users?: PresenceUserPayload[] }
+  | { type: "presence.online"; userId: string; user?: PresenceUserPayload }
   | { type: "presence.offline"; userId: string }
   | { type: "message.created"; message: MessagePayload }
   | { type: "message.updated"; message: MessagePayload }

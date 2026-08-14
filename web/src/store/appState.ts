@@ -1,6 +1,6 @@
 import type { Channel, CurrentUser, Message } from "../api/client";
 import type { ConnectionStatus } from "../ws/socketClient";
-import type { VoiceParticipant } from "../ws/protocol";
+import type { PresenceUser, VoiceParticipant } from "../ws/protocol";
 
 export type AppState = {
   currentUser: CurrentUser | null;
@@ -11,6 +11,7 @@ export type AppState = {
   unreadCounts: Record<string, number>;
   mentionChannelIds: string[];
   onlineUserIds: string[];
+  onlineUsers: PresenceUser[];
   voiceOccupancy: Record<string, VoiceParticipant[]>;
   voiceSpeakingUserIds: string[];
   connectionStatus: ConnectionStatus;
@@ -25,6 +26,7 @@ export const initialAppState: AppState = {
   unreadCounts: {},
   mentionChannelIds: [],
   onlineUserIds: [],
+  onlineUsers: [],
   voiceOccupancy: {},
   voiceSpeakingUserIds: [],
   connectionStatus: "connecting",
@@ -41,8 +43,8 @@ export type AppAction =
   | { type: "message/received"; message: Message; markUnread?: boolean; mention?: boolean }
   | { type: "message/updated"; message: Message }
   | { type: "message/deleted"; channelId: string; messageId: string }
-  | { type: "presence/sync"; userIds: string[] }
-  | { type: "presence/online"; userId: string }
+  | { type: "presence/sync"; userIds: string[]; users?: PresenceUser[] }
+  | { type: "presence/online"; userId: string; user?: PresenceUser }
   | { type: "presence/offline"; userId: string }
   | { type: "voice/sync"; channels: Record<string, VoiceParticipant[]>; preserveChannelId?: string | null }
   | { type: "voice/channel-synced"; channelId: string; participants: VoiceParticipant[] }
@@ -118,13 +120,13 @@ export function appReducer(state: AppState, action: AppAction): AppState {
       return { ...state, messagesByChannel: { ...state.messagesByChannel, [action.channelId]: existing.filter((message) => message.id !== action.messageId) } };
     }
     case "presence/sync":
-      return { ...state, onlineUserIds: action.userIds };
+      return { ...state, onlineUserIds: action.userIds, onlineUsers: action.users ?? state.onlineUsers };
     case "presence/online":
       return state.onlineUserIds.includes(action.userId)
         ? state
-        : { ...state, onlineUserIds: [...state.onlineUserIds, action.userId] };
+        : { ...state, onlineUserIds: [...state.onlineUserIds, action.userId], onlineUsers: action.user ? [...state.onlineUsers, action.user] : state.onlineUsers };
     case "presence/offline":
-      return { ...state, onlineUserIds: state.onlineUserIds.filter((id) => id !== action.userId) };
+      return { ...state, onlineUserIds: state.onlineUserIds.filter((id) => id !== action.userId), onlineUsers: state.onlineUsers.filter((user) => user.id !== action.userId) };
     case "voice/sync": {
       const voiceOccupancy = { ...action.channels };
       if (action.preserveChannelId && state.voiceOccupancy[action.preserveChannelId]) {

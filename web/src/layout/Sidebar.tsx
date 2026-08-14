@@ -2,7 +2,7 @@ import { useState, type FormEvent } from "react";
 import type { Capability, Channel, CurrentUser, VersionInfo } from "../api/client";
 import * as api from "../api/client";
 import { useToast } from "../toast/ToastContext";
-import type { VoiceParticipant } from "../ws/protocol";
+import type { PresenceUser, VoiceParticipant } from "../ws/protocol";
 import { Icon } from "../ui/Icon";
 import { RadioGroup, Select, TextField } from "../ui/form";
 import { Wordmark } from "../ui/Wordmark";
@@ -21,6 +21,7 @@ export function Sidebar({
   channels,
   selectedChannelId,
   onlineUserIds,
+  onlineUsers,
   voiceOccupancy,
   voiceSpeakingUserIds,
   unreadChannelIds,
@@ -39,6 +40,7 @@ export function Sidebar({
   channels: Channel[];
   selectedChannelId: string | null;
   onlineUserIds: string[];
+  onlineUsers?: PresenceUser[];
   voiceOccupancy: Record<string, VoiceParticipant[]>;
   voiceSpeakingUserIds?: string[];
   unreadChannelIds?: string[];
@@ -102,6 +104,13 @@ export function Sidebar({
         onViewProfile={onViewProfile}
       />
       <p className="sidebar-presence"><span className="online-dot" /> {onlineUserIds.length} online</p>
+      <section className="online-members" aria-label="Online members">
+        <h2><span className="online-dot" /> Online — {onlineUserIds.length}</h2>
+        <ul>
+          {(onlineUsers ?? []).map((user) => <li key={user.id}><span className="online-member-avatar">{user.avatarUrl ? <img src={user.avatarUrl} alt="" /> : user.username.slice(0, 1).toUpperCase()}</span><span>{user.username}</span></li>)}
+          {(onlineUsers ?? []).length === 0 && <li className="online-members-empty">No names available yet</li>}
+        </ul>
+      </section>
       {canManageChannels && (
         <button type="button" className="create-channel-button" onClick={() => setCreateChannelOpen(true)}><Icon name="plus" size={16} /> Create channel</button>
       )}

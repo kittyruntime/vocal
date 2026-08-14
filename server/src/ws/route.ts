@@ -78,8 +78,8 @@ export function registerWsRoute(
     // final socket.send() below — both sends are queued back-to-back.
     const channels = await visibleVoiceOccupancy(pool, user.capabilities, voicePresence.allOccupancy());
 
-    hub.add(user.id, user.capabilities, socket);
-    socket.send(JSON.stringify({ type: "presence.sync", userIds: hub.onlineUserIds() }));
+    hub.add(user.id, user.capabilities, { id: user.id, username: user.username, avatarUrl: user.avatarUrl }, socket);
+    socket.send(JSON.stringify({ type: "presence.sync", userIds: hub.onlineUserIds(), users: hub.onlineUsers() }));
     socket.send(JSON.stringify({ type: "voice.sync", channels }));
 
     socket.on("message", async (raw: Buffer) => {

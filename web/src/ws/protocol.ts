@@ -7,10 +7,11 @@ export type VoiceParticipant = {
   microphoneMuted?: boolean;
   deafened?: boolean;
 };
+export type PresenceUser = { id: string; username: string; avatarUrl: string | null };
 
 export type ServerEvent =
-  | { type: "presence.sync"; userIds: string[] }
-  | { type: "presence.online"; userId: string }
+  | { type: "presence.sync"; userIds: string[]; users?: PresenceUser[] }
+  | { type: "presence.online"; userId: string; user?: PresenceUser }
   | { type: "presence.offline"; userId: string }
   | { type: "message.created"; message: Message }
   | { type: "message.updated"; message: Message }

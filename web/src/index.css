@@ -344,6 +344,13 @@ textarea.form-input { resize: vertical; }
 }
 .online-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #23a55a; }
 .sidebar-presence { margin: 14px 16px 8px; color: #949ba4; font-size: 12px; }
+.online-members { margin: 12px 12px 8px; padding-top: 10px; border-top: 1px solid #1f2023; }
+.online-members h2 { display: flex; align-items: center; gap: 7px; margin: 0 4px 6px; color: #949ba4; font-size: 11px; font-weight: 700; text-transform: uppercase; }
+.online-members ul { display: grid; gap: 2px; max-height: 132px; overflow-y: auto; }
+.online-members li { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 3px 4px; color: #dbdee1; font-size: 12px; }
+.online-member-avatar { width: 20px; height: 20px; display: grid; flex: 0 0 20px; place-items: center; overflow: hidden; border-radius: 50%; background: #5865f2; color: #fff; font-size: 10px; font-weight: 700; }
+.online-member-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.online-members-empty { color: #727780 !important; font-size: 11px !important; }
 
 .create-channel-button { width: calc(100% - 16px); display: flex; align-items: center; justify-content: center; gap: 7px; margin: 6px 8px 12px; padding: 9px; border: 1px solid #4e5058; border-radius: 5px; background: transparent; color: #b5bac1; cursor: pointer; font-size: 13px; font-weight: 600; }
 .create-channel-button:hover { color: #fff; }

@@ -1,5 +1,5 @@
 import type { Capability } from "../capabilities.js";
-import type { ServerEvent } from "./protocol.js";
+import type { PresenceUserPayload, ServerEvent } from "./protocol.js";
 
 export interface WsLike {
   send(data: string): void;
@@ -7,18 +7,19 @@ export interface WsLike {
 }
 
 export interface WsHub {
-  add(userId: string, capabilities: Capability[], socket: WsLike): void;
+  add(userId: string, capabilities: Capability[], user: PresenceUserPayload, socket: WsLike): void;
   remove(userId: string, socket: WsLike): void;
   updateCapabilities(userId: string, capabilities: Capability[]): void;
   broadcast(event: ServerEvent): void;
   broadcastToCapability(requiredCapability: Capability | null, event: ServerEvent): void;
   onlineUserIds(): string[];
+  onlineUsers(): PresenceUserPayload[];
   disconnect(userId: string, code: number, reason: string): void;
 }
 
 export function createHub(): WsHub {
   // userId -> { capabilities, sockets } (a user may have several tabs/devices)
-  const byUser = new Map<string, { capabilities: Capability[]; sockets: Set<WsLike> }>();
+  const byUser = new Map<string, { capabilities: Capability[]; user: PresenceUserPayload; sockets: Set<WsLike> }>();
 
   function send(socket: WsLike, event: ServerEvent): void {
     socket.send(JSON.stringify(event));
@@ -36,18 +37,18 @@ export function createHub(): WsHub {
   }
 
   return {
-    add(userId, capabilities, socket) {
+    add(userId, capabilities, user, socket) {
       let entry = byUser.get(userId);
       const wasOffline = !entry || entry.sockets.size === 0;
       if (!entry) {
-        entry = { capabilities, sockets: new Set() };
+        entry = { capabilities, user, sockets: new Set() };
         byUser.set(userId, entry);
       } else {
         entry.capabilities = capabilities;
       }
       entry.sockets.add(socket);
       if (wasOffline) {
-        broadcastExcept(socket, { type: "presence.online", userId });
+        broadcastExcept(socket, { type: "presence.online", userId, user });
       }
     },
     remove(userId, socket) {
@@ -76,6 +77,9 @@ export function createHub(): WsHub {
     },
     onlineUserIds() {
       return [...byUser.keys()];
+    },
+    onlineUsers() {
+      return [...byUser.values()].map(({ user }) => user);
     },
     disconnect(userId, code, reason) {
       const entry = byUser.get(userId);
