@@ -25,7 +25,8 @@
     "icon": "build/icon.png",
     "files": [
       "dist/**/*",
-      "web-dist/**/*"
+      "web-dist/**/*",
+      "build/**/*"
     ],
     "extraMetadata": {
       "main": "dist/main.js"

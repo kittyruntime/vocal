@@ -1,4 +1,5 @@
-import { app, BrowserWindow, ipcMain, Menu, Notification, Tray, session, desktopCapturer } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, Menu, Notification, Tray, session, desktopCapturer } from "electron";
+import { appendFileSync } from "node:fs";
 import { join } from "node:path";
 import { clearConfig, loadConfig, saveConfig, type DesktopConfig } from "./config";
 import { startStaticServer } from "./staticServer";
@@ -6,6 +7,29 @@ import { startStaticServer } from "./staticServer";
 let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let quitting = false;
+
+// A packaged GUI app has no visible console -- a startup exception a user
+// hits (as opposed to one caught locally in dev) previously just closed the
+// window with no way to tell us what happened. Logs to userData/crash.log
+// AND shows a dialog (once app.whenReady() has resolved; before that a
+// dialog can't be shown, so the log file is the only record) instead of
+// silently dying.
+function reportFatal(context: string, err: unknown): void {
+  const message = err instanceof Error ? (err.stack ?? err.message) : String(err);
+  const line = `[${new Date().toISOString()}] ${context}: ${message}\n`;
+  try {
+    appendFileSync(join(app.getPath("userData"), "crash.log"), line);
+  } catch {
+    /* best effort -- still try to surface the dialog below */
+  }
+  console.error(line);
+  if (app.isReady()) {
+    dialog.showErrorBox("Vocal failed to start", `${context}\n\n${message}`);
+  }
+}
+
+process.on("uncaughtException", (err) => reportFatal("uncaughtException", err));
+process.on("unhandledRejection", (err) => reportFatal("unhandledRejection", err));
 
 // A second launch (double-clicking the icon, or a shortcut) should focus the
 // existing window instead of opening a duplicate instance against the same
@@ -23,7 +47,7 @@ if (!gotLock) {
   });
 
   app.whenReady().then(main).catch((err) => {
-    console.error("failed to start", err);
+    reportFatal("startup", err);
     app.quit();
   });
 }
@@ -113,15 +137,23 @@ function createWindow(startUrl: string): void {
   });
 }
 
+// The tray icon is a nice-to-have (background voice calls, quick reopen) --
+// it must never be able to take the whole app down if icon loading or Tray
+// construction fails for some reason on a given machine.
 function createTray(): void {
-  tray = new Tray(trayIcon());
-  tray.setToolTip("Vocal");
-  tray.setContextMenu(Menu.buildFromTemplate([
-    { label: "Open Vocal", click: () => { mainWindow?.show(); mainWindow?.focus(); } },
-    { type: "separator" },
-    { label: "Quit", click: () => { quitting = true; app.quit(); } },
-  ]));
-  tray.on("click", () => { mainWindow?.show(); mainWindow?.focus(); });
+  try {
+    tray = new Tray(trayIcon());
+    tray.setToolTip("Vocal");
+    tray.setContextMenu(Menu.buildFromTemplate([
+      { label: "Open Vocal", click: () => { mainWindow?.show(); mainWindow?.focus(); } },
+      { type: "separator" },
+      { label: "Quit", click: () => { quitting = true; app.quit(); } },
+    ]));
+    tray.on("click", () => { mainWindow?.show(); mainWindow?.focus(); });
+  } catch (err) {
+    reportFatal("createTray (non-fatal, continuing without a tray icon)", err);
+    tray = null;
+  }
 }
 
 function trayIcon() {
