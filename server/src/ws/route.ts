@@ -1,6 +1,7 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import type pg from "pg";
-import { getSessionUser } from "../auth/sessions.js";
+import { getSessionUser, getUserById } from "../auth/sessions.js";
+import { consumeWsTicket } from "../auth/wsTickets.js";
 import type { Capability } from "../capabilities.js";
 import type { WsHub } from "./hub.js";
 import type { VoicePresence } from "../voice/presence.js";
@@ -59,18 +60,26 @@ export function registerWsRoute(
   app: FastifyInstance, pool: pg.Pool, hub: WsHub, voicePresence: VoicePresence,
 ): void {
   app.get("/ws", { websocket: true }, async (socket, req) => {
-    // An explicit ?token= (the desktop app, which authenticates the same way
-    // over Bearer for its regular API calls) carries no ambient credential, so
-    // the CSWSH origin check below -- which exists purely because a browser
-    // attaches the sid cookie to cross-origin handshakes automatically --
-    // doesn't apply to it. Only a handshake relying on the ambient cookie is checked.
-    const queryToken = typeof (req.query as { token?: unknown })?.token === "string" ? (req.query as { token: string }).token : undefined;
-    if (!queryToken && !isAllowedOrigin(req)) {
+    // An explicit ?ticket= (the desktop app, minted just-in-time via an
+    // authenticated POST /api/ws-ticket -- never the long-lived session
+    // token itself, which must never end up in a URL/query-log) carries no
+    // ambient credential, so the CSWSH origin check below -- which exists
+    // purely because a browser attaches the sid cookie to cross-origin
+    // handshakes automatically -- doesn't apply to it. Only a handshake
+    // relying on the ambient cookie is checked.
+    const ticket = typeof (req.query as { ticket?: unknown })?.ticket === "string" ? (req.query as { ticket: string }).ticket : undefined;
+    if (!ticket && !isAllowedOrigin(req)) {
       socket.close(1008, "bad origin");
       return;
     }
-    const token = queryToken ?? parseCookie(req.headers.cookie, "sid");
-    const user = token ? await getSessionUser(pool, token) : null;
+    let user: Awaited<ReturnType<typeof getSessionUser>>;
+    if (ticket) {
+      const userId = consumeWsTicket(ticket);
+      user = userId ? await getUserById(pool, userId) : null;
+    } else {
+      const token = parseCookie(req.headers.cookie, "sid");
+      user = token ? await getSessionUser(pool, token) : null;
+    }
     if (!user) {
       socket.close(1008, "unauthorized");
       return;

@@ -75,95 +75,105 @@ export function MainLayout({ currentUser }: { currentUser: CurrentUser }) {
   }, []);
 
   useEffect(() => {
-    const socket = createSocketClient(api.getWsUrl(), {
-      onEvent(event) {
-        switch (event.type) {
-          case "presence.sync":
-            dispatch({ type: "presence/sync", userIds: event.userIds, users: event.users });
-            break;
-          case "presence.online":
-            dispatch({ type: "presence/online", userId: event.userId, user: event.user });
-            break;
-          case "presence.offline":
-            dispatch({ type: "presence/offline", userId: event.userId });
-            break;
-          case "message.created": {
-            const mentioned = event.message.content.includes("@everyone") || event.message.content.toLocaleLowerCase().includes(`@${currentUser.username.toLocaleLowerCase()}`);
-            const targetId = event.message.channelId ?? event.message.conversationId!;
-            const notificationLevel = notificationLevelsRef.current[targetId] ?? "all";
-            dispatch({ type: "message/received", message: event.message, markUnread: notificationLevel === "all" || (notificationLevel === "mentions" && mentioned), mention: mentioned });
-            if (event.message.userId !== currentUser.id) playAppSound("message");
-            break;
-          }
-          case "message.updated":
-            dispatch({ type: "message/updated", message: event.message });
-            break;
-          case "message.deleted":
-            dispatch({ type: "message/deleted", channelId: event.channelId, conversationId: event.conversationId, messageId: event.messageId });
-            break;
-          case "typing.updated": {
-            if (event.userId === currentUser.id) break;
-            const targetId = event.channelId ?? event.conversationId!;
-            const key = `${targetId}:${event.userId}`;
-            const previous = typingTimersRef.current.get(key);
-            if (previous) clearTimeout(previous);
-            setTypingByChannel((value) => {
-              const channel = { ...(value[targetId] ?? {}) };
-              if (event.active) channel[event.userId] = event.username;
-              else delete channel[event.userId];
-              return { ...value, [targetId]: channel };
-            });
-            if (event.active) typingTimersRef.current.set(key, setTimeout(() => setTypingByChannel((value) => {
-              const channel = { ...(value[targetId] ?? {}) }; delete channel[event.userId]; return { ...value, [targetId]: channel };
-            }), 3500));
-            break;
-          }
-          case "channel.created":
-            dispatch({ type: "channel/added", channel: event.channel });
-            break;
-          case "channel.deleted":
-            dispatch({ type: "channel/removed", channelId: event.channelId });
-            break;
-          case "conversation.created":
-            dispatch({ type: "conversation/added", conversation: event.conversation });
-            break;
-          case "conversation.updated":
-            dispatch({ type: "conversation/updated", conversation: event.conversation });
-            break;
-          case "conversation.removed":
-            dispatch({ type: "conversation/removed", conversationId: event.conversationId });
-            break;
-          case "voice.sync":
-            dispatch({ type: "voice/sync", channels: event.channels, preserveChannelId: joinedVoiceChannelIdRef.current });
-            joinedVoiceChannelIdRef.current = Object.entries(event.channels)
-              .find(([, participants]) => participants.some((participant) => participant.userId === currentUser.id))?.[0] ?? null;
-            break;
-          case "voice.joined":
-            dispatch({ type: "voice/joined", channelId: event.channelId, participant: event.participant });
-            if (event.participant.userId === currentUser.id) {
-              joinedVoiceChannelIdRef.current = event.channelId;
-              socketRef.current?.send({ type: "voice.status", channelId: event.channelId, ...selfVoiceStatusRef.current });
-              playAppSound("userJoin");
-            } else if (joinedVoiceChannelIdRef.current === event.channelId) {
-              playAppSound("userJoin");
+    let cancelled = false;
+    let socket: ReturnType<typeof createSocketClient> | null = null;
+    void api.getWsUrl().then((url) => {
+      if (cancelled) return;
+      socket = createSocketClient(url, {
+        onEvent(event) {
+          switch (event.type) {
+            case "presence.sync":
+              dispatch({ type: "presence/sync", userIds: event.userIds, users: event.users });
+              break;
+            case "presence.online":
+              dispatch({ type: "presence/online", userId: event.userId, user: event.user });
+              break;
+            case "presence.offline":
+              dispatch({ type: "presence/offline", userId: event.userId });
+              break;
+            case "message.created": {
+              const mentioned = event.message.content.includes("@everyone") || event.message.content.toLocaleLowerCase().includes(`@${currentUser.username.toLocaleLowerCase()}`);
+              const targetId = event.message.channelId ?? event.message.conversationId!;
+              const notificationLevel = notificationLevelsRef.current[targetId] ?? "all";
+              dispatch({ type: "message/received", message: event.message, markUnread: notificationLevel === "all" || (notificationLevel === "mentions" && mentioned), mention: mentioned });
+              if (event.message.userId !== currentUser.id) playAppSound("message");
+              break;
             }
-            break;
-          case "voice.updated":
-            dispatch({ type: "voice/updated", channelId: event.channelId, participant: event.participant });
-            break;
-          case "voice.left":
-            dispatch({ type: "voice/left", channelId: event.channelId, userId: event.userId });
-            if (joinedVoiceChannelIdRef.current === event.channelId) playAppSound("userLeave");
-            if (event.userId === currentUser.id) joinedVoiceChannelIdRef.current = null;
-            break;
-        }
-      },
-      onStatusChange(status) {
-        dispatch({ type: "connection/status", status });
-      },
+            case "message.updated":
+              dispatch({ type: "message/updated", message: event.message });
+              break;
+            case "message.deleted":
+              dispatch({ type: "message/deleted", channelId: event.channelId, conversationId: event.conversationId, messageId: event.messageId });
+              break;
+            case "typing.updated": {
+              if (event.userId === currentUser.id) break;
+              const targetId = event.channelId ?? event.conversationId!;
+              const key = `${targetId}:${event.userId}`;
+              const previous = typingTimersRef.current.get(key);
+              if (previous) clearTimeout(previous);
+              setTypingByChannel((value) => {
+                const channel = { ...(value[targetId] ?? {}) };
+                if (event.active) channel[event.userId] = event.username;
+                else delete channel[event.userId];
+                return { ...value, [targetId]: channel };
+              });
+              if (event.active) typingTimersRef.current.set(key, setTimeout(() => setTypingByChannel((value) => {
+                const channel = { ...(value[targetId] ?? {}) }; delete channel[event.userId]; return { ...value, [targetId]: channel };
+              }), 3500));
+              break;
+            }
+            case "channel.created":
+              dispatch({ type: "channel/added", channel: event.channel });
+              break;
+            case "channel.deleted":
+              dispatch({ type: "channel/removed", channelId: event.channelId });
+              break;
+            case "conversation.created":
+              dispatch({ type: "conversation/added", conversation: event.conversation });
+              break;
+            case "conversation.updated":
+              dispatch({ type: "conversation/updated", conversation: event.conversation });
+              break;
+            case "conversation.removed":
+              dispatch({ type: "conversation/removed", conversationId: event.conversationId });
+              break;
+            case "voice.sync":
+              dispatch({ type: "voice/sync", channels: event.channels, preserveChannelId: joinedVoiceChannelIdRef.current });
+              joinedVoiceChannelIdRef.current = Object.entries(event.channels)
+                .find(([, participants]) => participants.some((participant) => participant.userId === currentUser.id))?.[0] ?? null;
+              break;
+            case "voice.joined":
+              dispatch({ type: "voice/joined", channelId: event.channelId, participant: event.participant });
+              if (event.participant.userId === currentUser.id) {
+                joinedVoiceChannelIdRef.current = event.channelId;
+                socketRef.current?.send({ type: "voice.status", channelId: event.channelId, ...selfVoiceStatusRef.current });
+                playAppSound("userJoin");
+              } else if (joinedVoiceChannelIdRef.current === event.channelId) {
+                playAppSound("userJoin");
+              }
+              break;
+            case "voice.updated":
+              dispatch({ type: "voice/updated", channelId: event.channelId, participant: event.participant });
+              break;
+            case "voice.left":
+              dispatch({ type: "voice/left", channelId: event.channelId, userId: event.userId });
+              if (joinedVoiceChannelIdRef.current === event.channelId) playAppSound("userLeave");
+              if (event.userId === currentUser.id) joinedVoiceChannelIdRef.current = null;
+              break;
+          }
+        },
+        onStatusChange(status) {
+          dispatch({ type: "connection/status", status });
+        },
+      });
+      socketRef.current = socket;
     });
-    socketRef.current = socket;
-    return () => { socketRef.current = null; socket.close(); for (const timer of typingTimersRef.current.values()) clearTimeout(timer); };
+    return () => {
+      cancelled = true;
+      socketRef.current = null;
+      socket?.close();
+      for (const timer of typingTimersRef.current.values()) clearTimeout(timer);
+    };
   }, []);
 
   const selectChannel = useCallback((channelId: string) => {

@@ -42,3 +42,18 @@ export async function getSessionUser(
 export async function deleteSession(pool: pg.Pool, token: string): Promise<void> {
   await pool.query("DELETE FROM sessions WHERE token_hash = $1", [hashToken(token)]);
 }
+
+// Same shape as getSessionUser, but keyed on a user id that's already been
+// authenticated by the caller (see auth/wsTickets.ts) rather than re-proving
+// identity via a session token.
+export async function getUserById(pool: pg.Pool, userId: string): Promise<SessionUser | null> {
+  const res = await pool.query(
+    `SELECT u.id, u.username, u.email, u.avatar_url AS "avatarUrl", u.banner_url AS "bannerUrl", u.description,
+       u.voice_muted AS "voiceMuted",
+       ARRAY(SELECT capability FROM user_capabilities WHERE user_id = u.id
+             UNION SELECT rc.capability FROM user_roles ur JOIN role_capabilities rc ON rc.role_id = ur.role_id WHERE ur.user_id = u.id) AS capabilities
+     FROM users u WHERE u.id = $1 AND u.banned_at IS NULL`,
+    [userId],
+  );
+  return (res.rows[0] as SessionUser | undefined) ?? null;
+}

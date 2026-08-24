@@ -4,7 +4,6 @@ import type { FastifyInstance } from "fastify";
 import { WebSocket } from "ws";
 import { makeTestDb } from "./helpers/db.js";
 import { buildApp } from "../src/app.js";
-import { createSession } from "../src/auth/sessions.js";
 import type { VoicePresence } from "../src/voice/presence.js";
 
 let pool: pg.Pool;
@@ -101,10 +100,10 @@ describe("websocket", () => {
     await closed(ws);
   });
 
-  it("accepts a ?token= handshake from a foreign origin (desktop client) since it carries no ambient credential", async () => {
-    const me = await app.inject({ method: "GET", url: "/api/me", headers: { cookie: adminCookie } });
-    const { token } = await createSession(pool, me.json().id);
-    const ws = new WebSocket(`${baseUrl}/ws?token=${token}`, { headers: { origin: "https://not-the-server.example" } });
+  it("accepts a ?ticket= handshake from a foreign origin (desktop client) since it carries no ambient credential", async () => {
+    const minted = await app.inject({ method: "POST", url: "/api/ws-ticket", headers: { cookie: adminCookie } });
+    const { ticket } = minted.json();
+    const ws = new WebSocket(`${baseUrl}/ws?ticket=${ticket}`, { headers: { origin: "https://not-the-server.example" } });
     await new Promise((r) => ws.once("open", r));
     const sync = await nextMessage(ws);
     expect(sync.type).toBe("presence.sync");
@@ -112,9 +111,22 @@ describe("websocket", () => {
     await closed(ws);
   });
 
-  it("rejects a ?token= handshake with an invalid token", async () => {
-    const ws = new WebSocket(`${baseUrl}/ws?token=not-a-real-token`);
+  it("rejects a ?ticket= handshake with an invalid ticket", async () => {
+    const ws = new WebSocket(`${baseUrl}/ws?ticket=not-a-real-ticket`);
     const code = await closed(ws);
+    expect(code).toBe(1008);
+  });
+
+  it("rejects a ?ticket= replayed a second time", async () => {
+    const minted = await app.inject({ method: "POST", url: "/api/ws-ticket", headers: { cookie: adminCookie } });
+    const { ticket } = minted.json();
+    const first = new WebSocket(`${baseUrl}/ws?ticket=${ticket}`);
+    await new Promise((r) => first.once("open", r));
+    first.close();
+    await closed(first);
+
+    const second = new WebSocket(`${baseUrl}/ws?ticket=${ticket}`);
+    const code = await closed(second);
     expect(code).toBe(1008);
   });
 

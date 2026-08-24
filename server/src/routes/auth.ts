@@ -4,6 +4,7 @@ import { z } from "zod";
 import { hashPassword, verifyPassword } from "../auth/passwords.js";
 import { createSession, deleteSession, hashToken } from "../auth/sessions.js";
 import { extractSessionToken } from "../auth/guard.js";
+import { createWsTicket } from "../auth/wsTickets.js";
 import { CAPABILITIES } from "../capabilities.js";
 
 // Precomputed once at module load so that an unknown-username login still
@@ -183,6 +184,8 @@ export function registerAuthRoutes(app: FastifyInstance, pool: pg.Pool): void {
   });
 
   app.get("/api/me", { preHandler: app.requireAuth }, async (req) => req.user);
+
+  app.post("/api/ws-ticket", { preHandler: app.requireAuth }, async (req) => ({ ticket: createWsTicket(req.user!.id) }));
 
   app.get("/api/users/:id/avatar", { preHandler: app.requireAuth }, async (req, reply) => {
     const params = userIdSchema.safeParse(req.params);

@@ -118,10 +118,16 @@ export async function connectToServer(url: string): Promise<boolean> {
   }
 }
 
-export function getWsUrl(): string {
+// The long-lived session token must never end up in a URL (proxy/access
+// logs). Token-authenticated (desktop) connections instead exchange it for a
+// single-use, 30-second ticket right before opening the socket.
+export async function getWsUrl(): Promise<string> {
   const url = new URL("/ws", document.baseURI);
   url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
-  if (authToken) url.searchParams.set("token", authToken);
+  if (authToken) {
+    const { ticket } = await request<{ ticket: string }>("/api/ws-ticket", { method: "POST" });
+    url.searchParams.set("ticket", ticket);
+  }
   return url.toString();
 }
 

@@ -128,6 +128,17 @@ describe("login / logout", () => {
     const me = await app.inject({ method: "GET", url: "/api/me", headers: { authorization: "not-a-bearer-token" } });
     expect(me.statusCode).toBe(401);
   });
+
+  it("mints a WebSocket ticket for an authenticated user, refuses an unauthenticated one", async () => {
+    const cookie = sidCookie(await app.inject({ method: "POST", url: "/api/auth/login",
+      payload: { username: "theo", password: "correct horse battery" } }));
+    const minted = await app.inject({ method: "POST", url: "/api/ws-ticket", headers: { cookie } });
+    expect(minted.statusCode).toBe(200);
+    expect(typeof minted.json().ticket).toBe("string");
+
+    const anon = await app.inject({ method: "POST", url: "/api/ws-ticket" });
+    expect(anon.statusCode).toBe(401);
+  });
 });
 
 describe("profile", () => {

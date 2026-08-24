@@ -126,13 +126,18 @@ describe("desktop server configuration", () => {
     expect(init.headers.authorization).toBe("Bearer secret-token");
   });
 
-  it("getWsUrl resolves against the configured server and carries the token", () => {
+  it("getWsUrl resolves against the configured server and exchanges the token for a one-time ticket", async () => {
     setServerBase("https://vocal.example.com");
     setAuthToken("secret-token");
-    expect(getWsUrl()).toBe("wss://vocal.example.com/ws?token=secret-token");
+    mockFetchOnce(200, { ticket: "one-shot-ticket" });
+    await expect(getWsUrl()).resolves.toBe("wss://vocal.example.com/ws?ticket=one-shot-ticket");
+    const [url, init] = (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(url).toBe("/api/ws-ticket");
+    expect(init.method).toBe("POST");
+    expect(init.headers.authorization).toBe("Bearer secret-token");
   });
 
-  it("getWsUrl falls back to the page's own origin with no server configured", () => {
-    expect(getWsUrl()).toBe(`${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.host}/ws`);
+  it("getWsUrl falls back to the page's own origin with no server configured, no ticket exchange needed", async () => {
+    await expect(getWsUrl()).resolves.toBe(`${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.host}/ws`);
   });
 });
