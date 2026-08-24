@@ -364,6 +364,8 @@ textarea.form-input { resize: vertical; }
 .create-channel-form footer { position: sticky; bottom: 0; display: flex; justify-content: flex-end; gap: 10px; margin: 0 -24px; padding: 16px 24px; background: #2b2d31; }
 .create-channel-form footer button { padding: 9px 14px; border: 0; border-radius: 4px; color: #fff; cursor: pointer; }
 .create-channel-form footer .profile-cancel { background: transparent; }
+.create-channel-form footer .danger-link { background: transparent; color: #fa777c; }
+.create-channel-form footer .danger-link:hover { background: var(--bg-hover); }
 .create-channel-form footer button:disabled { opacity: .45; cursor: default; }
 .conversation-member-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
 .conversation-member-chips li { display: flex; align-items: center; gap: 6px; padding: 4px 6px 4px 10px; border-radius: 999px; background: #2b2d31; color: #dbdee1; font-size: 13px; }
