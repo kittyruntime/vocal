@@ -3,6 +3,18 @@ import * as api from "../api/client";
 import { ApiError } from "../api/client";
 import type { CurrentUser } from "../api/client";
 import { applyServerDefaultAccent } from "../theme/accent";
+import { desktopBridge, isDesktop } from "../desktop/bridge";
+
+// Persists the session token alongside the configured server so a relaunch
+// skips straight back to signed-in. No-op on the regular web client, which
+// authenticates via the cookie these same responses also set.
+async function rememberDesktopSession(token: string): Promise<void> {
+  if (!isDesktop()) return;
+  const serverUrl = api.getServerBase();
+  if (!serverUrl) return;
+  api.setAuthToken(token);
+  await desktopBridge().setConfig({ serverUrl, token });
+}
 
 type AuthState =
   | { phase: "loading" }
@@ -51,7 +63,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const completeSetup = useCallback(
     async (username: string, password: string) => {
-      await api.setup(username, password);
+      const { token } = await api.setup(username, password);
+      await rememberDesktopSession(token);
       await refresh();
     },
     [refresh],
@@ -59,7 +72,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signIn = useCallback(
     async (username: string, password: string) => {
-      await api.login(username, password);
+      const { token } = await api.login(username, password);
+      await rememberDesktopSession(token);
       await refresh();
     },
     [refresh],
@@ -67,7 +81,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signUp = useCallback(
     async (username: string, password: string, inviteToken?: string) => {
-      await api.register(username, password, inviteToken);
+      const { token } = await api.register(username, password, inviteToken);
+      await rememberDesktopSession(token);
       // Strip a legacy invite token from the URL after account creation.
       window.history.replaceState({}, "", window.location.pathname);
       await refresh();
@@ -77,6 +92,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = useCallback(async () => {
     await api.logout();
+    if (isDesktop()) {
+      // Forget the session but keep the configured server, so a relaunch
+      // goes straight to the login screen instead of "enter a server" again.
+      const serverUrl = api.getServerBase();
+      api.setAuthToken(null);
+      if (serverUrl) await desktopBridge().setConfig({ serverUrl, token: null });
+    }
     try {
       await applyServerDefaultAccent();
     } catch {

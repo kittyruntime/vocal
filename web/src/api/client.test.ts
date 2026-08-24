@@ -1,5 +1,8 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { ApiError, getSetupStatus, login, getMe, getVoiceToken, listChannels, postMessage, register, updateProfile } from "./client";
+import {
+  ApiError, connectToServer, getServerBase, getSetupStatus, getWsUrl, login, getMe, getVoiceToken,
+  listChannels, postMessage, register, setAuthToken, setServerBase, updateProfile,
+} from "./client";
 
 function mockFetchOnce(status: number, body: unknown) {
   vi.stubGlobal(
@@ -12,7 +15,11 @@ function mockFetchOnce(status: number, body: unknown) {
   );
 }
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.unstubAllGlobals();
+  setServerBase(null);
+  setAuthToken(null);
+});
 
 describe("api client", () => {
   it("getSetupStatus parses the response body", async () => {
@@ -89,5 +96,43 @@ describe("api client", () => {
     expect(url).toBe("/api/channels/c2/voice-token");
     expect(init.method).toBe("POST");
     expect(init.headers).not.toHaveProperty("content-type");
+  });
+});
+
+describe("desktop server configuration", () => {
+  it("connectToServer commits the base on success and confirms via /api/health", async () => {
+    mockFetchOnce(200, { status: "ok" });
+    const ok = await connectToServer("https://vocal.example.com");
+    expect(ok).toBe(true);
+    expect(getServerBase()).toBe("https://vocal.example.com/");
+    const [url] = (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(url).toBe("/api/health");
+  });
+
+  it("connectToServer reverts the base when the server is unreachable", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("network down")));
+    const ok = await connectToServer("https://not-a-vocal-server.example");
+    expect(ok).toBe(false);
+    expect(getServerBase()).toBeNull();
+  });
+
+  it("sends an Authorization header instead of cookies once a token is set", async () => {
+    setServerBase("https://vocal.example.com");
+    setAuthToken("secret-token");
+    mockFetchOnce(200, { id: "u1" });
+    await getMe();
+    const [, init] = (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(init.credentials).toBe("omit");
+    expect(init.headers.authorization).toBe("Bearer secret-token");
+  });
+
+  it("getWsUrl resolves against the configured server and carries the token", () => {
+    setServerBase("https://vocal.example.com");
+    setAuthToken("secret-token");
+    expect(getWsUrl()).toBe("wss://vocal.example.com/ws?token=secret-token");
+  });
+
+  it("getWsUrl falls back to the page's own origin with no server configured", () => {
+    expect(getWsUrl()).toBe(`${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.host}/ws`);
   });
 });

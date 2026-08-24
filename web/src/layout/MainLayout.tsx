@@ -75,8 +75,7 @@ export function MainLayout({ currentUser }: { currentUser: CurrentUser }) {
   }, []);
 
   useEffect(() => {
-    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const socket = createSocketClient(`${protocol}//${window.location.host}/ws`, {
+    const socket = createSocketClient(api.getWsUrl(), {
       onEvent(event) {
         switch (event.type) {
           case "presence.sync":

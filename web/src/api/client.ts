@@ -75,13 +75,67 @@ export class ApiError extends Error {
   }
 }
 
+// Non-null only for the desktop app, which points at an arbitrary self-hosted
+// server (cross-origin) and authenticates over this Bearer token instead of
+// the same-origin cookie the web client uses by default.
+let authToken: string | null = null;
+export function setAuthToken(token: string | null): void {
+  authToken = token;
+}
+
+// Points every relative request (fetch paths below, but also plain <img>/<a>
+// URLs the app renders for avatars/attachments, which it never prefixes
+// manually) at a remote server instead of the page's own origin. No-op
+// (removes the tag) for the normal same-origin web deployment.
+export function setServerBase(url: string | null): void {
+  const existing = document.querySelector("base[data-vocal-server]");
+  if (!url) {
+    existing?.remove();
+    return;
+  }
+  const base = existing ?? document.createElement("base");
+  base.setAttribute("data-vocal-server", "");
+  base.setAttribute("href", url.endsWith("/") ? url : `${url}/`);
+  if (!existing) document.head.prepend(base);
+}
+
+export function getServerBase(): string | null {
+  return document.querySelector("base[data-vocal-server]")?.getAttribute("href") ?? null;
+}
+
+// Tries `url` as a server base, confirming it's actually a vocal server via
+// /api/health before committing. Reverts on failure so a bad URL never
+// leaves the app pointed somewhere broken.
+export async function connectToServer(url: string): Promise<boolean> {
+  const previous = document.querySelector("base[data-vocal-server]")?.getAttribute("href") ?? null;
+  setServerBase(url);
+  try {
+    await request("/api/health");
+    return true;
+  } catch {
+    setServerBase(previous);
+    return false;
+  }
+}
+
+export function getWsUrl(): string {
+  const url = new URL("/ws", document.baseURI);
+  url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
+  if (authToken) url.searchParams.set("token", authToken);
+  return url.toString();
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const hasBody = init?.body !== undefined && init.body !== null;
   const isFormData = typeof FormData !== "undefined" && init?.body instanceof FormData;
   const res = await fetch(path, {
     ...init,
-    credentials: "include",
-    headers: { ...(hasBody && !isFormData ? { "content-type": "application/json" } : {}), ...init?.headers },
+    credentials: authToken ? "omit" : "include",
+    headers: {
+      ...(hasBody && !isFormData ? { "content-type": "application/json" } : {}),
+      ...(authToken ? { authorization: `Bearer ${authToken}` } : {}),
+      ...init?.headers,
+    },
   });
   if (res.status === 204) return undefined as T;
   const body: unknown = await res.json().catch(() => ({}));
@@ -96,7 +150,11 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 async function requestText(path: string, init?: RequestInit): Promise<string> {
-  const res = await fetch(path, { ...init, credentials: "include" });
+  const res = await fetch(path, {
+    ...init,
+    credentials: authToken ? "omit" : "include",
+    headers: { ...(authToken ? { authorization: `Bearer ${authToken}` } : {}), ...init?.headers },
+  });
   const text = await res.text();
   if (!res.ok) throw new ApiError(res.status, text || `request failed (${res.status})`);
   return text;
@@ -107,15 +165,18 @@ export function getSetupStatus(): Promise<{ done: boolean }> {
 }
 export function getRegistrationStatus(): Promise<Pick<ServerSettings, "registrationOpen">> { return request("/api/registration-status"); }
 
-export function setup(username: string, password: string): Promise<{ ok: true }> {
+// `token` is only meaningful to the desktop app (see setAuthToken above) --
+// the web client authenticates via the cookie these routes also set, and
+// simply ignores the field.
+export function setup(username: string, password: string): Promise<{ ok: true; token: string }> {
   return request("/api/setup", { method: "POST", body: JSON.stringify({ username, password }) });
 }
 
-export function login(username: string, password: string): Promise<{ ok: true }> {
+export function login(username: string, password: string): Promise<{ ok: true; token: string }> {
   return request("/api/auth/login", { method: "POST", body: JSON.stringify({ username, password }) });
 }
 
-export function register(username: string, password: string, inviteToken?: string): Promise<{ ok: true }> {
+export function register(username: string, password: string, inviteToken?: string): Promise<{ ok: true; token: string }> {
   return request("/api/auth/register", {
     method: "POST",
     body: JSON.stringify({ username, password, ...(inviteToken ? { inviteToken } : {}) }),

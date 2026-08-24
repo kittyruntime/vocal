@@ -48,7 +48,7 @@ describe("AuthGate", () => {
 
   it("creates the admin account and unlocks the app", async () => {
     vi.mocked(api.getSetupStatus).mockResolvedValue({ done: false });
-    vi.mocked(api.setup).mockResolvedValue({ ok: true });
+    vi.mocked(api.setup).mockResolvedValue({ ok: true, token: "tok" });
     renderGate();
     await screen.findByText("Welcome to Vocal");
     vi.mocked(api.getSetupStatus).mockResolvedValue({ done: true });
@@ -128,7 +128,7 @@ describe("AuthGate", () => {
     window.history.replaceState({}, "", "/?invite=abc123");
     vi.mocked(api.getSetupStatus).mockResolvedValue({ done: true });
     vi.mocked(api.getMe).mockRejectedValue(new ApiError(401, "authentication required"));
-    vi.mocked(api.register).mockResolvedValue({ ok: true });
+    vi.mocked(api.register).mockResolvedValue({ ok: true, token: "tok" });
     renderGate();
     await screen.findByText("Join Vocal");
 
