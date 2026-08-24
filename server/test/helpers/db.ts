@@ -6,8 +6,8 @@ process.env.LIVEKIT_URL ??= "ws://localhost:7880";
 process.env.LIVEKIT_API_KEY ??= "devkey";
 process.env.LIVEKIT_API_SECRET ??= "secret";
 
-const ADMIN_URL = "postgres://vocal:vocal@localhost:5432/vocal";
-export const TEST_URL = "postgres://vocal:vocal@localhost:5432/vocal_test";
+const ADMIN_URL = "postgres://vocal:vocal@localhost:5433/vocal";
+export const TEST_URL = "postgres://vocal:vocal@localhost:5433/vocal_test";
 
 export async function makeTestDb(): Promise<pg.Pool> {
   const admin = new pg.Pool({ connectionString: ADMIN_URL });
