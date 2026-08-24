@@ -38,7 +38,8 @@ export type ServerSettings = ChatSettings & { registrationOpen: boolean };
 
 export type Message = {
   id: string;
-  channelId: string;
+  channelId?: string;
+  conversationId?: string;
   userId: string;
   username: string;
   avatarUrl?: string | null;
@@ -56,6 +57,12 @@ export type SearchResults = {
   messages: { id: string; channelId: string; channelName: string; username: string; content: string; filenames: string[]; createdAt: string }[];
 };
 export type Invite = { id: string; token?: string; expiresAt: string; maxUses: number; useCount: number; createdAt?: string; revokedAt?: string | null };
+
+export type ConversationParticipant = { userId: string; username: string; avatarUrl: string | null };
+export type Conversation = { id: string; type: "dm" | "group"; name: string | null; participants: ConversationParticipant[]; createdAt: string };
+
+// Identifies where a message lives: exactly one of channelId/conversationId.
+export type MessageTarget = { channelId: string; conversationId?: undefined } | { channelId?: undefined; conversationId: string };
 
 export type VoiceToken = { token: string; url: string };
 
@@ -194,34 +201,56 @@ export function setUserVoiceMuted(userId: string, muted: boolean): Promise<Admin
   return request(`/api/admin/users/${userId}/voice-mute`, { method: "PATCH", body: JSON.stringify({ muted }) });
 }
 
-export function listMessages(channelId: string, opts?: { before?: string; limit?: number }): Promise<Message[]> {
+function messagesBasePath(target: MessageTarget): string {
+  return target.conversationId ? `/api/conversations/${target.conversationId}/messages` : `/api/channels/${target.channelId}/messages`;
+}
+
+export function listMessages(target: MessageTarget, opts?: { before?: string; limit?: number }): Promise<Message[]> {
   const params = new URLSearchParams();
   if (opts?.before) params.set("before", opts.before);
   if (opts?.limit) params.set("limit", String(opts.limit));
   const qs = params.toString();
-  return request(`/api/channels/${channelId}/messages${qs ? `?${qs}` : ""}`);
+  return request(`${messagesBasePath(target)}${qs ? `?${qs}` : ""}`);
 }
 
-export function postMessage(channelId: string, content: string, files: File[] = [], replyToMessageId?: string): Promise<Message> {
-  if (files.length === 0) return request(`/api/channels/${channelId}/messages`, { method: "POST", body: JSON.stringify({ content, replyToMessageId }) });
+export function postMessage(target: MessageTarget, content: string, files: File[] = [], replyToMessageId?: string): Promise<Message> {
+  const base = messagesBasePath(target);
+  if (files.length === 0) return request(base, { method: "POST", body: JSON.stringify({ content, replyToMessageId }) });
   const body = new FormData();
   body.set("content", content);
   if (replyToMessageId) body.set("replyToMessageId", replyToMessageId);
   for (const file of files) body.append("files", file, file.name);
-  return request(`/api/channels/${channelId}/messages`, { method: "POST", body });
+  return request(base, { method: "POST", body });
 }
 
-export function updateMessage(channelId: string, messageId: string, content: string): Promise<Message> {
-  return request(`/api/channels/${channelId}/messages/${messageId}`, { method: "PATCH", body: JSON.stringify({ content }) });
+export function updateMessage(target: MessageTarget, messageId: string, content: string): Promise<Message> {
+  return request(`${messagesBasePath(target)}/${messageId}`, { method: "PATCH", body: JSON.stringify({ content }) });
 }
-export function deleteMessage(channelId: string, messageId: string): Promise<void> {
-  return request(`/api/channels/${channelId}/messages/${messageId}`, { method: "DELETE" });
+export function deleteMessage(target: MessageTarget, messageId: string): Promise<void> {
+  return request(`${messagesBasePath(target)}/${messageId}`, { method: "DELETE" });
 }
-export function addMessageReaction(channelId: string, messageId: string, emoji: string): Promise<Message> {
-  return request(`/api/channels/${channelId}/messages/${messageId}/reactions`, { method: "PUT", body: JSON.stringify({ emoji }) });
+export function addMessageReaction(target: MessageTarget, messageId: string, emoji: string): Promise<Message> {
+  return request(`${messagesBasePath(target)}/${messageId}/reactions`, { method: "PUT", body: JSON.stringify({ emoji }) });
 }
-export function removeMessageReaction(channelId: string, messageId: string, emoji: string): Promise<Message> {
-  return request(`/api/channels/${channelId}/messages/${messageId}/reactions`, { method: "DELETE", body: JSON.stringify({ emoji }) });
+export function removeMessageReaction(target: MessageTarget, messageId: string, emoji: string): Promise<Message> {
+  return request(`${messagesBasePath(target)}/${messageId}/reactions`, { method: "DELETE", body: JSON.stringify({ emoji }) });
+}
+
+export function listConversations(): Promise<Conversation[]> { return request("/api/conversations"); }
+export function createDirectMessage(userId: string): Promise<Conversation> {
+  return request("/api/conversations", { method: "POST", body: JSON.stringify({ type: "dm", userId }) });
+}
+export function createGroupConversation(participantIds: string[], name?: string): Promise<Conversation> {
+  return request("/api/conversations", { method: "POST", body: JSON.stringify({ type: "group", participantIds, name }) });
+}
+export function renameConversation(conversationId: string, name: string): Promise<Conversation> {
+  return request(`/api/conversations/${conversationId}`, { method: "PATCH", body: JSON.stringify({ name }) });
+}
+export function addConversationParticipant(conversationId: string, userId: string): Promise<Conversation> {
+  return request(`/api/conversations/${conversationId}/participants`, { method: "POST", body: JSON.stringify({ userId }) });
+}
+export function removeConversationParticipant(conversationId: string, userId: string): Promise<void> {
+  return request(`/api/conversations/${conversationId}/participants/${userId}`, { method: "DELETE" });
 }
 
 export function getVoiceToken(channelId: string): Promise<VoiceToken> {

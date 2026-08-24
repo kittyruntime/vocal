@@ -12,6 +12,7 @@ import {
   LogOut,
   Maximize2,
   Menu,
+  MessageCircle,
   MessageSquareReply,
   Mic,
   MicOff,
@@ -28,6 +29,8 @@ import {
   Trash2,
   Volume2,
   Upload,
+  UserPlus,
+  UserMinus,
   Users,
   X,
   type LucideIcon,
@@ -47,6 +50,7 @@ type IconName =
   | "logout"
   | "maximize"
   | "menu"
+  | "message"
   | "reply"
   | "microphone"
   | "microphoneOff"
@@ -63,6 +67,8 @@ type IconName =
   | "trash"
   | "volume"
   | "upload"
+  | "userPlus"
+  | "userMinus"
   | "users"
   | "close";
 
@@ -80,6 +86,7 @@ const icons: Record<IconName, LucideIcon> = {
   logout: LogOut,
   maximize: Maximize2,
   menu: Menu,
+  message: MessageCircle,
   reply: MessageSquareReply,
   microphone: Mic,
   microphoneOff: MicOff,
@@ -96,6 +103,8 @@ const icons: Record<IconName, LucideIcon> = {
   trash: Trash2,
   volume: Volume2,
   upload: Upload,
+  userPlus: UserPlus,
+  userMinus: UserMinus,
   users: Users,
   close: X,
 };

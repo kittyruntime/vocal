@@ -50,7 +50,7 @@ describe("ChatView", () => {
         msg("3", "c", "2026-01-01T00:00:03Z"),
       ]),
     );
-    expect(api.listMessages).toHaveBeenCalledWith("c1", { limit: 50 });
+    expect(api.listMessages).toHaveBeenCalledWith({ channelId: "c1" }, { limit: 50 });
   });
 
   it("scrolls to the bottom once the initial history for a channel loads", async () => {
@@ -116,7 +116,7 @@ describe("ChatView", () => {
 
     log.dispatchEvent(new Event("scroll", { bubbles: true }));
     await waitFor(() => expect(onPrepended).toHaveBeenCalled());
-    expect(api.listMessages).toHaveBeenLastCalledWith("c1", { before: "2026-01-01T00:00:01Z", limit: 50 });
+    expect(api.listMessages).toHaveBeenLastCalledWith({ channelId: "c1" }, { before: "2026-01-01T00:00:01Z", limit: 50 });
 
     // The DOM grows taller once older messages are added, before scroll gets restored.
     Object.defineProperty(log, "scrollHeight", { value: 700, configurable: true });
@@ -172,7 +172,7 @@ describe("ChatView", () => {
     const input = screen.getByLabelText("Message in général");
     await user.type(input, "salut");
     await user.click(screen.getByRole("button", { name: "Send" }));
-    await waitFor(() => expect(api.postMessage).toHaveBeenCalledWith("c1", "salut"));
+    await waitFor(() => expect(api.postMessage).toHaveBeenCalledWith({ channelId: "c1" }, "salut"));
     expect(input).toHaveValue("");
     expect(input).toHaveFocus();
   });
@@ -186,7 +186,7 @@ describe("ChatView", () => {
     expect(screen.getByText(/Replying to/)).toBeInTheDocument();
     await user.type(screen.getByLabelText("Message in général"), "answer");
     await user.click(screen.getByRole("button", { name: "Send" }));
-    await waitFor(() => expect(api.postMessage).toHaveBeenCalledWith("c1", "answer", [], "1"));
+    await waitFor(() => expect(api.postMessage).toHaveBeenCalledWith({ channelId: "c1" }, "answer", [], "1"));
   });
 
   it("inserts an emote in the composer and keeps keyboard focus", async () => {
@@ -211,7 +211,7 @@ describe("ChatView", () => {
     await user.upload(screen.getByLabelText("Attach files").parentElement!.querySelector('input[type="file"]')!, file);
     expect(screen.getByText("notes.txt")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Send" }));
-    await waitFor(() => expect(api.postMessage).toHaveBeenCalledWith("c1", "", [file]));
+    await waitFor(() => expect(api.postMessage).toHaveBeenCalledWith({ channelId: "c1" }, "", [file]));
   });
 
   it("adds dropped files to the pending message", async () => {
@@ -271,7 +271,7 @@ describe("ChatView", () => {
     Object.defineProperty(container, "scrollTop", { value: 10, configurable: true });
     container.dispatchEvent(new Event("scroll", { bubbles: true }));
     await waitFor(() => expect(onPrepended).toHaveBeenCalledWith([msg("0", "plus vieux", "2025-12-31T00:00:00Z")]));
-    expect(api.listMessages).toHaveBeenLastCalledWith("c1", { before: "2026-01-01T00:00:01Z", limit: 50 });
+    expect(api.listMessages).toHaveBeenLastCalledWith({ channelId: "c1" }, { before: "2026-01-01T00:00:01Z", limit: 50 });
   });
 
   it("stops loading older history once the loaded cap is reached, without discarding anything", async () => {
@@ -319,7 +319,7 @@ describe("ChatView", () => {
     await user.clear(editInput);
     await user.type(editInput, "updated text");
     await user.click(screen.getByRole("button", { name: "Save" }));
-    await waitFor(() => expect(api.updateMessage).toHaveBeenCalledWith("c1", "1", "updated text"));
+    await waitFor(() => expect(api.updateMessage).toHaveBeenCalledWith({ channelId: "c1" }, "1", "updated text"));
   });
 
   it("does not trim messages while the user is scrolled up reading history", async () => {

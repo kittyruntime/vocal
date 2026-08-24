@@ -5,7 +5,7 @@ import { appReducer, initialAppState } from "../store/appState";
 import { createSocketClient } from "../ws/socketClient";
 import { useAuth } from "../auth/AuthContext";
 import { useToast } from "../toast/ToastContext";
-import { Sidebar } from "./Sidebar";
+import { Sidebar, conversationDisplayName } from "./Sidebar";
 import { ChatView } from "./ChatView";
 import { UserBar } from "./UserBar";
 import { ConnectionBanner } from "./ConnectionBanner";
@@ -57,6 +57,13 @@ export function MainLayout({ currentUser }: { currentUser: CurrentUser }) {
       .catch(() => showToast("Could not load channels"));
   }, [showToast]);
 
+  useEffect(() => {
+    api
+      .listConversations()
+      .then((conversations) => dispatch({ type: "conversations/set", conversations }))
+      .catch(() => showToast("Could not load direct messages"));
+  }, [showToast]);
+
   useEffect(() => { void api.getChatSettings().then(setChatSettings).catch(() => {}); }, []);
   useEffect(() => { void api.getVersion().then(setVersion).catch(() => {}); }, []);
 
@@ -81,31 +88,34 @@ export function MainLayout({ currentUser }: { currentUser: CurrentUser }) {
           case "presence.offline":
             dispatch({ type: "presence/offline", userId: event.userId });
             break;
-          case "message.created":
+          case "message.created": {
             const mentioned = event.message.content.includes("@everyone") || event.message.content.toLocaleLowerCase().includes(`@${currentUser.username.toLocaleLowerCase()}`);
-            const notificationLevel = notificationLevelsRef.current[event.message.channelId] ?? "all";
+            const targetId = event.message.channelId ?? event.message.conversationId!;
+            const notificationLevel = notificationLevelsRef.current[targetId] ?? "all";
             dispatch({ type: "message/received", message: event.message, markUnread: notificationLevel === "all" || (notificationLevel === "mentions" && mentioned), mention: mentioned });
             if (event.message.userId !== currentUser.id) playAppSound("message");
             break;
+          }
           case "message.updated":
             dispatch({ type: "message/updated", message: event.message });
             break;
           case "message.deleted":
-            dispatch({ type: "message/deleted", channelId: event.channelId, messageId: event.messageId });
+            dispatch({ type: "message/deleted", channelId: event.channelId, conversationId: event.conversationId, messageId: event.messageId });
             break;
           case "typing.updated": {
             if (event.userId === currentUser.id) break;
-            const key = `${event.channelId}:${event.userId}`;
+            const targetId = event.channelId ?? event.conversationId!;
+            const key = `${targetId}:${event.userId}`;
             const previous = typingTimersRef.current.get(key);
             if (previous) clearTimeout(previous);
             setTypingByChannel((value) => {
-              const channel = { ...(value[event.channelId] ?? {}) };
+              const channel = { ...(value[targetId] ?? {}) };
               if (event.active) channel[event.userId] = event.username;
               else delete channel[event.userId];
-              return { ...value, [event.channelId]: channel };
+              return { ...value, [targetId]: channel };
             });
             if (event.active) typingTimersRef.current.set(key, setTimeout(() => setTypingByChannel((value) => {
-              const channel = { ...(value[event.channelId] ?? {}) }; delete channel[event.userId]; return { ...value, [event.channelId]: channel };
+              const channel = { ...(value[targetId] ?? {}) }; delete channel[event.userId]; return { ...value, [targetId]: channel };
             }), 3500));
             break;
           }
@@ -114,6 +124,15 @@ export function MainLayout({ currentUser }: { currentUser: CurrentUser }) {
             break;
           case "channel.deleted":
             dispatch({ type: "channel/removed", channelId: event.channelId });
+            break;
+          case "conversation.created":
+            dispatch({ type: "conversation/added", conversation: event.conversation });
+            break;
+          case "conversation.updated":
+            dispatch({ type: "conversation/updated", conversation: event.conversation });
+            break;
+          case "conversation.removed":
+            dispatch({ type: "conversation/removed", conversationId: event.conversationId });
             break;
           case "voice.sync":
             dispatch({ type: "voice/sync", channels: event.channels, preserveChannelId: joinedVoiceChannelIdRef.current });
@@ -153,6 +172,11 @@ export function MainLayout({ currentUser }: { currentUser: CurrentUser }) {
     setMobileSidebarOpen(false);
   }, []);
 
+  const selectConversation = useCallback((conversationId: string) => {
+    dispatch({ type: "conversation/selected", conversationId });
+    setMobileSidebarOpen(false);
+  }, []);
+
   const reportSelfVoiceStatus = useCallback((channelId: string, status: { microphoneMuted: boolean; deafened: boolean }) => {
     selfVoiceStatusRef.current = status;
     socketRef.current?.send({ type: "voice.status", channelId, ...status });
@@ -160,6 +184,15 @@ export function MainLayout({ currentUser }: { currentUser: CurrentUser }) {
 
   const selectedChannel = state.channels.find((c) => c.id === state.selectedChannelId) ?? null;
   const voiceChannel = selectedChannel?.type === "voice" ? selectedChannel : retainedVoiceChannel;
+  const selectedConversation = state.conversations.find((c) => c.id === state.selectedConversationId) ?? null;
+  const conversationAsChannel = selectedConversation ? {
+    id: selectedConversation.id,
+    name: conversationDisplayName(selectedConversation, currentUser.id),
+    type: "text" as const,
+    requiredCapability: null,
+    position: 0,
+    createdAt: selectedConversation.createdAt,
+  } : null;
 
   useEffect(() => {
     if (selectedChannel?.type === "voice") setRetainedVoiceChannel(selectedChannel);
@@ -192,12 +225,21 @@ export function MainLayout({ currentUser }: { currentUser: CurrentUser }) {
             onChannelCreated={(channel) => dispatch({ type: "channel/added", channel })}
             onChannelUpdated={(channel) => dispatch({ type: "channel/updated", channel })}
             onChannelDeleted={(channelId) => dispatch({ type: "channel/removed", channelId })}
+            conversations={state.conversations}
+            selectedConversationId={state.selectedConversationId}
+            unreadConversationIds={state.unreadConversationIds}
+            unreadConversationCounts={state.unreadConversationCounts}
+            onSelectConversation={selectConversation}
+            onConversationCreated={(conversation) => { dispatch({ type: "conversation/added", conversation }); selectConversation(conversation.id); }}
+            onConversationUpdated={(conversation) => dispatch({ type: "conversation/updated", conversation })}
+            onConversationRemoved={(conversationId) => dispatch({ type: "conversation/removed", conversationId })}
           />
           <UserBar currentUser={currentUser} onOpenProfile={() => setProfileOpen(true)} onSignOut={signOut} />
         </aside>
         <div className="main-content">
           {selectedChannel?.type === "text" ? (
             <ChatView
+              key={selectedChannel.id}
               channel={selectedChannel}
               maxMessageLength={chatSettings.maxMessageLength}
               messages={state.messagesByChannel[selectedChannel.id] ?? []}
@@ -216,6 +258,25 @@ export function MainLayout({ currentUser }: { currentUser: CurrentUser }) {
               onNotificationLevelChange={(level) => setNotificationLevels((value) => {
                 const next = { ...value, [selectedChannel.id]: level }; notificationLevelsRef.current = next; localStorage.setItem("vocal.notification-levels", JSON.stringify(next)); return next;
               })}
+            />
+          ) : conversationAsChannel ? (
+            <ChatView
+              key={conversationAsChannel.id}
+              channel={conversationAsChannel}
+              isConversation
+              maxMessageLength={chatSettings.maxMessageLength}
+              messages={state.messagesByConversation[conversationAsChannel.id] ?? []}
+              onMessagesLoaded={(messages) =>
+                dispatch({ type: "conversation-messages/loaded", conversationId: conversationAsChannel.id, messages })
+              }
+              onMessagesPrepended={(messages) =>
+                dispatch({ type: "conversation-messages/prepended", conversationId: conversationAsChannel.id, messages })
+              }
+              onOpenSidebar={() => setMobileSidebarOpen(true)}
+              onViewProfile={setViewedProfileId}
+              currentUser={currentUser}
+              typingUsernames={Object.values(typingByChannel[conversationAsChannel.id] ?? {})}
+              onTypingChange={(active) => socketRef.current?.send({ type: "typing.update", conversationId: conversationAsChannel.id, active })}
             />
           ) : selectedChannel?.type !== "voice" ? (
             <div className="no-channel">

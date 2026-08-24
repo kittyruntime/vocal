@@ -67,14 +67,14 @@ describe("api client", () => {
     mockFetchOnce(201, {
       id: "m1", channelId: "c1", userId: "u1", username: "theo", content: "hi", createdAt: "now",
     });
-    const msg = await postMessage("c1", "hi");
+    const msg = await postMessage({ channelId: "c1" }, "hi");
     expect(msg.content).toBe("hi");
   });
 
   it("posts files as multipart data without forcing a JSON content type", async () => {
     mockFetchOnce(201, { id: "m1", content: "photo", attachments: [] });
     const file = new File(["image"], "photo.png", { type: "image/png" });
-    await postMessage("c1", "photo", [file]);
+    await postMessage({ channelId: "c1" }, "photo", [file]);
     const [, init] = (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls[0];
     expect(init.body).toBeInstanceOf(FormData);
     expect((init.body as FormData).get("content")).toBe("photo");

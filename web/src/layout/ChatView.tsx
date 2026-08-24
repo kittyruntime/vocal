@@ -34,6 +34,7 @@ const MAX_LOADED_MESSAGES = 300;
 
 export function ChatView({
   channel,
+  isConversation = false,
   maxMessageLength = 4000,
   messages,
   onMessagesLoaded,
@@ -47,6 +48,11 @@ export function ChatView({
   onNotificationLevelChange,
 }: {
   channel: Channel;
+  // When true, `channel` is a synthetic stand-in (id = conversation id, name
+  // = display name) for a direct-message/group conversation rather than a
+  // real server channel -- routes messages through /api/conversations/:id
+  // instead of /api/channels/:id and swaps a few channel-specific labels.
+  isConversation?: boolean;
   maxMessageLength?: number;
   messages: Message[];
   onMessagesLoaded(messages: Message[]): void;
@@ -59,6 +65,7 @@ export function ChatView({
   notificationLevel?: "all" | "mentions" | "none";
   onNotificationLevelChange?(level: "all" | "mentions" | "none"): void;
 }) {
+  const target: api.MessageTarget = isConversation ? { conversationId: channel.id } : { channelId: channel.id };
   const { showToast } = useToast();
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
@@ -89,7 +96,7 @@ export function ChatView({
     pendingScrollActionRef.current = "load";
     (async () => {
       try {
-        const page = await api.listMessages(channel.id, { limit: PAGE_SIZE });
+        const page = await api.listMessages(target, { limit: PAGE_SIZE });
         if (cancelled) return;
         onMessagesLoaded([...page].reverse());
         setHasMore(page.length >= PAGE_SIZE);
@@ -184,7 +191,7 @@ export function ChatView({
     }
     pendingScrollActionRef.current = "prepend";
     try {
-      const page = await api.listMessages(channel.id, { before: messages[0].createdAt, limit: PAGE_SIZE });
+      const page = await api.listMessages(target, { before: messages[0].createdAt, limit: PAGE_SIZE });
       onMessagesPrepended([...page].reverse());
       setHasMore(page.length >= PAGE_SIZE);
     } catch {
@@ -246,10 +253,10 @@ export function ChatView({
     setSending(true);
     try {
       await (replyTo
-        ? api.postMessage(channel.id, content, files, replyTo.id)
+        ? api.postMessage(target, content, files, replyTo.id)
         : files.length > 0
-          ? api.postMessage(channel.id, content, files)
-          : api.postMessage(channel.id, content));
+          ? api.postMessage(target, content, files)
+          : api.postMessage(target, content));
       setDraft("");
       setFiles([]);
       setReplyTo(null);
@@ -266,21 +273,21 @@ export function ChatView({
     const content = editDraft.trim();
     if (!content) return;
     try {
-      await api.updateMessage(channel.id, messageId, content);
+      await api.updateMessage(target, messageId, content);
       setEditingId(null);
     } catch { showToast("The message could not be edited"); }
   }
 
   async function removeMessage(message: Message) {
     if (!window.confirm("Delete this message?")) return;
-    try { await api.deleteMessage(channel.id, message.id); }
+    try { await api.deleteMessage(target, message.id); }
     catch { showToast("The message could not be deleted"); }
   }
 
   async function toggleReaction(message: Message, emoji: string) {
     try {
       const active = message.reactions?.find((reaction) => reaction.emoji === emoji)?.userIds.includes(currentUser?.id ?? "") ?? false;
-      await (active ? api.removeMessageReaction(channel.id, message.id, emoji) : api.addMessageReaction(channel.id, message.id, emoji));
+      await (active ? api.removeMessageReaction(target, message.id, emoji) : api.addMessageReaction(target, message.id, emoji));
     } catch { showToast("The reaction could not be updated"); }
   }
 
@@ -310,7 +317,7 @@ export function ChatView({
         <button type="button" className="mobile-menu-button" aria-label="Open channel list" onClick={() => onOpenSidebar?.()}>
           <Icon name="menu" size={20} />
         </button>
-        <span className="header-channel-icon"><Icon name="hash" size={22} /></span> {channel.name}
+        <span className="header-channel-icon"><Icon name={isConversation ? "message" : "hash"} size={22} /></span> {channel.name}
         <button type="button" className="chat-notification-button" aria-label={`Notifications: ${notificationLevel}`} title={`Notifications: ${notificationLevel}`} onClick={() => onNotificationLevelChange?.(notificationLevel === "all" ? "mentions" : notificationLevel === "mentions" ? "none" : "all")}><Icon name={notificationLevel === "all" ? "bellRing" : notificationLevel === "mentions" ? "bell" : "bellOff"} size={18} /></button>
       </header>
       <div
@@ -322,9 +329,9 @@ export function ChatView({
       >
         {messages.length === 0 && (
           <div className="chat-empty">
-            <div className="chat-empty-icon"><Icon name="hash" size={38} /></div>
-            <h1>Welcome to #{channel.name}</h1>
-            <p>This is the beginning of this channel.</p>
+            <div className="chat-empty-icon"><Icon name={isConversation ? "message" : "hash"} size={38} /></div>
+            <h1>{isConversation ? channel.name : `Welcome to #${channel.name}`}</h1>
+            <p>{isConversation ? "This is the beginning of your conversation." : "This is the beginning of this channel."}</p>
           </div>
         )}
         {messages.map((message) => (
@@ -371,7 +378,7 @@ export function ChatView({
             ref={composerInputRef}
             label={`Message in ${channel.name}`}
             visuallyHiddenLabel
-            placeholder={`Send a message in #${channel.name}`}
+            placeholder={isConversation ? `Message ${channel.name}` : `Send a message in #${channel.name}`}
             value={draft}
             maxLength={maxMessageLength}
             onChange={(e) => updateDraft(e.target.value)}

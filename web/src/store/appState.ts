@@ -1,4 +1,4 @@
-import type { Channel, CurrentUser, Message } from "../api/client";
+import type { Channel, Conversation, CurrentUser, Message } from "../api/client";
 import type { ConnectionStatus } from "../ws/socketClient";
 import type { PresenceUser, VoiceParticipant } from "../ws/protocol";
 
@@ -10,6 +10,11 @@ export type AppState = {
   unreadChannelIds: string[];
   unreadCounts: Record<string, number>;
   mentionChannelIds: string[];
+  conversations: Conversation[];
+  selectedConversationId: string | null;
+  messagesByConversation: Record<string, Message[]>;
+  unreadConversationIds: string[];
+  unreadConversationCounts: Record<string, number>;
   onlineUserIds: string[];
   onlineUsers: PresenceUser[];
   voiceOccupancy: Record<string, VoiceParticipant[]>;
@@ -25,6 +30,11 @@ export const initialAppState: AppState = {
   unreadChannelIds: [],
   unreadCounts: {},
   mentionChannelIds: [],
+  conversations: [],
+  selectedConversationId: null,
+  messagesByConversation: {},
+  unreadConversationIds: [],
+  unreadConversationCounts: {},
   onlineUserIds: [],
   onlineUsers: [],
   voiceOccupancy: {},
@@ -42,7 +52,14 @@ export type AppAction =
   | { type: "messages/prepended"; channelId: string; messages: Message[] }
   | { type: "message/received"; message: Message; markUnread?: boolean; mention?: boolean }
   | { type: "message/updated"; message: Message }
-  | { type: "message/deleted"; channelId: string; messageId: string }
+  | { type: "message/deleted"; channelId?: string; conversationId?: string; messageId: string }
+  | { type: "conversations/set"; conversations: Conversation[] }
+  | { type: "conversation/added"; conversation: Conversation }
+  | { type: "conversation/updated"; conversation: Conversation }
+  | { type: "conversation/removed"; conversationId: string }
+  | { type: "conversation/selected"; conversationId: string }
+  | { type: "conversation-messages/loaded"; conversationId: string; messages: Message[] }
+  | { type: "conversation-messages/prepended"; conversationId: string; messages: Message[] }
   | { type: "presence/sync"; userIds: string[]; users?: PresenceUser[] }
   | { type: "presence/online"; userId: string; user?: PresenceUser }
   | { type: "presence/offline"; userId: string }
@@ -81,6 +98,7 @@ export function appReducer(state: AppState, action: AppAction): AppState {
       return {
         ...state,
         selectedChannelId: action.channelId,
+        selectedConversationId: null,
         unreadChannelIds: state.unreadChannelIds.filter((id) => id !== action.channelId),
         unreadCounts,
         mentionChannelIds: state.mentionChannelIds.filter((id) => id !== action.channelId),
@@ -98,26 +116,89 @@ export function appReducer(state: AppState, action: AppAction): AppState {
       };
     }
     case "message/received": {
-      const { channelId } = action.message;
-      const existing = state.messagesByChannel[channelId] ?? [];
+      const { channelId, conversationId } = action.message;
+      if (conversationId) {
+        const existing = state.messagesByConversation[conversationId] ?? [];
+        const shouldMarkUnread = action.markUnread !== false && action.message.userId !== state.currentUser?.id && conversationId !== state.selectedConversationId;
+        return {
+          ...state,
+          messagesByConversation: { ...state.messagesByConversation, [conversationId]: [...existing, action.message] },
+          unreadConversationIds: shouldMarkUnread && !state.unreadConversationIds.includes(conversationId)
+            ? [...state.unreadConversationIds, conversationId]
+            : state.unreadConversationIds,
+          unreadConversationCounts: shouldMarkUnread ? { ...state.unreadConversationCounts, [conversationId]: (state.unreadConversationCounts[conversationId] ?? 0) + 1 } : state.unreadConversationCounts,
+        };
+      }
+      const existing = state.messagesByChannel[channelId!] ?? [];
       const shouldMarkUnread = action.markUnread !== false && action.message.userId !== state.currentUser?.id && channelId !== state.selectedChannelId;
       return {
         ...state,
-        messagesByChannel: { ...state.messagesByChannel, [channelId]: [...existing, action.message] },
-        unreadChannelIds: shouldMarkUnread && !state.unreadChannelIds.includes(channelId)
-          ? [...state.unreadChannelIds, channelId]
+        messagesByChannel: { ...state.messagesByChannel, [channelId!]: [...existing, action.message] },
+        unreadChannelIds: shouldMarkUnread && !state.unreadChannelIds.includes(channelId!)
+          ? [...state.unreadChannelIds, channelId!]
           : state.unreadChannelIds,
-        unreadCounts: shouldMarkUnread ? { ...state.unreadCounts, [channelId]: (state.unreadCounts[channelId] ?? 0) + 1 } : state.unreadCounts,
-        mentionChannelIds: shouldMarkUnread && action.mention && !state.mentionChannelIds.includes(channelId) ? [...state.mentionChannelIds, channelId] : state.mentionChannelIds,
+        unreadCounts: shouldMarkUnread ? { ...state.unreadCounts, [channelId!]: (state.unreadCounts[channelId!] ?? 0) + 1 } : state.unreadCounts,
+        mentionChannelIds: shouldMarkUnread && action.mention && !state.mentionChannelIds.includes(channelId!) ? [...state.mentionChannelIds, channelId!] : state.mentionChannelIds,
       };
     }
     case "message/updated": {
-      const existing = state.messagesByChannel[action.message.channelId] ?? [];
-      return { ...state, messagesByChannel: { ...state.messagesByChannel, [action.message.channelId]: existing.map((message) => message.id === action.message.id ? action.message : message) } };
+      const { channelId, conversationId } = action.message;
+      if (conversationId) {
+        const existing = state.messagesByConversation[conversationId] ?? [];
+        return { ...state, messagesByConversation: { ...state.messagesByConversation, [conversationId]: existing.map((message) => message.id === action.message.id ? action.message : message) } };
+      }
+      const existing = state.messagesByChannel[channelId!] ?? [];
+      return { ...state, messagesByChannel: { ...state.messagesByChannel, [channelId!]: existing.map((message) => message.id === action.message.id ? action.message : message) } };
     }
     case "message/deleted": {
-      const existing = state.messagesByChannel[action.channelId] ?? [];
-      return { ...state, messagesByChannel: { ...state.messagesByChannel, [action.channelId]: existing.filter((message) => message.id !== action.messageId) } };
+      if (action.conversationId) {
+        const existing = state.messagesByConversation[action.conversationId] ?? [];
+        return { ...state, messagesByConversation: { ...state.messagesByConversation, [action.conversationId]: existing.filter((message) => message.id !== action.messageId) } };
+      }
+      const existing = state.messagesByChannel[action.channelId!] ?? [];
+      return { ...state, messagesByChannel: { ...state.messagesByChannel, [action.channelId!]: existing.filter((message) => message.id !== action.messageId) } };
+    }
+    case "conversations/set":
+      return { ...state, conversations: action.conversations };
+    case "conversation/added":
+      return state.conversations.some((c) => c.id === action.conversation.id)
+        ? state
+        : { ...state, conversations: [action.conversation, ...state.conversations] };
+    case "conversation/updated":
+      return {
+        ...state,
+        conversations: state.conversations.some((c) => c.id === action.conversation.id)
+          ? state.conversations.map((c) => c.id === action.conversation.id ? action.conversation : c)
+          : [action.conversation, ...state.conversations],
+      };
+    case "conversation/removed": {
+      const conversations = state.conversations.filter((c) => c.id !== action.conversationId);
+      const messagesByConversation = { ...state.messagesByConversation };
+      delete messagesByConversation[action.conversationId];
+      return {
+        ...state,
+        conversations,
+        selectedConversationId: state.selectedConversationId === action.conversationId ? null : state.selectedConversationId,
+        messagesByConversation,
+        unreadConversationIds: state.unreadConversationIds.filter((id) => id !== action.conversationId),
+      };
+    }
+    case "conversation/selected": {
+      const unreadConversationCounts = { ...state.unreadConversationCounts };
+      delete unreadConversationCounts[action.conversationId];
+      return {
+        ...state,
+        selectedConversationId: action.conversationId,
+        selectedChannelId: null,
+        unreadConversationIds: state.unreadConversationIds.filter((id) => id !== action.conversationId),
+        unreadConversationCounts,
+      };
+    }
+    case "conversation-messages/loaded":
+      return { ...state, messagesByConversation: { ...state.messagesByConversation, [action.conversationId]: action.messages } };
+    case "conversation-messages/prepended": {
+      const existing = state.messagesByConversation[action.conversationId] ?? [];
+      return { ...state, messagesByConversation: { ...state.messagesByConversation, [action.conversationId]: [...action.messages, ...existing] } };
     }
     case "presence/sync":
       return { ...state, onlineUserIds: action.userIds, onlineUsers: action.users ?? state.onlineUsers };
