@@ -12,6 +12,7 @@ import { createHub, type WsHub } from "./ws/hub.js";
 import { registerWsRoute } from "./ws/route.js";
 import { loadMasterKey } from "./crypto/messages.js";
 import { registerMessageRoutes } from "./routes/messages.js";
+import { registerConversationRoutes } from "./routes/conversations.js";
 import { loadLiveKitConfig } from "./voice/tokens.js";
 import { registerVoiceTokenRoute, registerVoiceWebhookRoute } from "./routes/voice.js";
 import { registerAdminRoutes } from "./routes/admin.js";
@@ -58,6 +59,7 @@ export async function buildApp(
   registerInviteRoutes(app, opts.pool);
   registerChannelRoutes(app, opts.pool, hub);
   registerMessageRoutes(app, opts.pool, key, hub);
+  registerConversationRoutes(app, opts.pool, key, hub);
   registerSearchRoutes(app, opts.pool, key);
   registerSoundRoutes(app, opts.pool);
   registerAppearanceRoutes(app, opts.pool);
