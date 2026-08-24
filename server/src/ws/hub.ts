@@ -12,6 +12,7 @@ export interface WsHub {
   updateCapabilities(userId: string, capabilities: Capability[]): void;
   broadcast(event: ServerEvent): void;
   broadcastToCapability(requiredCapability: Capability | null, event: ServerEvent): void;
+  sendToUsers(userIds: string[], event: ServerEvent): void;
   onlineUserIds(): string[];
   onlineUsers(): PresenceUserPayload[];
   disconnect(userId: string, code: number, reason: string): void;
@@ -73,6 +74,15 @@ export function createHub(): WsHub {
       for (const { capabilities, sockets } of byUser.values()) {
         if (requiredCapability !== null && !capabilities.includes(requiredCapability)) continue;
         for (const socket of sockets) send(socket, event);
+      }
+    },
+    // Used for direct-message conversations: delivery is scoped to a specific
+    // set of participant user IDs rather than every connected socket.
+    sendToUsers(userIds, event) {
+      for (const userId of userIds) {
+        const entry = byUser.get(userId);
+        if (!entry) continue;
+        for (const socket of entry.sockets) send(socket, event);
       }
     },
     onlineUserIds() {

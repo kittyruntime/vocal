@@ -6,17 +6,21 @@ const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 100;
 
 type Row = {
-  id: string; channel_id: string; user_id: string;
+  id: string; channel_id: string | null; conversation_id: string | null; user_id: string;
   username: string; avatar_url: string | null; content_encrypted: string; created_at: Date; edited_at: Date | null;
   reply_id: string | null; reply_user_id: string | null; reply_username: string | null; reply_content_encrypted: string | null;
 };
 
 export type NewAttachment = { filename: string; mimeType: string; content: Buffer };
 
+// Exactly one of channelId/conversationId identifies where a message lives.
+export type MessageTarget = { channelId: string; conversationId?: undefined } | { channelId?: undefined; conversationId: string };
+
 function toPayload(row: Row, key: Buffer, attachments: MessageAttachmentPayload[] = [], reactions: MessageReactionPayload[] = []): MessagePayload {
   return {
     id: row.id,
-    channelId: row.channel_id,
+    channelId: row.channel_id ?? undefined,
+    conversationId: row.conversation_id ?? undefined,
     userId: row.user_id,
     username: row.username,
     avatarUrl: row.avatar_url ? `/api/users/${row.user_id}/avatar` : null,
@@ -36,7 +40,7 @@ function toPayload(row: Row, key: Buffer, attachments: MessageAttachmentPayload[
 
 export async function createMessage(
   pool: pg.Pool, key: Buffer,
-  input: { channelId: string; userId: string; content: string; attachments?: NewAttachment[]; replyToMessageId?: string },
+  input: MessageTarget & { userId: string; content: string; attachments?: NewAttachment[]; replyToMessageId?: string },
 ): Promise<MessagePayload> {
   const encrypted = encryptMessage(input.content, key);
   const client = await pool.connect();
@@ -44,18 +48,18 @@ export async function createMessage(
     await client.query("BEGIN");
     const res = await client.query<Row>(
       `WITH inserted AS (
-         INSERT INTO messages (channel_id, user_id, content_encrypted, reply_to_message_id)
-         VALUES ($1, $2, $3, $4)
-         RETURNING id, channel_id, user_id, content_encrypted, created_at, edited_at, reply_to_message_id
+         INSERT INTO messages (channel_id, conversation_id, user_id, content_encrypted, reply_to_message_id)
+         VALUES ($1, $2, $3, $4, $5)
+         RETURNING id, channel_id, conversation_id, user_id, content_encrypted, created_at, edited_at, reply_to_message_id
        )
-       SELECT inserted.id, inserted.channel_id, inserted.user_id, inserted.content_encrypted, inserted.created_at,
+       SELECT inserted.id, inserted.channel_id, inserted.conversation_id, inserted.user_id, inserted.content_encrypted, inserted.created_at,
               inserted.edited_at, u.username, u.avatar_url,
               r.id AS reply_id, r.user_id AS reply_user_id, ru.username AS reply_username,
               r.content_encrypted AS reply_content_encrypted
        FROM inserted JOIN users u ON u.id = inserted.user_id
        LEFT JOIN messages r ON r.id = inserted.reply_to_message_id
        LEFT JOIN users ru ON ru.id = r.user_id`,
-      [input.channelId, input.userId, encrypted, input.replyToMessageId ?? null],
+      [input.channelId ?? null, input.conversationId ?? null, input.userId, encrypted, input.replyToMessageId ?? null],
     );
     const attachments: MessageAttachmentPayload[] = [];
     for (const attachment of input.attachments ?? []) {
@@ -79,18 +83,18 @@ export async function createMessage(
 
 export async function listMessages(
   pool: pg.Pool, key: Buffer,
-  input: { channelId: string; before?: string; limit?: number },
+  input: MessageTarget & { before?: string; limit?: number },
 ): Promise<MessagePayload[]> {
   const limit = Math.min(input.limit ?? DEFAULT_LIMIT, MAX_LIMIT);
-  const params: unknown[] = [input.channelId];
-  let where = "m.channel_id = $1";
+  const params: unknown[] = [input.channelId ?? input.conversationId];
+  let where = input.conversationId ? "m.conversation_id = $1" : "m.channel_id = $1";
   if (input.before) {
     params.push(input.before);
     where += ` AND m.created_at < $${params.length}`;
   }
   params.push(limit);
   const res = await pool.query<Row>(
-    `SELECT m.id, m.channel_id, m.user_id, u.username, u.avatar_url, m.content_encrypted, m.created_at, m.edited_at,
+    `SELECT m.id, m.channel_id, m.conversation_id, m.user_id, u.username, u.avatar_url, m.content_encrypted, m.created_at, m.edited_at,
             r.id AS reply_id, r.user_id AS reply_user_id, ru.username AS reply_username, r.content_encrypted AS reply_content_encrypted
      FROM messages m JOIN users u ON u.id = m.user_id
      LEFT JOIN messages r ON r.id = m.reply_to_message_id
@@ -136,7 +140,7 @@ export async function listMessages(
 
 export async function getMessage(pool: pg.Pool, key: Buffer, messageId: string): Promise<MessagePayload | null> {
   const row = await pool.query<Row>(
-    `SELECT m.id, m.channel_id, m.user_id, u.username, u.avatar_url, m.content_encrypted, m.created_at, m.edited_at,
+    `SELECT m.id, m.channel_id, m.conversation_id, m.user_id, u.username, u.avatar_url, m.content_encrypted, m.created_at, m.edited_at,
             r.id AS reply_id, r.user_id AS reply_user_id, ru.username AS reply_username, r.content_encrypted AS reply_content_encrypted
      FROM messages m JOIN users u ON u.id = m.user_id
      LEFT JOIN messages r ON r.id = m.reply_to_message_id LEFT JOIN users ru ON ru.id = r.user_id WHERE m.id = $1`,
