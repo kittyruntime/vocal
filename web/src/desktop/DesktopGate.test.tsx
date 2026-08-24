@@ -9,6 +9,7 @@ function stubDesktop(config: DesktopConfig | null): DesktopBridge {
     getConfig: vi.fn().mockResolvedValue(config),
     setConfig: vi.fn().mockResolvedValue(undefined),
     clearConfig: vi.fn().mockResolvedValue(undefined),
+    notify: vi.fn().mockResolvedValue(undefined),
   };
   window.vocalDesktop = bridge;
   return bridge;

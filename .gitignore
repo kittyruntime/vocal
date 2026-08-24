@@ -4,3 +4,5 @@ dist/
 .superpowers/
 .claude/
 docs/superpowers/
+desktop/web-dist/
+desktop/release/

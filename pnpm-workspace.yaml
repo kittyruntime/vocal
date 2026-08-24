@@ -1,7 +1,10 @@
 packages:
   - server
   - web
+  - desktop
 
 onlyBuiltDependencies:
   - argon2
   - esbuild
+  - electron
+  - electron-builder

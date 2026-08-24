@@ -8,6 +8,7 @@ export type DesktopBridge = {
   getConfig(): Promise<DesktopConfig | null>;
   setConfig(config: DesktopConfig): Promise<void>;
   clearConfig(): Promise<void>;
+  notify(title: string, body: string): Promise<void>;
 };
 
 declare global {

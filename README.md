@@ -7,6 +7,9 @@ SFU.
 
 - `server/` — Fastify + PostgreSQL API and WebSocket backend.
 - `web/` — React + Vite single-page client.
+- `desktop/` — Electron shell around the same web client, for a native
+  Windows/macOS/Linux app that connects to any self-hosted server URL. See
+  `desktop/README.md`.
 - `deploy/` — Dockerfiles and nginx config for a production build.
 
 ## Requirements

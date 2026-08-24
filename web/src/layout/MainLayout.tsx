@@ -16,6 +16,7 @@ import { ProfileModal } from "./ProfileModal";
 import { UserProfileModal } from "./UserProfileModal";
 import { SearchModal } from "./SearchModal";
 import { AboutModal } from "./AboutModal";
+import { desktopBridge, isDesktop } from "../desktop/bridge";
 
 const VoiceView = lazy(() => import("../voice/VoiceView").then((module) => ({ default: module.VoiceView })));
 
@@ -96,7 +97,12 @@ export function MainLayout({ currentUser }: { currentUser: CurrentUser }) {
               const targetId = event.message.channelId ?? event.message.conversationId!;
               const notificationLevel = notificationLevelsRef.current[targetId] ?? "all";
               dispatch({ type: "message/received", message: event.message, markUnread: notificationLevel === "all" || (notificationLevel === "mentions" && mentioned), mention: mentioned });
-              if (event.message.userId !== currentUser.id) playAppSound("message");
+              if (event.message.userId !== currentUser.id) {
+                playAppSound("message");
+                if (isDesktop() && document.hidden) {
+                  void desktopBridge().notify(event.message.username, event.message.content || "Sent an attachment");
+                }
+              }
               break;
             }
             case "message.updated":

@@ -1,0 +1,48 @@
+{
+  "name": "desktop",
+  "private": true,
+  "version": "0.1.0",
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsc -p tsconfig.json && VOCAL_WEB_DEV_URL=http://localhost:5173 electron dist/main.js",
+    "prepare-web": "node -e \"require('fs').rmSync('web-dist',{recursive:true,force:true});require('fs').cpSync('../web/dist','web-dist',{recursive:true})\"",
+    "start": "npm run build && npm run prepare-web && electron dist/main.js",
+    "dist": "npm run build && npm run prepare-web && electron-builder"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "electron": "^33.0.0",
+    "electron-builder": "^25.1.0",
+    "typescript": "^5.7.0"
+  },
+  "build": {
+    "appId": "com.vocal.desktop",
+    "productName": "Vocal",
+    "directories": {
+      "output": "release"
+    },
+    "icon": "build/icon.png",
+    "files": [
+      "dist/**/*",
+      "web-dist/**/*"
+    ],
+    "extraMetadata": {
+      "main": "dist/main.js"
+    },
+    "win": {
+      "target": "nsis"
+    },
+    "mac": {
+      "target": "dmg",
+      "category": "public.app-category.social-networking"
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Network"
+    }
+  }
+}
