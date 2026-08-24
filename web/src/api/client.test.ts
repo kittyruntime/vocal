@@ -109,6 +109,17 @@ describe("desktop server configuration", () => {
     expect(url).toBe("/api/health");
   });
 
+  it("connectToServer's pre-auth health check never asks for credentials (regression: was blocked by CORS)", async () => {
+    // Bug caught live: the health check runs before any token exists, so a
+    // credentials check keyed off authToken alone sent "include" here --
+    // the server's CORS policy for cross-origin requests doesn't allow
+    // credentialed requests, and the browser fails the fetch outright.
+    mockFetchOnce(200, { status: "ok" });
+    await connectToServer("https://vocal.example.com");
+    const [, init] = (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(init.credentials).toBe("omit");
+  });
+
   it("connectToServer reverts the base when the server is unreachable", async () => {
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("network down")));
     const ok = await connectToServer("https://not-a-vocal-server.example");

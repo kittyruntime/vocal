@@ -136,7 +136,13 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const isFormData = typeof FormData !== "undefined" && init?.body instanceof FormData;
   const res = await fetch(path, {
     ...init,
-    credentials: authToken ? "omit" : "include",
+    // Cross-origin (a server base is configured, i.e. the desktop app) never
+    // sends credentials, even before a token exists yet -- e.g. the very
+    // first /api/health check in connectToServer, pre-auth. The server's
+    // CORS policy for /api/* only allows non-credentialed requests; asking
+    // for "include" here would make the browser require
+    // Access-Control-Allow-Credentials and fail the request outright.
+    credentials: getServerBase() ? "omit" : "include",
     headers: {
       ...(hasBody && !isFormData ? { "content-type": "application/json" } : {}),
       ...(authToken ? { authorization: `Bearer ${authToken}` } : {}),
@@ -158,7 +164,13 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 async function requestText(path: string, init?: RequestInit): Promise<string> {
   const res = await fetch(path, {
     ...init,
-    credentials: authToken ? "omit" : "include",
+    // Cross-origin (a server base is configured, i.e. the desktop app) never
+    // sends credentials, even before a token exists yet -- e.g. the very
+    // first /api/health check in connectToServer, pre-auth. The server's
+    // CORS policy for /api/* only allows non-credentialed requests; asking
+    // for "include" here would make the browser require
+    // Access-Control-Allow-Credentials and fail the request outright.
+    credentials: getServerBase() ? "omit" : "include",
     headers: { ...(authToken ? { authorization: `Bearer ${authToken}` } : {}), ...init?.headers },
   });
   const text = await res.text();
