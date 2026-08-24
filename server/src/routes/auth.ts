@@ -3,6 +3,7 @@ import type pg from "pg";
 import { z } from "zod";
 import { hashPassword, verifyPassword } from "../auth/passwords.js";
 import { createSession, deleteSession, hashToken } from "../auth/sessions.js";
+import { extractSessionToken } from "../auth/guard.js";
 import { CAPABILITIES } from "../capabilities.js";
 
 // Precomputed once at module load so that an unknown-username login still
@@ -88,7 +89,7 @@ export function registerAuthRoutes(app: FastifyInstance, pool: pg.Pool): void {
     }
     const session = await createSession(pool, userId);
     setSidCookie(reply, session.token, session.expiresAt);
-    return reply.code(201).send({ ok: true });
+    return reply.code(201).send({ ok: true, token: session.token });
   });
 
   app.post("/api/auth/login", {
@@ -116,7 +117,7 @@ export function registerAuthRoutes(app: FastifyInstance, pool: pg.Pool): void {
     }
     const session = await createSession(pool, row.id);
     setSidCookie(reply, session.token, session.expiresAt);
-    return { ok: true };
+    return { ok: true, token: session.token };
   });
 
   app.post("/api/auth/register", {
@@ -164,7 +165,7 @@ export function registerAuthRoutes(app: FastifyInstance, pool: pg.Pool): void {
       await client.query("COMMIT");
       const session = await createSession(pool, user.rows[0].id);
       setSidCookie(reply, session.token, session.expiresAt);
-      return reply.code(201).send({ ok: true });
+      return reply.code(201).send({ ok: true, token: session.token });
     } catch (err: any) {
       await client.query("ROLLBACK");
       if (err?.code === "23505") return reply.code(409).send({ error: "username taken" });
@@ -175,7 +176,8 @@ export function registerAuthRoutes(app: FastifyInstance, pool: pg.Pool): void {
   });
 
   app.post("/api/auth/logout", async (req, reply) => {
-    if (req.cookies.sid) await deleteSession(pool, req.cookies.sid);
+    const token = extractSessionToken(req);
+    if (token) await deleteSession(pool, token);
     reply.clearCookie("sid", { path: "/" });
     return { ok: true };
   });

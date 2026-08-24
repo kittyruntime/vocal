@@ -103,6 +103,31 @@ describe("login / logout", () => {
     expect(res.statusCode).toBe(401);
     expect(res.json()).toEqual({ error: "invalid credentials" });
   });
+
+  it("returns a raw session token usable as a Bearer header (desktop client auth)", async () => {
+    const login = await app.inject({ method: "POST", url: "/api/auth/login",
+      payload: { username: "theo", password: "correct horse battery" } });
+    const token = login.json().token;
+    expect(typeof token).toBe("string");
+    const me = await app.inject({ method: "GET", url: "/api/me",
+      headers: { authorization: `Bearer ${token}` } });
+    expect(me.statusCode).toBe(200);
+    expect(me.json().username).toBe("theo");
+  });
+
+  it("logout with a Bearer token revokes the session for both transports", async () => {
+    const login = await app.inject({ method: "POST", url: "/api/auth/login",
+      payload: { username: "theo", password: "correct horse battery" } });
+    const token = login.json().token;
+    await app.inject({ method: "POST", url: "/api/auth/logout", headers: { authorization: `Bearer ${token}` } });
+    const me = await app.inject({ method: "GET", url: "/api/me", headers: { authorization: `Bearer ${token}` } });
+    expect(me.statusCode).toBe(401);
+  });
+
+  it("rejects a malformed Authorization header", async () => {
+    const me = await app.inject({ method: "GET", url: "/api/me", headers: { authorization: "not-a-bearer-token" } });
+    expect(me.statusCode).toBe(401);
+  });
 });
 
 describe("profile", () => {

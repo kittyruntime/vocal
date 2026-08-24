@@ -21,9 +21,21 @@ declare module "fastify" {
   }
 }
 
+// The cookie is the default transport for browser clients (same-origin,
+// httpOnly). Non-browser/cross-origin clients -- namely the desktop app,
+// which can point at an arbitrary self-hosted server and can't rely on
+// SameSite cookies working across origins -- authenticate with the same
+// session token via a Bearer header instead.
+export function extractSessionToken(req: FastifyRequest): string | undefined {
+  if (req.cookies.sid) return req.cookies.sid;
+  const auth = req.headers.authorization;
+  if (auth?.startsWith("Bearer ")) return auth.slice("Bearer ".length);
+  return undefined;
+}
+
 export function registerAuthGuard(app: FastifyInstance, pool: pg.Pool): void {
   app.decorate("requireAuth", async (req: FastifyRequest, reply: FastifyReply) => {
-    const token = req.cookies.sid;
+    const token = extractSessionToken(req);
     const user = token ? await getSessionUser(pool, token) : null;
     if (!user) {
       await reply.code(401).send({ error: "authentication required" });

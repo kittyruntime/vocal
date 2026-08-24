@@ -4,6 +4,7 @@ import type { FastifyInstance } from "fastify";
 import { WebSocket } from "ws";
 import { makeTestDb } from "./helpers/db.js";
 import { buildApp } from "../src/app.js";
+import { createSession } from "../src/auth/sessions.js";
 import type { VoicePresence } from "../src/voice/presence.js";
 
 let pool: pg.Pool;
@@ -98,6 +99,23 @@ describe("websocket", () => {
     expect(sync.type).toBe("presence.sync");
     ws.close();
     await closed(ws);
+  });
+
+  it("accepts a ?token= handshake from a foreign origin (desktop client) since it carries no ambient credential", async () => {
+    const me = await app.inject({ method: "GET", url: "/api/me", headers: { cookie: adminCookie } });
+    const { token } = await createSession(pool, me.json().id);
+    const ws = new WebSocket(`${baseUrl}/ws?token=${token}`, { headers: { origin: "https://not-the-server.example" } });
+    await new Promise((r) => ws.once("open", r));
+    const sync = await nextMessage(ws);
+    expect(sync.type).toBe("presence.sync");
+    ws.close();
+    await closed(ws);
+  });
+
+  it("rejects a ?token= handshake with an invalid token", async () => {
+    const ws = new WebSocket(`${baseUrl}/ws?token=not-a-real-token`);
+    const code = await closed(ws);
+    expect(code).toBe(1008);
   });
 
   it("sends presence.sync on connect and answers ping with pong", async () => {

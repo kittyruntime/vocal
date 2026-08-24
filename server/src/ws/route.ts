@@ -59,11 +59,17 @@ export function registerWsRoute(
   app: FastifyInstance, pool: pg.Pool, hub: WsHub, voicePresence: VoicePresence,
 ): void {
   app.get("/ws", { websocket: true }, async (socket, req) => {
-    if (!isAllowedOrigin(req)) {
+    // An explicit ?token= (the desktop app, which authenticates the same way
+    // over Bearer for its regular API calls) carries no ambient credential, so
+    // the CSWSH origin check below -- which exists purely because a browser
+    // attaches the sid cookie to cross-origin handshakes automatically --
+    // doesn't apply to it. Only a handshake relying on the ambient cookie is checked.
+    const queryToken = typeof (req.query as { token?: unknown })?.token === "string" ? (req.query as { token: string }).token : undefined;
+    if (!queryToken && !isAllowedOrigin(req)) {
       socket.close(1008, "bad origin");
       return;
     }
-    const token = parseCookie(req.headers.cookie, "sid");
+    const token = queryToken ?? parseCookie(req.headers.cookie, "sid");
     const user = token ? await getSessionUser(pool, token) : null;
     if (!user) {
       socket.close(1008, "unauthorized");

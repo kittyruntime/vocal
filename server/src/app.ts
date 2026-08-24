@@ -1,5 +1,6 @@
 import Fastify, { type FastifyError, type FastifyInstance } from "fastify";
 import cookie from "@fastify/cookie";
+import cors from "@fastify/cors";
 import rateLimit from "@fastify/rate-limit";
 import websocket from "@fastify/websocket";
 import multipart from "@fastify/multipart";
@@ -29,6 +30,11 @@ export async function buildApp(
 ): Promise<{ app: FastifyInstance; hub: WsHub; voicePresence: VoicePresence }> {
   const app = Fastify({ logger: false, bodyLimit: 2 * 1024 * 1024 });
   await app.register(cookie);
+  // Reflects the request origin with no credentialed access (the desktop app,
+  // which can point at an arbitrary self-hosted server, authenticates over a
+  // Bearer token instead of cookies -- see auth/guard.ts -- so there is no
+  // ambient credential for a cross-origin page to ride along on here).
+  await app.register(cors, { origin: true, credentials: false });
   await app.register(rateLimit, { global: false });
   await app.register(websocket);
   await app.register(multipart, {
