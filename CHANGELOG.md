@@ -4,6 +4,8 @@ All notable changes to Vocal are documented here.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-08-25
+
 ### Added
 - Direct messages and group conversations, alongside server channels, with full feature parity (attachments, reactions, replies, edit/delete, search).
 - A native desktop client for Windows, macOS, and Linux, so voice calls no longer depend on the browser's microphone permission handling.
