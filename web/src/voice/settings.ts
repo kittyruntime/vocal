@@ -13,6 +13,7 @@ export type VoiceSettings = {
   devices: DeviceSelections;
   vadThreshold: number;
   pushToTalk: boolean;
+  noiseReduction: boolean;
   audioQuality: CustomMediaQuality;
   cameraQuality: CustomMediaQuality;
   screenQuality: CustomScreenQuality;
@@ -30,6 +31,7 @@ export const DEFAULT_VOICE_SETTINGS: VoiceSettings = {
   devices: {},
   vadThreshold: 0.15,
   pushToTalk: false,
+  noiseReduction: true,
   audioQuality: "standard",
   cameraQuality: "standard",
   screenQuality: "standard",
@@ -87,6 +89,7 @@ export function loadVoiceSettings(storage?: Pick<Storage, "getItem">): VoiceSett
       devices: isRecord(parsed.devices) ? parsed.devices as DeviceSelections : {},
       vadThreshold: typeof parsed.vadThreshold === "number" ? parsed.vadThreshold : DEFAULT_VOICE_SETTINGS.vadThreshold,
       pushToTalk: parsed.pushToTalk === true,
+      noiseReduction: typeof parsed.noiseReduction === "boolean" ? parsed.noiseReduction : DEFAULT_VOICE_SETTINGS.noiseReduction,
       audioQuality: isMediaQuality(parsed.audioQuality) ? parsed.audioQuality : DEFAULT_VOICE_SETTINGS.audioQuality,
       cameraQuality: isMediaQuality(parsed.cameraQuality) ? parsed.cameraQuality : DEFAULT_VOICE_SETTINGS.cameraQuality,
       screenQuality: isScreenQuality(parsed.screenQuality) ? parsed.screenQuality : DEFAULT_VOICE_SETTINGS.screenQuality,

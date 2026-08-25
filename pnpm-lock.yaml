@@ -86,6 +86,9 @@ importers:
       '@fontsource/space-grotesk':
         specifier: ^5.3.0
         version: 5.3.0
+      '@sapphi-red/web-noise-suppressor':
+        specifier: 0.4.0
+        version: 0.4.0
       livekit-client:
         specifier: ^2.21.0
         version: 2.21.0(@types/dom-mediacapture-record@1.0.22)
@@ -588,6 +591,9 @@ packages:
 
   '@rolldown/pluginutils@1.0.1':
     resolution: {integrity: sha512-2j9bGt5Jh8hj+vPtgzPtl72j0yRxHAyumoo6TNfAjsLB04UtpSvPbPcDcBMxz7n+9CYB0c1GxQFxYRg2jimqGw==}
+
+  '@sapphi-red/web-noise-suppressor@0.4.0':
+    resolution: {integrity: sha512-vkBEL/VDkbeP3qqSRQFRtPLGa19a38JUzO6J0r5D/MQSumrlERy671DAMaETgY6etXjDCoJcD7JBIaXnuGVtVw==}
 
   '@sindresorhus/is@4.6.0':
     resolution: {integrity: sha512-t09vSN3MdfsyCHoFcTRCH/iUtG7OJ0CsjzB8cjAmKc/va/kIgeDI/TxsigdncE/4be734m0cvIYwNaV4i2XqAw==}
@@ -3181,6 +3187,8 @@ snapshots:
     optional: true
 
   '@rolldown/pluginutils@1.0.1': {}
+
+  '@sapphi-red/web-noise-suppressor@0.4.0': {}
 
   '@sindresorhus/is@4.6.0': {}
 

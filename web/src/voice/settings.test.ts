@@ -10,6 +10,7 @@ describe("loadVoiceSettings", () => {
     const settings = loadVoiceSettings(storageFor(JSON.stringify({ advancedMode: true })));
     expect(settings).toMatchObject({
       advancedMode: true,
+      noiseReduction: true,
       audioQuality: "standard",
       cameraQuality: "standard",
       screenQuality: "standard",
@@ -77,5 +78,11 @@ describe("loadVoiceSettings", () => {
 
   it("returns all defaults for invalid JSON", () => {
     expect(loadVoiceSettings(storageFor("{"))).toEqual(DEFAULT_VOICE_SETTINGS);
+  });
+
+  it("respects an explicit noiseReduction: false, defaults to true when absent or malformed", () => {
+    expect(loadVoiceSettings(storageFor(JSON.stringify({ noiseReduction: false }))).noiseReduction).toBe(false);
+    expect(loadVoiceSettings(storageFor(JSON.stringify({}))).noiseReduction).toBe(true);
+    expect(loadVoiceSettings(storageFor(JSON.stringify({ noiseReduction: "off" }))).noiseReduction).toBe(true);
   });
 });

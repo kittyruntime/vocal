@@ -339,7 +339,7 @@ export function VoiceView({
   }
 
   async function installVoiceGate(track: LocalAudioTrack) {
-    const gate = new VoiceGateProcessor();
+    const gate = new VoiceGateProcessor(settingsRef.current.noiseReduction);
     try {
       await track.setProcessor(gate);
       voiceGateRef.current = gate;
@@ -1336,6 +1336,12 @@ export function VoiceView({
                   }}
                   onCommit={(next) => localStorage.setItem(SETTINGS_KEY, JSON.stringify({ ...settingsRef.current, vadThreshold: next }))}
                 />
+              </div>
+              <div className="settings-section">
+                <div className="settings-section-heading">
+                  <div><h3>Noise reduction</h3><p>Suppresses background noise (fans, keyboard, traffic) with an on-device model. Applies the next time your microphone is enabled.</p></div>
+                  <Switch label="Noise reduction" visuallyHiddenLabel checked={settings.noiseReduction} onChange={(next) => saveSettings({ ...settings, noiseReduction: next })} />
+                </div>
               </div>
             </div>
           </section>
