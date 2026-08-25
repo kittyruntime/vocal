@@ -101,9 +101,9 @@ describe("MainLayout", () => {
     const socket = FakeWebSocket.instances[0];
     socket.emit("open");
     socket.sendServerEvent({ type: "presence.sync", userIds: ["u1"] });
-    await waitFor(() => expect(screen.getByText("1 online")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("Online — 1")).toBeInTheDocument());
     socket.sendServerEvent({ type: "presence.online", userId: "u2" });
-    await waitFor(() => expect(screen.getByText("2 online")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("Online — 2")).toBeInTheDocument());
   });
 
   it("appends an incoming message to the selected channel", async () => {

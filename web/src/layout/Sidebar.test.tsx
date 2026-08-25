@@ -50,7 +50,7 @@ describe("Sidebar", () => {
     expect(screen.getByText("Text channels")).toBeInTheDocument();
     expect(screen.getByText("Voice channels")).toBeInTheDocument();
     expect(screen.getByText("général", { exact: false })).toBeInTheDocument();
-    expect(screen.getByText("1 online")).toBeInTheDocument();
+    expect(screen.getByText("Online — 1")).toBeInTheDocument();
     expect(screen.getByText("theo (you)")).toBeInTheDocument();
     expect(screen.getByText("alice")).toBeInTheDocument();
     expect(screen.getByLabelText("theo: microphone muted")).toBeInTheDocument();

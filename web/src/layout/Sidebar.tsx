@@ -122,6 +122,9 @@ export function Sidebar({
         onEditChannel={canManageChannels ? setEditingChannelId : undefined}
         onViewProfile={onViewProfile}
       />
+      {canManageChannels && (
+        <button type="button" className="create-channel-button" onClick={() => setCreateChannelOpen(true)}><Icon name="plus" size={16} /> Create channel</button>
+      )}
       <section className="channel-group conversation-group">
         <h2><Icon name="chevron" size={13} /> Direct messages</h2>
         <ul>
@@ -158,7 +161,6 @@ export function Sidebar({
         </ul>
         <button type="button" className="create-channel-button" onClick={() => setNewConversationOpen(true)}><Icon name="plus" size={16} /> New message</button>
       </section>
-      <p className="sidebar-presence"><span className="online-dot" /> {onlineUserIds.length} online</p>
       <section className="online-members" aria-label="Online members">
         <h2><span className="online-dot" /> Online — {onlineUserIds.length}</h2>
         <ul>
@@ -166,9 +168,6 @@ export function Sidebar({
           {(onlineUsers ?? []).length === 0 && <li className="online-members-empty">No names available yet</li>}
         </ul>
       </section>
-      {canManageChannels && (
-        <button type="button" className="create-channel-button" onClick={() => setCreateChannelOpen(true)}><Icon name="plus" size={16} /> Create channel</button>
-      )}
       {createChannelOpen ? (
         <CreateChannelModal
           onCreated={(channel) => { onChannelCreated(channel); setCreateChannelOpen(false); }}

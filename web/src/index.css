@@ -343,7 +343,7 @@ textarea.form-input { resize: vertical; }
   object-position: center;
 }
 .online-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #23a55a; }
-.sidebar-presence { margin: 14px 16px 8px; color: #949ba4; font-size: 12px; }
+.conversation-group { border-top: 1px solid #1f2023; }
 .online-members { margin: 12px 12px 8px; padding-top: 10px; border-top: 1px solid #1f2023; }
 .online-members h2 { display: flex; align-items: center; gap: 7px; margin: 0 4px 6px; color: #949ba4; font-size: 11px; font-weight: 700; text-transform: uppercase; }
 .online-members ul { display: grid; gap: 2px; max-height: 132px; overflow-y: auto; }
@@ -827,6 +827,7 @@ textarea.form-input { resize: vertical; }
 
 .channel-group { padding: 15px 8px 0; }
 .channel-group h2 { margin: 0 4px 5px; font-size: 11px; line-height: 16px; letter-spacing: .045em; }
+.conversation-group { margin-top: 6px; padding-top: 14px; }
 .channel-link { min-height: 34px; gap: 6px; padding: 5px 8px; border-radius: var(--radius-sm); font-size: 15px; }
 .channel-link:hover { background: var(--bg-hover); }
 .channel-link.active { background: var(--bg-active); color: var(--text-strong); }
@@ -836,7 +837,6 @@ textarea.form-input { resize: vertical; }
 .voice-occupants li:hover { background: rgb(255 255 255 / 3%); color: var(--text-normal); }
 .create-channel-button { min-height: 36px; margin-top: 10px; border-color: transparent; border-radius: var(--radius-sm); background: rgb(255 255 255 / 4%); }
 .create-channel-button:hover { border-color: transparent; background: var(--bg-active); }
-.sidebar-presence { margin: 14px 12px 8px; }
 .user-bar { min-height: 58px; padding: 7px 8px; border-top: 1px solid rgb(0 0 0 / 18%); background: var(--bg-panel); }
 .user-avatar { width: 36px; height: 36px; }
 .user-name { line-height: 18px; }
