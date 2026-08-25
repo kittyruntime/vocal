@@ -75,7 +75,10 @@ export function appReducer(state: AppState, action: AppAction): AppState {
   switch (action.type) {
     case "channels/set": {
       const stillPresent = state.selectedChannelId && action.channels.some((c) => c.id === state.selectedChannelId);
-      const selectedChannelId = stillPresent ? state.selectedChannelId : (action.channels[0]?.id ?? null);
+      // Channels and conversations load independently on mount; don't
+      // auto-pick a default channel out from under a conversation the user
+      // already opened while this fetch was still in flight.
+      const selectedChannelId = stillPresent ? state.selectedChannelId : state.selectedConversationId ? null : (action.channels[0]?.id ?? null);
       return { ...state, channels: action.channels, selectedChannelId };
     }
     case "channel/added":

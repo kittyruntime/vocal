@@ -22,6 +22,17 @@ describe("appReducer", () => {
     expect(state.selectedChannelId).toBe("c2");
   });
 
+  it("channels/set does not steal selection away from an open conversation", () => {
+    // Channels and conversations load in parallel on mount; if the user opens
+    // a DM before the (independent, sometimes slower) channel list finishes
+    // loading, channels/set must not auto-pick a default channel out from
+    // under them -- that silently swaps their open conversation for a channel.
+    const withConversation: AppState = { ...initialAppState, selectedChannelId: null, selectedConversationId: "conv1" };
+    const state = appReducer(withConversation, { type: "channels/set", channels: [channelA, channelB] });
+    expect(state.selectedChannelId).toBeNull();
+    expect(state.selectedConversationId).toBe("conv1");
+  });
+
   it("channel/added ignores a channel that's already present", () => {
     const withChannel: AppState = { ...initialAppState, channels: [channelA] };
     const state = appReducer(withChannel, { type: "channel/added", channel: channelA });
