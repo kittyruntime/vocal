@@ -73,9 +73,9 @@ export const screenProfiles: Record<ScreenQuality, QualityProfile<ScreenShareCap
   },
   ultra: {
     label: "Ultra",
-    detail: "1440p · 30 fps · 8 Mb/s",
-    capture: { audio: true, resolution: { width: 2560, height: 1440, frameRate: 30 }, contentHint: "detail" },
-    publish: { screenShareEncoding: { maxBitrate: 8_000_000, maxFramerate: 30 }, degradationPreference: "maintain-resolution" },
+    detail: "1440p · 60 fps · 12 Mb/s",
+    capture: { audio: true, resolution: { width: 2560, height: 1440, frameRate: 60 }, contentHint: "motion" },
+    publish: { screenShareEncoding: { maxBitrate: 12_000_000, maxFramerate: 60 }, degradationPreference: "maintain-framerate" },
   },
 };
 

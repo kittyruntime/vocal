@@ -36,7 +36,8 @@ describe("media quality profiles", () => {
     expect(audioProfiles.ultra.publish.audioPreset?.maxBitrate).toBeGreaterThan(audioProfiles.high.publish.audioPreset?.maxBitrate ?? 0);
     expect(cameraProfiles.ultra.publish.videoEncoding?.maxBitrate).toBeGreaterThan(cameraProfiles.high.publish.videoEncoding?.maxBitrate ?? 0);
     expect(cameraProfiles.ultra.capture.resolution).toMatchObject({ width: 2560, height: 1440 });
-    expect(screenProfiles.ultra.capture.resolution).toMatchObject({ width: 2560, height: 1440 });
+    expect(screenProfiles.ultra.capture.resolution).toMatchObject({ width: 2560, height: 1440, frameRate: 60 });
+    expect(screenProfiles.ultra.publish.screenShareEncoding?.maxBitrate).toBeGreaterThan(8_000_000);
   });
 
   it("returns existing preset objects unchanged", () => {
