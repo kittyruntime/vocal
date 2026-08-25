@@ -130,6 +130,7 @@ function Quality({ label, value, game, onChange }: { label: string; value: strin
       <option value="low">Data saver</option>
       <option value="standard">Balanced</option>
       <option value="high">High</option>
+      <option value="ultra">Ultra</option>
       {game ? <option value="game">Game mode 1080p60</option> : null}
     </Select>
   );

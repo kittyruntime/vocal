@@ -27,9 +27,9 @@ export type Channel = {
   requiredCapability: Capability | null;
   position: number;
   createdAt: string;
-  defaultAudioQuality?: "low" | "standard" | "high";
-  defaultCameraQuality?: "low" | "standard" | "high";
-  defaultScreenQuality?: "low" | "standard" | "high" | "game";
+  defaultAudioQuality?: "low" | "standard" | "high" | "ultra";
+  defaultCameraQuality?: "low" | "standard" | "high" | "ultra";
+  defaultScreenQuality?: "low" | "standard" | "high" | "ultra" | "game";
 };
 export type Role = { id: string; name: string; color: string; position: number; capabilities: Capability[]; memberCount: number };
 export type AdminUser = CurrentUser & { createdAt: string; bannedAt: string | null; voiceMuted: boolean; roles?: Pick<Role, "id" | "name" | "color">[] };

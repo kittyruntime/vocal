@@ -37,7 +37,7 @@ describe("loadVoiceSettings", () => {
 
   it("falls back each malformed field independently", () => {
     const settings = loadVoiceSettings(storageFor(JSON.stringify({
-      audioQuality: "ultra", screenQuality: "cinema",
+      audioQuality: "lossless", screenQuality: "cinema",
       customAudio: { bitrateKbps: 15 },
       customCamera: { width: 3841, height: 1080, frameRate: null, bitrateKbps: "fast" },
       customScreen: { width: 640, height: 360, frameRate: 60, bitrateKbps: 30000 },
@@ -78,6 +78,16 @@ describe("loadVoiceSettings", () => {
 
   it("returns all defaults for invalid JSON", () => {
     expect(loadVoiceSettings(storageFor("{"))).toEqual(DEFAULT_VOICE_SETTINGS);
+  });
+
+  it("accepts the ultra quality tier for audio, camera, and screen", () => {
+    const settings = loadVoiceSettings(storageFor(JSON.stringify({
+      audioQuality: "ultra", cameraQuality: "ultra", screenQuality: "ultra", screenAudioQuality: "ultra",
+    })));
+    expect(settings.audioQuality).toBe("ultra");
+    expect(settings.cameraQuality).toBe("ultra");
+    expect(settings.screenQuality).toBe("ultra");
+    expect(settings.screenAudioQuality).toBe("ultra");
   });
 
   it("respects an explicit noiseReduction: false, defaults to true when absent or malformed", () => {

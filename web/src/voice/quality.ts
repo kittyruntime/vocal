@@ -5,7 +5,7 @@ import type {
   VideoCaptureOptions,
 } from "livekit-client";
 
-export type MediaQuality = "low" | "standard" | "high";
+export type MediaQuality = "low" | "standard" | "high" | "ultra";
 export type ScreenQuality = MediaQuality | "game";
 export type CustomMediaQuality = MediaQuality | "custom";
 export type CustomScreenQuality = ScreenQuality | "custom";
@@ -38,6 +38,12 @@ export const cameraProfiles: Record<MediaQuality, QualityProfile<VideoCaptureOpt
     capture: { resolution: { width: 1920, height: 1080, frameRate: 30 } },
     publish: { videoEncoding: { maxBitrate: 3_000_000, maxFramerate: 30 }, simulcast: true },
   },
+  ultra: {
+    label: "Ultra",
+    detail: "1440p · 30 fps · 6 Mb/s",
+    capture: { resolution: { width: 2560, height: 1440, frameRate: 30 } },
+    publish: { videoEncoding: { maxBitrate: 6_000_000, maxFramerate: 30 }, simulcast: true },
+  },
 };
 
 export const screenProfiles: Record<ScreenQuality, QualityProfile<ScreenShareCaptureOptions>> = {
@@ -65,6 +71,12 @@ export const screenProfiles: Record<ScreenQuality, QualityProfile<ScreenShareCap
     capture: { audio: true, resolution: { width: 1920, height: 1080, frameRate: 60 }, contentHint: "motion" },
     publish: { screenShareEncoding: { maxBitrate: 8_000_000, maxFramerate: 60 }, degradationPreference: "maintain-framerate" },
   },
+  ultra: {
+    label: "Ultra",
+    detail: "1440p · 30 fps · 8 Mb/s",
+    capture: { audio: true, resolution: { width: 2560, height: 1440, frameRate: 30 }, contentHint: "detail" },
+    publish: { screenShareEncoding: { maxBitrate: 8_000_000, maxFramerate: 30 }, degradationPreference: "maintain-resolution" },
+  },
 };
 
 export const audioProfiles: Record<MediaQuality, QualityProfile<AudioCaptureOptions>> = {
@@ -85,6 +97,12 @@ export const audioProfiles: Record<MediaQuality, QualityProfile<AudioCaptureOpti
     detail: "Stereo · 96 kb/s",
     capture: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 2 },
     publish: { audioPreset: { maxBitrate: 96_000 }, dtx: false, red: true, forceStereo: true },
+  },
+  ultra: {
+    label: "Ultra",
+    detail: "Stereo · 128 kb/s",
+    capture: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 2 },
+    publish: { audioPreset: { maxBitrate: 128_000 }, dtx: false, red: true, forceStereo: true },
   },
 };
 

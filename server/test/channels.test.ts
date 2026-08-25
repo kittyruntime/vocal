@@ -99,6 +99,13 @@ describe("channels", () => {
     expect(updated.json()).toMatchObject({ name: "gaming", requiredCapability: "moderate", defaultAudioQuality: "high", defaultCameraQuality: "high", defaultScreenQuality: "game" });
   });
 
+  it("accepts the ultra quality tier", async () => {
+    const created = await app.inject({ method: "POST", url: "/api/channels", headers: { cookie: adminCookie }, payload: { name: "hifi", type: "voice" } });
+    const updated = await app.inject({ method: "PATCH", url: `/api/channels/${created.json().id}`, headers: { cookie: adminCookie }, payload: { defaultAudioQuality: "ultra", defaultCameraQuality: "ultra", defaultScreenQuality: "ultra" } });
+    expect(updated.statusCode).toBe(200);
+    expect(updated.json()).toMatchObject({ defaultAudioQuality: "ultra", defaultCameraQuality: "ultra", defaultScreenQuality: "ultra" });
+  });
+
   it("rejects a malformed channel id on delete", async () => {
     const res = await app.inject({ method: "DELETE", url: "/api/channels/not-a-uuid",
       headers: { cookie: adminCookie } });

@@ -32,6 +32,13 @@ describe("media quality profiles", () => {
     expect(audioProfiles.high.publish).toMatchObject({ forceStereo: true, dtx: false });
   });
 
+  it("offers an ultra tier above high for audio, camera, and screen share", () => {
+    expect(audioProfiles.ultra.publish.audioPreset?.maxBitrate).toBeGreaterThan(audioProfiles.high.publish.audioPreset?.maxBitrate ?? 0);
+    expect(cameraProfiles.ultra.publish.videoEncoding?.maxBitrate).toBeGreaterThan(cameraProfiles.high.publish.videoEncoding?.maxBitrate ?? 0);
+    expect(cameraProfiles.ultra.capture.resolution).toMatchObject({ width: 2560, height: 1440 });
+    expect(screenProfiles.ultra.capture.resolution).toMatchObject({ width: 2560, height: 1440 });
+  });
+
   it("returns existing preset objects unchanged", () => {
     expect(resolveAudioProfile("low", { bitrateKbps: 64 }, "microphone")).toBe(audioProfiles.low);
     expect(resolveCameraProfile("high", customQualityDefaults.camera)).toBe(cameraProfiles.high);

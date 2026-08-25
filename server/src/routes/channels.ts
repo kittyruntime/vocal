@@ -9,9 +9,9 @@ const createSchema = z.object({
   name: z.string().min(1).max(64),
   type: z.enum(["text", "voice"]),
   requiredCapability: z.enum(CAPABILITIES).nullable().default(null),
-  defaultAudioQuality: z.enum(["low", "standard", "high"]).default("standard"),
-  defaultCameraQuality: z.enum(["low", "standard", "high"]).default("standard"),
-  defaultScreenQuality: z.enum(["low", "standard", "high", "game"]).default("standard"),
+  defaultAudioQuality: z.enum(["low", "standard", "high", "ultra"]).default("standard"),
+  defaultCameraQuality: z.enum(["low", "standard", "high", "ultra"]).default("standard"),
+  defaultScreenQuality: z.enum(["low", "standard", "high", "ultra", "game"]).default("standard"),
 });
 const updateSchema = createSchema.omit({ type: true }).partial().refine((value) => Object.keys(value).length > 0);
 

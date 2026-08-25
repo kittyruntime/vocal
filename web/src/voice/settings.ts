@@ -73,7 +73,7 @@ function customVideoSettings(
 }
 
 function isMediaQuality(value: unknown): value is CustomMediaQuality {
-  return value === "low" || value === "standard" || value === "high" || value === "custom";
+  return value === "low" || value === "standard" || value === "high" || value === "ultra" || value === "custom";
 }
 
 function isScreenQuality(value: unknown): value is CustomScreenQuality {
