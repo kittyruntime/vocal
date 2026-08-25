@@ -2,6 +2,12 @@
   "name": "desktop",
   "private": true,
   "version": "0.2.0",
+  "description": "Desktop client for Vocal, a self-hosted chat and voice platform.",
+  "homepage": "https://github.com/kittyruntime/vocal",
+  "author": {
+    "name": "kittyruntime",
+    "email": "kittyruntime@users.noreply.github.com"
+  },
   "main": "dist/main.js",
   "scripts": {
     "build": "tsc -p tsconfig.json",
