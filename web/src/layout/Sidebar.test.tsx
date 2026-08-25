@@ -1,3 +1,4 @@
+import type { ComponentProps } from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -8,7 +9,7 @@ import type { Channel, CurrentUser } from "../api/client";
 
 vi.mock("../api/client", async () => {
   const actual = await vi.importActual<typeof import("../api/client")>("../api/client");
-  return { ...actual, createChannel: vi.fn() };
+  return { ...actual, createChannel: vi.fn(), createDirectMessage: vi.fn(), search: vi.fn() };
 });
 
 const admin: CurrentUser = { id: "u1", username: "theo", capabilities: ["manage_channels", "manage_server", "moderate", "publish_voice"] };
@@ -19,7 +20,7 @@ const channels: Channel[] = [
   { id: "c2", name: "salle", type: "voice", requiredCapability: null, position: 1, createdAt: "now" },
 ];
 
-function renderSidebar(user: CurrentUser, onSelect = vi.fn(), onCreated = vi.fn(), unreadChannelIds: string[] = []) {
+function renderSidebar(user: CurrentUser, onSelect = vi.fn(), onCreated = vi.fn(), unreadChannelIds: string[] = [], extraProps: Partial<ComponentProps<typeof Sidebar>> = {}) {
   render(
     <ToastProvider>
       <Sidebar
@@ -31,12 +32,17 @@ function renderSidebar(user: CurrentUser, onSelect = vi.fn(), onCreated = vi.fn(
         currentUser={user}
         onSelectChannel={onSelect}
         onChannelCreated={onCreated}
+        {...extraProps}
       />
     </ToastProvider>,
   );
 }
 
-beforeEach(() => vi.mocked(api.createChannel).mockReset());
+beforeEach(() => {
+  vi.mocked(api.createChannel).mockReset();
+  vi.mocked(api.createDirectMessage).mockReset();
+  vi.mocked(api.search).mockReset();
+});
 
 describe("Sidebar", () => {
   it("groups channels by type and shows the presence count", () => {
@@ -123,5 +129,38 @@ describe("Sidebar", () => {
     await user.selectOptions(screen.getByLabelText("Who can access it?"), "moderate");
     await user.click(within(dialog).getByRole("button", { name: "Create channel" }));
     await waitFor(() => expect(api.createChannel).toHaveBeenCalledWith({ name: "staff voice", type: "voice", requiredCapability: "moderate" }));
+  });
+});
+
+describe("NewConversationModal", () => {
+  const onlineUsers = [
+    { id: "u1", username: "theo", avatarUrl: null },
+    { id: "u2", username: "alice", avatarUrl: null },
+    { id: "u3", username: "bob", avatarUrl: null },
+  ];
+
+  it("lists online members to pick from without typing anything", async () => {
+    renderSidebar(admin, vi.fn(), vi.fn(), [], { onlineUsers });
+    await userEvent.setup().click(screen.getByRole("button", { name: "New message" }));
+    const dialog = screen.getByRole("dialog", { name: "Start a conversation" });
+    const results = within(dialog).getByRole("list", { name: "Online members" });
+    // The current user (theo) is excluded from their own pick list.
+    expect(within(results).getByText("alice")).toBeInTheDocument();
+    expect(within(results).getByText("bob")).toBeInTheDocument();
+    expect(within(results).queryByText("theo")).not.toBeInTheDocument();
+  });
+
+  it("selects the top result with Enter and starts a DM on submit", async () => {
+    const created = { id: "conv1", type: "dm" as const, name: null, participants: [], createdAt: "now" };
+    vi.mocked(api.createDirectMessage).mockResolvedValue(created);
+    const onConversationCreated = vi.fn();
+    renderSidebar(admin, vi.fn(), vi.fn(), [], { onlineUsers, onConversationCreated });
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "New message" }));
+    const dialog = screen.getByRole("dialog", { name: "Start a conversation" });
+    await user.type(within(dialog).getByPlaceholderText("Search by username"), "{Enter}");
+    expect(within(dialog).getByText("alice")).toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: "Message" }));
+    await waitFor(() => expect(api.createDirectMessage).toHaveBeenCalledWith("u2"));
   });
 });

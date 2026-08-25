@@ -188,6 +188,7 @@ export function Sidebar({
       {newConversationOpen ? (
         <NewConversationModal
           currentUserId={currentUser.id}
+          onlineUsers={onlineUsers}
           onCreated={(conversation) => { onConversationCreated?.(conversation); setNewConversationOpen(false); }}
           onError={() => showToast("Could not start the conversation")}
           onClose={() => setNewConversationOpen(false)}
@@ -375,12 +376,22 @@ type MemberOption = { id: string; username: string; avatarUrl: string | null };
 // Debounced member search shared by the new-conversation and group-settings
 // modals -- both need "type a name, pick from matches" over the full member
 // list (not just online users), reusing /api/search the same way SearchModal does.
-function useMemberSearch(excludeIds: string[]) {
+function useMemberSearch(excludeIds: string[], browseList: MemberOption[] = []) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<MemberOption[]>([]);
   const requestRef = useRef(0);
+  // Keyed on the ids rather than the array itself: excludeIds/browseList are
+  // freshly-allocated on every parent render, and re-running this effect on
+  // every render (not just when the actual membership changes) would refetch
+  // needlessly and, with the browse-list branch, race the clear-on-select in
+  // pickTopResult below.
+  const excludeKey = excludeIds.join(",");
+  const browseKey = browseList.map((m) => m.id).join(",");
   useEffect(() => {
-    if (query.trim().length < 2) { setResults([]); return; }
+    if (query.trim().length < 2) {
+      setResults(browseList.filter((member) => !excludeIds.includes(member.id)));
+      return;
+    }
     const request = ++requestRef.current;
     const timer = setTimeout(() => {
       void api.search(query.trim())
@@ -389,17 +400,19 @@ function useMemberSearch(excludeIds: string[]) {
     }, 250);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query]);
-  return { query, setQuery, results };
+  }, [query, excludeKey, browseKey]);
+  return { query, setQuery, results, browsing: query.trim().length < 2 };
 }
 
 function NewConversationModal({
   currentUserId,
+  onlineUsers,
   onCreated,
   onError,
   onClose,
 }: {
   currentUserId: string;
+  onlineUsers?: PresenceUser[];
   onCreated(conversation: Conversation): void;
   onError(): void;
   onClose(): void;
@@ -407,7 +420,14 @@ function NewConversationModal({
   const [selected, setSelected] = useState<MemberOption[]>([]);
   const [groupName, setGroupName] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const { query, setQuery, results } = useMemberSearch([currentUserId, ...selected.map((m) => m.id)]);
+  const browseList = (onlineUsers ?? []).map((user) => ({ id: user.id, username: user.username, avatarUrl: user.avatarUrl ?? null }));
+  const { query, setQuery, results, browsing } = useMemberSearch([currentUserId, ...selected.map((m) => m.id)], browseList);
+
+  function pickTopResult() {
+    if (results.length === 0) return;
+    setSelected((values) => [...values, results[0]]);
+    setQuery("");
+  }
 
   async function handleSubmit() {
     if (selected.length === 0 || submitting) return;
@@ -436,9 +456,18 @@ function NewConversationModal({
               {selected.map((member) => <li key={member.id}>{member.username}<button type="button" aria-label={`Remove ${member.username}`} onClick={() => setSelected((values) => values.filter((v) => v.id !== member.id))}><Icon name="close" size={12} /></button></li>)}
             </ul>
           ) : null}
-          <TextField label="Search members" visuallyHiddenLabel autoFocus placeholder="Search by username" value={query} onChange={(event) => setQuery(event.target.value)} />
+          <TextField
+            label="Search members"
+            visuallyHiddenLabel
+            autoFocus
+            placeholder="Search by username"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            onKeyDown={(event) => { if (event.key === "Enter" && results.length > 0) { event.preventDefault(); pickTopResult(); } }}
+          />
           {results.length > 0 ? (
-            <ul className="conversation-member-results" aria-label="Search results">
+            <ul className="conversation-member-results" aria-label={browsing ? "Online members" : "Search results"}>
+              {browsing ? <li className="conversation-member-results-heading" aria-hidden="true">Online</li> : null}
               {results.map((member) => <li key={member.id}><button type="button" onClick={() => { setSelected((values) => [...values, member]); setQuery(""); }}><span className="member-avatar">{member.avatarUrl ? <img src={member.avatarUrl} alt="" /> : member.username[0].toUpperCase()}</span><span>{member.username}</span></button></li>)}
             </ul>
           ) : null}

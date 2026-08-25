@@ -192,6 +192,17 @@ export function MainLayout({ currentUser }: { currentUser: CurrentUser }) {
     setMobileSidebarOpen(false);
   }, []);
 
+  const startConversationWithUser = useCallback((userId: string) => {
+    api.createDirectMessage(userId)
+      .then((conversation) => {
+        dispatch({ type: "conversation/added", conversation });
+        selectConversation(conversation.id);
+        setViewedProfileId(null);
+        setSearchOpen(false);
+      })
+      .catch(() => showToast("Could not start the conversation"));
+  }, [selectConversation, showToast]);
+
   const reportSelfVoiceStatus = useCallback((channelId: string, status: { microphoneMuted: boolean; deafened: boolean }) => {
     selfVoiceStatusRef.current = status;
     socketRef.current?.send({ type: "voice.status", channelId, ...status });
@@ -333,7 +344,14 @@ export function MainLayout({ currentUser }: { currentUser: CurrentUser }) {
           ) : null}
         </div>
         {profileOpen ? <ProfileModal currentUser={currentUser} onClose={() => setProfileOpen(false)} onSaved={refresh} /> : null}
-        {viewedProfileId ? <UserProfileModal userId={viewedProfileId} onClose={() => setViewedProfileId(null)} /> : null}
+        {viewedProfileId ? (
+          <UserProfileModal
+            userId={viewedProfileId}
+            currentUserId={currentUser.id}
+            onClose={() => setViewedProfileId(null)}
+            onMessage={startConversationWithUser}
+          />
+        ) : null}
         {searchOpen ? <SearchModal onClose={() => setSearchOpen(false)} onSelectChannel={selectChannel} onViewProfile={setViewedProfileId} /> : null}
         {aboutOpen && version ? <AboutModal version={version} onClose={() => setAboutOpen(false)} /> : null}
       </div>

@@ -3,9 +3,20 @@ import type { PublicProfile } from "../api/client";
 import * as api from "../api/client";
 import { Icon } from "../ui/Icon";
 
-export function UserProfileModal({ userId, onClose }: { userId: string; onClose(): void }) {
+export function UserProfileModal({
+  userId,
+  currentUserId,
+  onClose,
+  onMessage,
+}: {
+  userId: string;
+  currentUserId?: string;
+  onClose(): void;
+  onMessage?(userId: string): void;
+}) {
   const [profile, setProfile] = useState<PublicProfile | null>(null);
   const [error, setError] = useState("");
+  const [messaging, setMessaging] = useState(false);
 
   useEffect(() => {
     void api.getPublicProfile(userId).then(setProfile).catch(() => setError("This profile could not be loaded."));
@@ -24,6 +35,16 @@ export function UserProfileModal({ userId, onClose }: { userId: string; onClose(
         <div className="public-profile-body">
           <span className="public-profile-avatar">{profile.avatarUrl ? <img src={profile.avatarUrl} alt="" /> : profile.username.slice(0, 1).toUpperCase()}</span>
           <h2>{profile.username}</h2>
+          {onMessage && profile.id !== currentUserId ? (
+            <button
+              type="button"
+              className="public-profile-message"
+              disabled={messaging}
+              onClick={() => { setMessaging(true); onMessage(profile.id); }}
+            >
+              <Icon name="message" size={16} /> {messaging ? "Opening…" : "Message"}
+            </button>
+          ) : null}
           <div className="public-profile-about"><strong>About me</strong><p>{profile.description || "No description yet."}</p></div>
         </div>
       </> : <div className="public-profile-loading">Loading profile…</div>}

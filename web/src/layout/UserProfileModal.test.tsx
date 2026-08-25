@@ -25,4 +25,19 @@ describe("UserProfileModal", () => {
     await userEvent.setup().click(screen.getByRole("button", { name: "Close user profile" }));
     expect(onClose).toHaveBeenCalled();
   });
+
+  it("offers a Message button that starts a conversation with that user", async () => {
+    vi.mocked(api.getPublicProfile).mockResolvedValue({ id: "u2", username: "alice", description: "", avatarUrl: null, bannerUrl: null });
+    const onMessage = vi.fn();
+    render(<UserProfileModal userId="u2" currentUserId="u1" onClose={vi.fn()} onMessage={onMessage} />);
+    await userEvent.setup().click(await screen.findByRole("button", { name: "Message" }));
+    expect(onMessage).toHaveBeenCalledWith("u2");
+  });
+
+  it("hides the Message button on your own profile", async () => {
+    vi.mocked(api.getPublicProfile).mockResolvedValue({ id: "u1", username: "me", description: "", avatarUrl: null, bannerUrl: null });
+    render(<UserProfileModal userId="u1" currentUserId="u1" onClose={vi.fn()} onMessage={vi.fn()} />);
+    await screen.findByRole("dialog");
+    expect(screen.queryByRole("button", { name: "Message" })).not.toBeInTheDocument();
+  });
 });
