@@ -24,6 +24,22 @@ on macOS, and an AppImage/`.deb` on Linux. The build is currently unsigned:
 Windows SmartScreen and macOS Gatekeeper will both warn on first launch
 until a code-signing certificate is added.
 
+## Releasing
+
+Version and changelog entries live at the repo root (`VERSION`,
+`CHANGELOG.md`), not in this package.
+
+1. Add the release's notes under `## [Unreleased]` in `CHANGELOG.md` as you go.
+2. When ready to cut a release: `pnpm release <version>` from the repo root
+   (e.g. `pnpm release 0.2.0`). This bumps `VERSION`, moves the `[Unreleased]`
+   entries under a dated heading, syncs `desktop/package.json`'s version, and
+   commits + tags `vX.Y.Z` locally.
+3. `git push origin main --tags` — pushing the tag triggers
+   `.github/workflows/release.yml`, which builds the Windows, Linux, and
+   macOS clients (macOS is best-effort and won't block the release if it
+   fails) and publishes them as a GitHub Release with that version's
+   changelog section as the release notes.
+
 ## What's not there yet
 
 - Code signing / notarization

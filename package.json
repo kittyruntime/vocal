@@ -3,6 +3,9 @@
   "private": true,
   "type": "module",
   "packageManager": "pnpm@10.30.0",
+  "scripts": {
+    "release": "node scripts/release.mjs"
+  },
   "pnpm": {
     "onlyBuiltDependencies": [
       "argon2",

@@ -1,0 +1,101 @@
+name: Release desktop clients
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm -C web build
+      - run: pnpm -C desktop build
+      - run: pnpm -C desktop run prepare-web
+      - run: pnpm -C desktop exec electron-builder --win --x64
+        env:
+          # No code-signing certificate yet (see desktop/README.md) --
+          # produces an unsigned installer; users will see an "unknown
+          # publisher" warning until one is added.
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer
+          path: desktop/release/*.exe
+          if-no-files-found: error
+
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm -C web build
+      - run: pnpm -C desktop build
+      - run: pnpm -C desktop run prepare-web
+      - run: pnpm -C desktop exec electron-builder --linux --x64
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-installers
+          path: |
+            desktop/release/*.AppImage
+            desktop/release/*.deb
+          if-no-files-found: error
+
+  build-mac:
+    runs-on: macos-latest
+    # Best-effort: no Apple Developer certificate to sign/notarize with, and
+    # nobody on the team can verify a macOS build by hand. A failure here
+    # (or Apple tightening Gatekeeper requirements) must never block the
+    # Windows/Linux release.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm -C web build
+      - run: pnpm -C desktop build
+      - run: pnpm -C desktop run prepare-web
+      - run: pnpm -C desktop exec electron-builder --mac --x64 --arm64
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-installer
+          path: desktop/release/*.dmg
+          if-no-files-found: error
+
+  publish:
+    needs: [build-windows, build-linux, build-mac]
+    if: always() && (needs.build-windows.result == 'success' || needs.build-linux.result == 'success')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - run: node scripts/changelog-section.mjs "${GITHUB_REF_NAME#v}" > release-notes.md
+      - uses: softprops/action-gh-release@v2
+        with:
+          name: "Vocal ${{ github.ref_name }}"
+          body_path: release-notes.md
+          files: artifacts/**/*
+          fail_on_unmatched_files: true
