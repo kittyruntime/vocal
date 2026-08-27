@@ -1,6 +1,6 @@
 import { app, Notification } from "electron";
 import { autoUpdater } from "electron-updater";
-import { appendFileSync } from "node:fs";
+import { appendFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 
 // electron-updater checks every 4h in addition to the startup check -- the
@@ -27,7 +27,37 @@ function logUpdateError(context: string, err: unknown): void {
   console.error(line);
 }
 
+// electron-builder writes a `package-type` marker file into the app's
+// resources for its deb/rpm targets, and electron-updater keys off exactly
+// that file to swap AppImageUpdater out for DebUpdater/RpmUpdater -- updaters
+// that shell out to `pkexec`/`gksudo`/`sudo` to run `dpkg -i`, i.e. a
+// graphical root-password prompt. System-package auto-update is explicitly
+// out of scope (design doc: "`.deb` auto-update (electron-updater does not
+// support it on Linux)"), and `desktop/README.md` tells `.deb` users to
+// reinstall manually. Every electron-updater 6.x ships and dispatches
+// DebUpdater, so this has to be refused here rather than by pinning the
+// dependency. AppImage builds carry no marker and update normally.
+let systemPackageInstall: boolean | null = null;
+function isSystemPackageInstall(): boolean {
+  if (systemPackageInstall === null) {
+    try {
+      // A running AppImage always sets APPIMAGE (it's how AppImageUpdater
+      // itself locates the file to patch). Checking it first keeps the marker
+      // check from ever misfiring: electron-builder writes `package-type`
+      // into the shared linux-unpacked/ directory the AppImage is also built
+      // from, so which of the two targets is built first decides whether the
+      // AppImage ends up carrying a stray marker.
+      systemPackageInstall =
+        !process.env.APPIMAGE && existsSync(join(process.resourcesPath, "package-type"));
+    } catch {
+      systemPackageInstall = false;
+    }
+  }
+  return systemPackageInstall;
+}
+
 export function checkForUpdates(): void {
+  if (isSystemPackageInstall()) return;
   autoUpdater
     .checkForUpdates()
     .then((result) => {
@@ -59,6 +89,10 @@ export function restartToInstallUpdate(): void {
 // outside a packaged build (no update checks in dev).
 export function initUpdater(onUpdateReady: (version: string) => void): void {
   if (!app.isPackaged) return;
+  if (isSystemPackageInstall()) {
+    console.info("updater: system-package install (deb/rpm), auto-update disabled");
+    return;
+  }
 
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = false;
