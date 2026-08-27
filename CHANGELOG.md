@@ -4,6 +4,11 @@ All notable changes to Vocal are documented here.
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-08-27
+
+### Fixed
+- The Linux desktop build failed to produce a `.deb` package because required package metadata (homepage, author email) was missing.
+
 ## [0.2.0] - 2026-08-25
 
 ### Added

@@ -1,7 +1,7 @@
 {
   "name": "desktop",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Desktop client for Vocal, a self-hosted chat and voice platform.",
   "homepage": "https://github.com/kittyruntime/vocal",
   "author": {
