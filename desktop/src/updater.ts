@@ -8,6 +8,10 @@ import { join } from "node:path";
 // single check per launch isn't enough to ever reach most users.
 const CHECK_INTERVAL_MS = 4 * 60 * 60 * 1000;
 
+// Version whose "update ready" notification has already been shown, so the
+// re-emitted `update-downloaded` events don't re-notify. See the handler.
+let notifiedVersion: string | null = null;
+
 // Update failures (no signed build on macOS yet, no network, no release
 // found, ...) are expected and must never interrupt the app -- logged
 // best-effort to the same crash.log main.ts's reportFatal writes to, never
@@ -24,11 +28,29 @@ function logUpdateError(context: string, err: unknown): void {
 }
 
 export function checkForUpdates(): void {
-  autoUpdater.checkForUpdates().catch((err) => logUpdateError("checkForUpdates", err));
+  autoUpdater
+    .checkForUpdates()
+    .then((result) => {
+      // With autoDownload on, the resolved result carries a *separate*
+      // download promise that electron-updater never attaches a handler to.
+      // Left alone, a failed download (unsigned macOS build, network drop)
+      // becomes an unhandledRejection, which main.ts turns into a blocking
+      // "Vocal failed to start" dialog. Update failures stay silent.
+      result?.downloadPromise?.catch((err) => logUpdateError("downloadUpdate", err));
+    })
+    .catch((err) => logUpdateError("checkForUpdates", err));
 }
 
+// quitAndInstall can throw synchronously (MacUpdater when Squirrel isn't in a
+// ready state). This runs from tray/notification click handlers, where an
+// uncaught throw would reach main.ts's uncaughtException handler and show the
+// same bogus fatal dialog.
 export function restartToInstallUpdate(): void {
-  autoUpdater.quitAndInstall();
+  try {
+    autoUpdater.quitAndInstall();
+  } catch (err) {
+    logUpdateError("quitAndInstall", err);
+  }
 }
 
 // Wires electron-updater in: silent background download, a native
@@ -42,7 +64,14 @@ export function initUpdater(onUpdateReady: (version: string) => void): void {
   autoUpdater.autoInstallOnAppQuit = false;
 
   autoUpdater.on("update-downloaded", (info) => {
+    // Once an update is cached, every subsequent periodic check re-emits
+    // `update-downloaded` without re-downloading, so notify only once per
+    // version -- otherwise a user who doesn't restart collects a toast every
+    // 4h. `onUpdateReady` stays unconditional: it's idempotent and keeps the
+    // tray menu correct.
     onUpdateReady(info.version);
+    if (notifiedVersion === info.version) return;
+    notifiedVersion = info.version;
     if (Notification.isSupported()) {
       const notification = new Notification({
         title: "Update ready",
