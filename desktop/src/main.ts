@@ -115,6 +115,11 @@ function createWindow(startUrl: string): void {
     minHeight: 480,
     title: "Vocal",
     icon: join(__dirname, "..", "build", "icon.png"),
+    // The default File/Edit/View/Window/Help menu has no custom items and
+    // is pure clutter for a chat/voice app -- hide it (Alt still reveals it
+    // if someone needs it). No-op on macOS, which has no per-window menu
+    // bar to begin with.
+    autoHideMenuBar: true,
     webPreferences: {
       preload: join(__dirname, "preload.js"),
       contextIsolation: true,
