@@ -3,10 +3,12 @@ import { appendFileSync } from "node:fs";
 import { join } from "node:path";
 import { clearConfig, loadConfig, saveConfig, type DesktopConfig } from "./config";
 import { startStaticServer } from "./staticServer";
+import { checkForUpdates, initUpdater, restartToInstallUpdate } from "./updater";
 
 let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let quitting = false;
+let updateReadyVersion: string | null = null;
 
 // A packaged GUI app has no visible console -- a startup exception a user
 // hits (as opposed to one caught locally in dev) previously just closed the
@@ -75,6 +77,10 @@ async function main(): Promise<void> {
   const startUrl = await resolveStartUrl();
   createWindow(startUrl);
   createTray();
+  initUpdater((version) => {
+    updateReadyVersion = version;
+    rebuildTrayMenu();
+  });
 
   ipcMain.handle("desktop:get-config", (): DesktopConfig | null => loadConfig());
   ipcMain.handle("desktop:set-config", (_event, config: DesktopConfig) => saveConfig(config));
@@ -149,16 +155,36 @@ function createTray(): void {
   try {
     tray = new Tray(trayIcon());
     tray.setToolTip("Vocal");
-    tray.setContextMenu(Menu.buildFromTemplate([
-      { label: "Open Vocal", click: () => { mainWindow?.show(); mainWindow?.focus(); } },
-      { type: "separator" },
-      { label: "Quit", click: () => { quitting = true; app.quit(); } },
-    ]));
+    tray.setContextMenu(Menu.buildFromTemplate(trayMenuTemplate()));
     tray.on("click", () => { mainWindow?.show(); mainWindow?.focus(); });
   } catch (err) {
     reportFatal("createTray (non-fatal, continuing without a tray icon)", err);
     tray = null;
   }
+}
+
+// Rebuilt whenever `updateReadyVersion` changes (see initUpdater's
+// onUpdateReady callback in main()) so a "restart to update" item can
+// appear without recreating the Tray itself.
+function trayMenuTemplate(): Electron.MenuItemConstructorOptions[] {
+  const items: Electron.MenuItemConstructorOptions[] = [];
+  if (updateReadyVersion) {
+    items.push(
+      { label: `Restart to update (v${updateReadyVersion})`, click: () => restartToInstallUpdate() },
+      { type: "separator" },
+    );
+  }
+  items.push(
+    { label: "Open Vocal", click: () => { mainWindow?.show(); mainWindow?.focus(); } },
+    { label: "Check for Updates", click: () => checkForUpdates() },
+    { type: "separator" },
+    { label: "Quit", click: () => { quitting = true; app.quit(); } },
+  );
+  return items;
+}
+
+function rebuildTrayMenu(): void {
+  tray?.setContextMenu(Menu.buildFromTemplate(trayMenuTemplate()));
 }
 
 function trayIcon() {

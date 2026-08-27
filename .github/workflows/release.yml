@@ -22,16 +22,22 @@ jobs:
       - run: pnpm -C web build
       - run: pnpm -C desktop build
       - run: pnpm -C desktop run prepare-web
-      - run: pnpm -C desktop exec electron-builder --win --x64
+      - run: pnpm -C desktop exec electron-builder --win --x64 --publish never
         env:
           # No code-signing certificate yet (see desktop/README.md) --
           # produces an unsigned installer; users will see an "unknown
-          # publisher" warning until one is added.
+          # publisher" warning until one is added. --publish never still
+          # writes the auto-update feed metadata (latest.yml) locally
+          # without electron-builder trying to talk to GitHub itself --
+          # the softprops/action-gh-release step below handles the upload.
           CSC_IDENTITY_AUTO_DISCOVERY: false
       - uses: actions/upload-artifact@v4
         with:
           name: windows-installer
-          path: desktop/release/*.exe
+          path: |
+            desktop/release/*.exe
+            desktop/release/*.exe.blockmap
+            desktop/release/latest.yml
           if-no-files-found: error
 
   build-linux:
@@ -47,13 +53,15 @@ jobs:
       - run: pnpm -C web build
       - run: pnpm -C desktop build
       - run: pnpm -C desktop run prepare-web
-      - run: pnpm -C desktop exec electron-builder --linux --x64
+      - run: pnpm -C desktop exec electron-builder --linux --x64 --publish never
       - uses: actions/upload-artifact@v4
         with:
           name: linux-installers
           path: |
             desktop/release/*.AppImage
             desktop/release/*.deb
+            desktop/release/*.AppImage.blockmap
+            desktop/release/latest-linux.yml
           if-no-files-found: error
 
   build-mac:
@@ -74,13 +82,17 @@ jobs:
       - run: pnpm -C web build
       - run: pnpm -C desktop build
       - run: pnpm -C desktop run prepare-web
-      - run: pnpm -C desktop exec electron-builder --mac --x64 --arm64
+      - run: pnpm -C desktop exec electron-builder --mac --x64 --arm64 --publish never
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: false
       - uses: actions/upload-artifact@v4
         with:
           name: macos-installer
-          path: desktop/release/*.dmg
+          path: |
+            desktop/release/*.dmg
+            desktop/release/*.zip
+            desktop/release/*.zip.blockmap
+            desktop/release/latest-mac.yml
           if-no-files-found: error
 
   publish:

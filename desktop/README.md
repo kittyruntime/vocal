@@ -40,9 +40,19 @@ Version and changelog entries live at the repo root (`VERSION`,
    fails) and publishes them as a GitHub Release with that version's
    changelog section as the release notes.
 
+## Auto-update
+
+The app checks for a newer GitHub release on startup and every 4 hours
+while running, downloads it silently in the background, then offers to
+restart via a notification and a tray menu item ("Restart to update") --
+nothing is installed without that explicit click. Windows and the Linux
+AppImage update in place; a `.deb` install must be reinstalled manually,
+and macOS checks run but won't actually apply an update until the app is
+code-signed (see below).
+
 ## What's not there yet
 
-- Code signing / notarization
-- Auto-update
+- Code signing / notarization (blocks macOS auto-update from actually
+  applying — see "Auto-update" above)
 - A proper screen/window picker for screen sharing (the primary screen is
   auto-selected)

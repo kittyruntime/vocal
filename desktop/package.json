@@ -16,6 +16,9 @@
     "start": "npm run build && npm run prepare-web && electron dist/main.js",
     "dist": "npm run build && npm run prepare-web && electron-builder"
   },
+  "dependencies": {
+    "electron-updater": "6.8.9"
+  },
   "devDependencies": {
     "@types/node": "^24.0.0",
     "electron": "^33.0.0",
@@ -37,11 +40,16 @@
     "extraMetadata": {
       "main": "dist/main.js"
     },
+    "publish": {
+      "provider": "github",
+      "owner": "kittyruntime",
+      "repo": "vocal"
+    },
     "win": {
       "target": "nsis"
     },
     "mac": {
-      "target": "dmg",
+      "target": ["dmg", "zip"],
       "category": "public.app-category.social-networking"
     },
     "linux": {

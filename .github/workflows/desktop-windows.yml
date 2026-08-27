@@ -35,7 +35,7 @@ jobs:
 
       - run: pnpm -C desktop run prepare-web
 
-      - run: pnpm -C desktop exec electron-builder --win --x64
+      - run: pnpm -C desktop exec electron-builder --win --x64 --publish never
         env:
           # No code-signing certificate yet (see desktop/README.md) --
           # produces an unsigned installer; users will see an "unknown
