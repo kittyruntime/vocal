@@ -157,8 +157,6 @@ function createTray(): void {
 }
 
 function trayIcon() {
-  // A bundled real icon (converted from web/public/favicon.svg) is a
-  // follow-up; Electron's own default icon is used until then.
   return join(__dirname, "..", "build", "tray.png");
 }
 

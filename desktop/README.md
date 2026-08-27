@@ -46,5 +46,3 @@ Version and changelog entries live at the repo root (`VERSION`,
 - Auto-update
 - A proper screen/window picker for screen sharing (the primary screen is
   auto-selected)
-- `build/icon.png` and `build/tray.png` are flat placeholder squares —
-  swap them for real icons before shipping
