@@ -4,6 +4,8 @@ All notable changes to Vocal are documented here.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-08-27
+
 ### Added
 - The desktop client now checks for updates automatically (on startup and every 4 hours) and offers to restart and install them once downloaded -- no more manual reinstalls for Windows and Linux (AppImage) users. macOS auto-update is wired up but won't apply updates until the app is code-signed.
 
