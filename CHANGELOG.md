@@ -7,6 +7,9 @@ All notable changes to Vocal are documented here.
 ### Added
 - The desktop client now checks for updates automatically (on startup and every 4 hours) and offers to restart and install them once downloaded -- no more manual reinstalls for Windows and Linux (AppImage) users. macOS auto-update is wired up but won't apply updates until the app is code-signed.
 
+### Changed
+- The desktop app now shows its real icon (instead of a placeholder square) and hides the unused default menu bar.
+
 ## [0.2.1] - 2026-08-27
 
 ### Fixed
