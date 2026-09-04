@@ -4,6 +4,14 @@ All notable changes to Vocal are documented here.
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-09-04
+
+### Fixed
+- The in-app changelog/about modal no longer renders transparent and illegible -- it now uses the defined theme tokens.
+- Profile avatars and chat attachment images now load in the desktop client (and any Bearer-token session) by fetching with the auth token and rendering blob URLs instead of plain `<img>` tags.
+- The chat composer attach button now shows a paperclip icon with a subtle style instead of the off-looking plus-in-circle.
+- Screen sharing in the desktop client no longer fails silently when no screen source is available -- it logs the cause and shows an explanatory dialog (e.g. missing macOS Screen Recording permission).
+
 ## [0.3.0] - 2026-08-27
 
 ### Added
