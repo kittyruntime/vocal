@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type ClipboardEvent, type
 import type { Channel, CurrentUser, Message } from "../api/client";
 import * as api from "../api/client";
 import { useToast } from "../toast/ToastContext";
+import { AuthenticatedImage, useAuthenticatedUrl } from "../ui/AuthenticatedImage";
 import { Icon } from "../ui/Icon";
 import { TextField } from "../ui/form";
 
@@ -336,7 +337,7 @@ export function ChatView({
         )}
         {messages.map((message) => (
           <article key={message.id} className="chat-message">
-            <button type="button" className="message-profile-trigger" aria-label={`View profile of ${message.username}`} onClick={() => onViewProfile?.(message.userId)}><span className="message-avatar" aria-hidden="true">{message.avatarUrl ? <img src={message.avatarUrl} alt="" /> : message.username.slice(0, 1).toUpperCase()}</span></button>
+            <button type="button" className="message-profile-trigger" aria-label={`View profile of ${message.username}`} onClick={() => onViewProfile?.(message.userId)}><span className="message-avatar" aria-hidden="true">{message.avatarUrl ? <AuthenticatedImage src={message.avatarUrl} alt="" /> : message.username.slice(0, 1).toUpperCase()}</span></button>
             <div className="message-body">
               {message.replyTo ? <div className="message-reply-context"><Icon name="reply" size={13} /><strong>{message.replyTo.username}</strong><span>{message.replyTo.content || "Attachment"}</span></div> : null}
               <div className="message-meta">
@@ -345,16 +346,7 @@ export function ChatView({
               </div>
               {editingId === message.id ? <form className="message-edit-form" onSubmit={(event) => { event.preventDefault(); void saveEdit(message.id); }}><TextField label="Edit message" visuallyHiddenLabel value={editDraft} maxLength={maxMessageLength} autoFocus onChange={(event) => setEditDraft(event.target.value)} /><div><button type="button" onClick={() => setEditingId(null)}>Cancel</button><button type="submit">Save</button></div></form> : <MessageContent content={message.content} />}
               {(message.attachments?.length ?? 0) > 0 ? <div className="message-attachments">
-                {message.attachments!.map((attachment) => INLINE_SAFE_MIME_TYPES.has(attachment.mimeType) ? (
-                  <a key={attachment.id} className="message-image" href={attachment.url} target="_blank" rel="noreferrer">
-                    <img src={attachment.url} alt={attachment.filename} loading="lazy" />
-                  </a>
-                ) : (
-                  <a key={attachment.id} className="message-file" href={attachment.url} download={attachment.filename}>
-                    <span><Icon name="file" size={22} /></span>
-                    <span><strong>{attachment.filename}</strong><small>{formatFileSize(attachment.size)}</small></span>
-                  </a>
-                ))}
+                {message.attachments!.map((attachment) => <MessageAttachment key={attachment.id} attachment={attachment} />)}
               </div> : null}
               {(message.reactions?.length ?? 0) > 0 ? <div className="message-reactions">{message.reactions!.map((reaction) => <button type="button" key={reaction.emoji} className={reaction.userIds.includes(currentUser?.id ?? "") ? "active" : ""} aria-label={`${reaction.emoji}, ${reaction.count} reactions`} onClick={() => void toggleReaction(message, reaction.emoji)}><span>{reaction.emoji}</span>{reaction.count}</button>)}</div> : null}
             </div>
@@ -368,7 +360,7 @@ export function ChatView({
       {replyTo ? <div className="composer-reply"><span>Replying to <strong>{replyTo.username}</strong></span><button type="button" aria-label="Cancel reply" onClick={() => setReplyTo(null)}><Icon name="close" size={15} /></button></div> : null}
       <form className="chat-composer" onSubmit={handleSubmit}>
         <div className="composer-field">
-          <button type="button" className="composer-attach-button" aria-label="Attach files" onClick={() => fileInputRef.current?.click()}><Icon name="plus" size={20} /></button>
+          <button type="button" className="composer-attach-button" aria-label="Attach files" title="Attach files" onClick={() => fileInputRef.current?.click()}><Icon name="attach" size={20} /></button>
           <input ref={fileInputRef} className="sr-only" type="file" multiple onChange={(event) => {
             const selected = [...(event.target.files ?? [])];
             addFiles(selected);
@@ -398,6 +390,27 @@ export function ChatView({
       </form>
       <div className="typing-indicator" aria-live="polite">{formatTypingUsers(typingUsernames)}</div>
     </div>
+  );
+}
+
+function MessageAttachment({ attachment }: { attachment: NonNullable<Message["attachments"]>[number] }) {
+  // Same Bearer-vs-<img>/<a> gap as avatars: under token auth the blob URL
+  // carries the auth, the raw `/api/attachments/:id` URL cannot. Cookie auth
+  // keeps the raw URL (hook returns the input untouched).
+  const resolvedUrl = useAuthenticatedUrl(attachment.url);
+  const href = resolvedUrl ?? attachment.url;
+  if (INLINE_SAFE_MIME_TYPES.has(attachment.mimeType)) {
+    return (
+      <a className="message-image" href={href} target="_blank" rel="noreferrer">
+        <AuthenticatedImage src={attachment.url} alt={attachment.filename} loading="lazy" />
+      </a>
+    );
+  }
+  return (
+    <a className="message-file" href={href} download={attachment.filename}>
+      <span><Icon name="file" size={22} /></span>
+      <span><strong>{attachment.filename}</strong><small>{formatFileSize(attachment.size)}</small></span>
+    </a>
   );
 }
 

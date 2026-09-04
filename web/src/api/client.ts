@@ -82,6 +82,22 @@ let authToken: string | null = null;
 export function setAuthToken(token: string | null): void {
   authToken = token;
 }
+export function getAuthToken(): string | null {
+  return authToken;
+}
+
+// Same credential + Bearer transport as `request()`, but returns the raw
+// Response so binary payloads (avatars, attachments) can be read as blobs.
+// Plain `<img src>` tags can never send the `Authorization` header, so the
+// desktop app (Bearer auth, no usable cookie) must load images through here
+// and render them as object URLs instead.
+export function fetchWithAuth(url: string, init?: RequestInit): Promise<Response> {
+  return fetch(url, {
+    ...init,
+    credentials: getServerBase() ? "omit" : "include",
+    headers: { ...(authToken ? { authorization: `Bearer ${authToken}` } : {}), ...init?.headers },
+  });
+}
 
 // Points every relative request (fetch paths below, but also plain <img>/<a>
 // URLs the app renders for avatars/attachments, which it never prefixes

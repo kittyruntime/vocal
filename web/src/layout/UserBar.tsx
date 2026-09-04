@@ -1,4 +1,5 @@
 import type { CurrentUser } from "../api/client";
+import { AuthenticatedImage } from "../ui/AuthenticatedImage";
 import { Icon } from "../ui/Icon";
 
 function describeCapabilities(capabilities: CurrentUser["capabilities"]): string {
@@ -11,7 +12,7 @@ export function UserBar({ currentUser, onOpenProfile, onSignOut }: { currentUser
   return (
     <div className="user-bar">
       <button type="button" className="user-profile-button" aria-label="Edit profile" onClick={onOpenProfile}>
-        <span className="user-avatar" aria-hidden="true">{currentUser.avatarUrl ? <img src={currentUser.avatarUrl} alt="" /> : currentUser.username.slice(0, 1).toUpperCase()}</span>
+        <span className="user-avatar" aria-hidden="true">{currentUser.avatarUrl ? <AuthenticatedImage src={currentUser.avatarUrl} alt="" /> : currentUser.username.slice(0, 1).toUpperCase()}</span>
       </button>
       <div className="user-identity">
         <span className="user-name">{currentUser.username}</span>

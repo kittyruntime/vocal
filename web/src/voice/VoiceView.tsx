@@ -29,6 +29,7 @@ import type { Channel, CurrentUser } from "../api/client";
 import * as api from "../api/client";
 import { playAppSound } from "../audio/sounds";
 import { useToast } from "../toast/ToastContext";
+import { AuthenticatedImage } from "../ui/AuthenticatedImage";
 import { Icon } from "../ui/Icon";
 import { RadioGroup, RangeSlider, Select, Switch } from "../ui/form";
 import { CustomNumberField } from "./CustomNumberField";
@@ -1155,7 +1156,7 @@ export function VoiceView({
               return (
                 <article key={participant.identity} className={`voice-participant ${speaking ? "is-speaking" : ""}`} onClick={() => onViewProfile?.(participant.identity)}>
                   <div className="participant-avatar-wrap">
-                    <span className="participant-avatar">{participant.avatarUrl ? <img src={participant.avatarUrl} alt="" /> : participant.name.slice(0, 1).toUpperCase()}</span>
+                    <span className="participant-avatar">{participant.avatarUrl ? <AuthenticatedImage src={participant.avatarUrl} alt="" /> : participant.name.slice(0, 1).toUpperCase()}</span>
                   </div>
                   <strong>{participant.name}{participant.local ? " (you)" : ""}</strong>
                   <div className="participant-media-status" aria-label={`${participant.name}: ${participant.microphoneMuted ? "microphone muted" : "microphone on"}${participant.deafened ? ", sound muted" : ""}`}>
@@ -1172,7 +1173,7 @@ export function VoiceView({
           <div ref={localCameraRef} className={`local-video ${pinnedTileId === "local-camera" ? "is-pinned" : ""} ${localSpeaking ? "is-speaking" : ""}`} data-participant-id={currentUser.id} onClick={() => cameraEnabled && setPinnedTileId((value) => value === "local-camera" ? null : "local-camera")} />
           <div ref={remoteVideoRef} className="remote-videos" />
         </div>
-        {hasVideo && !hideAudioOnly && audioOnlyParticipants.length > 0 ? <div className="voice-audio-strip">{audioOnlyParticipants.map((participant) => <button type="button" key={participant.identity} onClick={() => onViewProfile?.(participant.identity)}><span className={`member-avatar ${activeSpeakerIds.has(participant.identity) ? "is-speaking" : ""}`}>{participant.avatarUrl ? <img src={participant.avatarUrl} alt="" /> : participant.name[0].toUpperCase()}</span><span>{participant.name}{participant.local ? " (you)" : ""}</span><span className="voice-media-status" aria-label={`${participant.name}: ${participant.microphoneMuted ? "microphone muted" : "microphone on"}${participant.deafened ? ", sound muted" : ""}`}>{participant.microphoneMuted ? <Icon name="microphoneOff" size={14} /> : null}{participant.deafened ? <Icon name="headphonesOff" size={14} /> : null}</span></button>)}</div> : null}
+        {hasVideo && !hideAudioOnly && audioOnlyParticipants.length > 0 ? <div className="voice-audio-strip">{audioOnlyParticipants.map((participant) => <button type="button" key={participant.identity} onClick={() => onViewProfile?.(participant.identity)}><span className={`member-avatar ${activeSpeakerIds.has(participant.identity) ? "is-speaking" : ""}`}>{participant.avatarUrl ? <AuthenticatedImage src={participant.avatarUrl} alt="" /> : participant.name[0].toUpperCase()}</span><span>{participant.name}{participant.local ? " (you)" : ""}</span><span className="voice-media-status" aria-label={`${participant.name}: ${participant.microphoneMuted ? "microphone muted" : "microphone on"}${participant.deafened ? ", sound muted" : ""}`}>{participant.microphoneMuted ? <Icon name="microphoneOff" size={14} /> : null}{participant.deafened ? <Icon name="headphonesOff" size={14} /> : null}</span></button>)}</div> : null}
         {screenAudioParticipants.length > 0 ? (
           <div className="screen-audio-mixer" aria-label="Screen share audio controls">
             {screenAudioParticipants.map((participant) => {

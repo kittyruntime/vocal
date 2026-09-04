@@ -19,6 +19,7 @@ import {
   Minimize2,
   MonitorUp,
   MonitorOff,
+  Paperclip,
   PhoneOff,
   Plus,
   Pencil,
@@ -59,6 +60,7 @@ type IconName =
   | "monitorOff"
   | "phone"
   | "plus"
+  | "attach"
   | "edit"
   | "send"
   | "search"
@@ -95,6 +97,7 @@ const icons: Record<IconName, LucideIcon> = {
   monitorOff: MonitorOff,
   phone: PhoneOff,
   plus: Plus,
+  attach: Paperclip,
   edit: Pencil,
   send: Send,
   search: Search,

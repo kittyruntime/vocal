@@ -70,8 +70,26 @@ async function main(): Promise<void> {
   // window/screen picker UI is a reasonable follow-up, not required for the
   // app to work.
   session.defaultSession.setDisplayMediaRequestHandler(async (_request, callback) => {
-    const sources = await desktopCapturer.getSources({ types: ["screen"] });
-    callback({ video: sources[0], audio: "loopback" });
+    let sources: Electron.DesktopCapturerSource[] = [];
+    try {
+      sources = await desktopCapturer.getSources({ types: ["screen"] });
+    } catch (err) {
+      console.error("[display-media] desktopCapturer.getSources failed:", err);
+    }
+    const primary = sources[0];
+    if (!primary) {
+      console.error("[display-media] no screen sources available (OS permission missing or Wayland restriction?)");
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        dialog.showMessageBox(mainWindow, {
+          type: "warning",
+          title: "Screen sharing unavailable",
+          message: "No screen was found to share.",
+          detail: "If you are on macOS, allow Screen Recording for Vocal in System Settings > Privacy & Security. On Linux/Wayland, screen capture may be restricted to the system picker.",
+        }).catch(() => {});
+      }
+      return;
+    }
+    callback({ video: primary, audio: "loopback" });
   }, { useSystemPicker: true });
 
   const startUrl = await resolveStartUrl();

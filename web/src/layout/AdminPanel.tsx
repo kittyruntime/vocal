@@ -4,6 +4,7 @@ import { ACCENT_PRESETS, CAPABILITIES, SOUND_EVENTS } from "../api/client";
 import * as api from "../api/client";
 import { previewSound } from "../audio/sounds";
 import { ACCENT_PRESET_LABELS, ACCENT_SWATCH_COLORS } from "../theme/accent";
+import { AuthenticatedImage } from "../ui/AuthenticatedImage";
 import { Icon } from "../ui/Icon";
 import { Checkbox, ColorField, Select, Switch, TextField } from "../ui/form";
 
@@ -211,7 +212,7 @@ export function AdminPanel({ currentUser, onClose }: {
             <div className="admin-user-list">
               {users.map((user) => (
                 <div className={`admin-user ${user.bannedAt ? "is-banned" : ""}`} key={user.id}>
-                  <span className="member-avatar">{user.avatarUrl ? <img src={user.avatarUrl} alt="" /> : user.username[0].toUpperCase()}</span>
+                  <span className="member-avatar">{user.avatarUrl ? <AuthenticatedImage src={user.avatarUrl} alt="" /> : user.username[0].toUpperCase()}</span>
                   <strong>{user.username}{user.id === currentUser.id ? " (you)" : ""}{user.bannedAt ? <span className="ban-badge">Banned</span> : null}{user.voiceMuted ? <span className="mute-badge">Voice muted</span> : null}</strong>
                   <div className="admin-user-capabilities">
                     {canManageServer && roles.length > 0 ? (

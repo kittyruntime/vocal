@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { PublicProfile } from "../api/client";
 import * as api from "../api/client";
+import { AuthenticatedImage, useAuthenticatedUrl } from "../ui/AuthenticatedImage";
 import { Icon } from "../ui/Icon";
 
 export function UserProfileModal({
@@ -27,13 +28,14 @@ export function UserProfileModal({
     return () => window.removeEventListener("keydown", close);
   }, [onClose]);
 
+  const bannerUrl = useAuthenticatedUrl(profile?.bannerUrl ?? null);
   return <div className="voice-modal-backdrop public-profile-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
     <section className="public-profile-modal" role="dialog" aria-modal="true" aria-label={profile ? `Profile of ${profile.username}` : "User profile"}>
       <button type="button" className="modal-close public-profile-close" aria-label="Close user profile" onClick={onClose}><Icon name="close" size={18} /></button>
       {error ? <p className="form-error" role="alert">{error}</p> : profile ? <>
-        <div className="public-profile-banner" style={profile.bannerUrl ? { backgroundImage: `url(${profile.bannerUrl})` } : undefined} />
+        <div className="public-profile-banner" style={(bannerUrl ?? profile.bannerUrl) ? { backgroundImage: `url(${bannerUrl ?? profile.bannerUrl})` } : undefined} />
         <div className="public-profile-body">
-          <span className="public-profile-avatar">{profile.avatarUrl ? <img src={profile.avatarUrl} alt="" /> : profile.username.slice(0, 1).toUpperCase()}</span>
+          <span className="public-profile-avatar">{profile.avatarUrl ? <AuthenticatedImage src={profile.avatarUrl} alt="" /> : profile.username.slice(0, 1).toUpperCase()}</span>
           <h2>{profile.username}</h2>
           {onMessage && profile.id !== currentUserId ? (
             <button

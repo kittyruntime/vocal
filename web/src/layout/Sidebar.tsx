@@ -3,6 +3,7 @@ import type { Capability, Channel, Conversation, CurrentUser, VersionInfo } from
 import * as api from "../api/client";
 import { useToast } from "../toast/ToastContext";
 import type { PresenceUser, VoiceParticipant } from "../ws/protocol";
+import { AuthenticatedImage } from "../ui/AuthenticatedImage";
 import { Icon } from "../ui/Icon";
 import { RadioGroup, Select, TextField } from "../ui/form";
 import { Wordmark } from "../ui/Wordmark";
@@ -164,7 +165,7 @@ export function Sidebar({
       <section className="online-members" aria-label="Online members">
         <h2><span className="online-dot" /> Online — {onlineUserIds.length}</h2>
         <ul>
-          {(onlineUsers ?? []).map((user) => <li key={user.id}><span className="online-member-avatar">{user.avatarUrl ? <img src={user.avatarUrl} alt="" /> : user.username.slice(0, 1).toUpperCase()}</span><span>{user.username}</span></li>)}
+          {(onlineUsers ?? []).map((user) => <li key={user.id}><span className="online-member-avatar">{user.avatarUrl ? <AuthenticatedImage src={user.avatarUrl} alt="" /> : user.username.slice(0, 1).toUpperCase()}</span><span>{user.username}</span></li>)}
           {(onlineUsers ?? []).length === 0 && <li className="online-members-empty">No names available yet</li>}
         </ul>
       </section>
@@ -282,7 +283,7 @@ function ChannelGroup({
                   const speaking = voiceSpeakingUserIds?.includes(participant.userId) ?? false;
                   return (
                     <li key={participant.userId} className={speaking ? "is-speaking" : ""} onClick={() => onViewProfile?.(participant.userId)}>
-                      <span className="member-avatar">{participant.avatarUrl ? <img src={participant.avatarUrl} alt="" /> : participant.username.slice(0, 1).toUpperCase()}</span>
+                      <span className="member-avatar">{participant.avatarUrl ? <AuthenticatedImage src={participant.avatarUrl} alt="" /> : participant.username.slice(0, 1).toUpperCase()}</span>
                       <span className="voice-occupant-name">{participant.userId === currentUserId ? `${participant.username} (you)` : participant.username}</span>
                       <span className="voice-media-status" aria-label={`${participant.username}: ${participant.microphoneMuted ? "microphone muted" : "microphone on"}${participant.deafened ? ", sound muted" : ""}`}>
                         {participant.microphoneMuted ? <Icon name="microphoneOff" size={14} /> : null}
@@ -467,7 +468,7 @@ function NewConversationModal({
           {results.length > 0 ? (
             <ul className="conversation-member-results" aria-label={browsing ? "Online members" : "Search results"}>
               {browsing ? <li className="conversation-member-results-heading" aria-hidden="true">Online</li> : null}
-              {results.map((member) => <li key={member.id}><button type="button" onClick={() => { setSelected((values) => [...values, member]); setQuery(""); }}><span className="member-avatar">{member.avatarUrl ? <img src={member.avatarUrl} alt="" /> : member.username[0].toUpperCase()}</span><span>{member.username}</span></button></li>)}
+              {results.map((member) => <li key={member.id}><button type="button" onClick={() => { setSelected((values) => [...values, member]); setQuery(""); }}><span className="member-avatar">{member.avatarUrl ? <AuthenticatedImage src={member.avatarUrl} alt="" /> : member.username[0].toUpperCase()}</span><span>{member.username}</span></button></li>)}
             </ul>
           ) : null}
           {selected.length > 1 ? (
@@ -541,7 +542,7 @@ function GroupSettingsModal({
           <TextField label="Add a member" visuallyHiddenLabel placeholder="Search by username" value={query} onChange={(event) => setQuery(event.target.value)} />
           {results.length > 0 ? (
             <ul className="conversation-member-results" aria-label="Search results">
-              {results.map((member) => <li key={member.id}><button type="button" onClick={() => void addParticipant(member.id)}><span className="member-avatar">{member.avatarUrl ? <img src={member.avatarUrl} alt="" /> : member.username[0].toUpperCase()}</span><span>{member.username}</span><Icon name="userPlus" size={14} /></button></li>)}
+              {results.map((member) => <li key={member.id}><button type="button" onClick={() => void addParticipant(member.id)}><span className="member-avatar">{member.avatarUrl ? <AuthenticatedImage src={member.avatarUrl} alt="" /> : member.username[0].toUpperCase()}</span><span>{member.username}</span><Icon name="userPlus" size={14} /></button></li>)}
             </ul>
           ) : null}
           <footer><button type="button" className="danger-link" onClick={() => void removeParticipant(currentUserId)} disabled={busy}><Icon name="logout" size={14} /> Leave group</button></footer>
