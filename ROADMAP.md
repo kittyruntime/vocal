@@ -1,6 +1,6 @@
 # Vocal roadmap
 
-Last updated: 2026-08-13 (custom-stream-quality: validated Custom media controls and whole-feature verification)
+Last updated: 2026-09-29 (roadmap refresh: v0.2.0 through v0.3.1 -- direct messages, desktop client, auto-update -- plus release gaps and re-ranked next steps)
 
 This file is the hand-off point for the current product pass. Update it after every stable, pushed lot.
 
@@ -28,8 +28,17 @@ This file is the hand-off point for the current product pass. Update it after ev
 - [x] Vocal identity phase 1: replaced Discord's literally-copied brand colors/font with a new identity -- 5 fixed accent-color presets (server-wide default + optional personal override), a wordmark/favicon, and Inter/Space Grotesk typography
 - [x] Vocal identity phase 2: swept the rest of the app's hardcoded Discord blurple onto the accent tokens, plus 5 small non-blocking fixes flagged by the phase-1 final review
 
-All planned lots for this product pass are now delivered. See "Next steps"
-under Handoff for what's left, none of it blocking.
+- [x] Versioning and multi-platform release pipeline: root `VERSION` + `CHANGELOG.md`, `pnpm release <version>`, tag-triggered GitHub Release builds (v0.1.0)
+- [x] Direct messages and group conversations with channel feature parity (v0.2.0)
+- [x] Electron desktop client for Windows, macOS and Linux, with Bearer-token auth and a configurable server URL (v0.2.0)
+- [x] RNNoise noise reduction, an "Ultra" quality tier, simpler ways to start a DM, sidebar reorganization and online members list (v0.2.0)
+- [x] Desktop auto-update via `electron-updater`, real app icon, hidden menu bar (v0.3.0)
+- [x] Desktop/Bearer-token polish: authenticated image loading, readable About modal, screen-share failure dialog (v0.3.1)
+- [ ] Code signing / notarization for desktop builds (see "Release and distribution gaps")
+
+The original product pass is delivered and released as v0.1.0 through
+v0.3.1 (see `CHANGELOG.md`). See "Next steps" under Handoff for what's
+next.
 
 ## Delivery notes
 
@@ -86,11 +95,33 @@ under Handoff for what's left, none of it blocking.
 
   The final whole-branch review (3 rounds, the last two using a live-rendered Chromium check against the actual CSS rather than trusting the diff) caught real defects the task-level reviews couldn't see: **a correctness bug** -- `signOut`'s new accent-reset call could reject (e.g. a network blip right after logout) and, uncaught, prevent the sign-out state transition entirely, stranding the UI on "signed-in" against an already-destroyed server session; fixed by making the reset best-effort (`try { await applyServerDefaultAccent(); } catch {}`) around only that call, never around `api.logout()` itself. **And two rounds of contrast bugs**, all invisible in a diff: the plan's "only change the background value" instruction left `color: #fff` hardcoded on 12 total brand-colored buttons/avatars across both this branch's own conversions and pre-existing phase-1 surfaces -- under the default `amber` preset that's ~1.7:1 contrast, not the ~4.6:1 Discord's fixed blurple gave for free. Fixed by pairing each with the existing `--brand-contrast` token (already used correctly elsewhere since phase 1), scoped per-selector (a bare class or the shared multi-button rule was sometimes out-specified by a sibling Cancel-button rule -- each fix had to be verified by an actual computed-style render, not just "the property is present in the CSS", after one first attempt silently lost a specificity fight and shipped unfixed). `.message-mention` and `.message-reactions button.active` similarly moved from `color: var(--brand)` on a `color-mix()`-tinted background (fails AA on magenta/ember-red, ~2.7:1) to a fixed `var(--text-strong)` foreground. **Take-away for any future CSS-token sweep in this codebase**: "swap the color value" is not verifiable by tests or diff review alone -- budget an actual rendered check (this review used a cached Playwright Chromium against a static harness of the real `index.css`, no dev server needed) against at least the default preset and one non-default preset, the same way this lot eventually did, from the start rather than after three review rounds.
 
-  One pre-existing, out-of-scope bug was found and deliberately left alone: `.admin-channel-actions`'s Cancel button (`ChannelSettingsModal.tsx`) has no `.profile-cancel` background override the way `.create-channel-form footer`'s does, so it renders with the accent background just like its sibling Save button -- present since before this branch, not part of its Global Constraints, worth a one-line fix (`.admin-channel-actions .profile-cancel { background: transparent; }`) next time that file is touched.
+  One pre-existing, out-of-scope bug was found and left for later: `.admin-channel-actions`'s Cancel button (`ChannelSettingsModal.tsx`) rendered with the accent background like its sibling Save button. Since fixed (`.admin-channel-actions .profile-cancel { background: transparent; }` in `web/src/index.css`).
 
   Final baseline: web 28 files / 212 tests passing, server 16 files / 131 tests passing, `tsc --noEmit` clean, production build clean, `grep -n "5865f2\|88 101 242\|949cf7" web/src/index.css` empty.
 
-Branch state (continued): `vocal-identity-phase2` was built on its own worktree/branch (`worktree-vocal-identity-phase2`, off `5be74f8`) as a 5-task plan (`docs/superpowers/plans/2026-08-12-vocal-identity-phase2.md`), executed via `superpowers:subagent-driven-development`. Task 3's dispatched fix subagent hit an account-wide session usage limit before making any change; the controller applied the reviewer-specified one-line fix directly instead, then dispatched a fresh re-review, which came back clean. The final whole-branch review ran 3 rounds (see `Delivered lots` above for what each round found and fixed) -- round 2 and 3 used an ad hoc live-rendered Chromium check (a cached Playwright binary, no dev server or MCP browser tool needed) against the actual `web/src/index.css`, which is what caught the contrast bugs a diff-only review couldn't see. All fixes landed as their own commits on the branch. Not yet merged to `main` as of this update -- proceeding to `superpowers:finishing-a-development-branch` next.
+Branch state (continued): `vocal-identity-phase2` was built on its own worktree/branch (`worktree-vocal-identity-phase2`, off `5be74f8`) as a 5-task plan (`docs/superpowers/plans/2026-08-12-vocal-identity-phase2.md`), executed via `superpowers:subagent-driven-development`. Task 3's dispatched fix subagent hit an account-wide session usage limit before making any change; the controller applied the reviewer-specified one-line fix directly instead, then dispatched a fresh re-review, which came back clean. The final whole-branch review ran 3 rounds (see `Delivered lots` above for what each round found and fixed) -- round 2 and 3 used an ad hoc live-rendered Chromium check (a cached Playwright binary, no dev server or MCP browser tool needed) against the actual `web/src/index.css`, which is what caught the contrast bugs a diff-only review couldn't see. All fixes landed as their own commits on the branch. Since merged to `main`.
+
+- `direct-messages` (v0.2.0): `server/migrations/020_conversations.sql` adds conversations (1:1 and group) next to server channels; the message store and realtime hub were generalized so channels and conversations share one code path (`server/src/routes/conversations.ts`), giving DMs full parity -- attachments, reactions, replies, edit/delete and search. The web client gains a conversations section in the sidebar and a one-click "Message" button on user profiles. Fixed along the way: an open DM was silently swapped for a channel when the channel list finished loading after the DM was already selected.
+
+- `desktop-client` (v0.2.0): an Electron shell (`desktop/`) around the built `web/` app, created because browser `getUserMedia` permission handling proved unreliable (Firefox in particular). The server gained Bearer-token auth and CORS for cross-origin clients (`ff78d09`), and the web app a configurable server base URL entered on first launch. Screen sharing goes through `setDisplayMediaRequestHandler` and auto-selects the primary screen (no picker yet). Windows installers build on a native Windows runner (`.github/workflows/desktop-windows.yml`).
+
+- `voice-quality-extras` (v0.2.0): RNNoise-based noise reduction, on by default, and an "Ultra" preset above "High" for microphone, webcam and screen share (`server/migrations/021_more_quality_presets.sql`; screen-share Ultra is 1440p60 at 12 Mb/s).
+
+- `release-pipeline` (v0.1.0, `e18d7b6`): version and changelog live at the repo root (`VERSION`, `CHANGELOG.md`). `pnpm release <version>` bumps the version, moves `[Unreleased]` notes under a dated heading, syncs `desktop/package.json` and tags `vX.Y.Z`; pushing the tag runs `.github/workflows/release.yml`, which builds Windows, Linux and macOS clients and publishes a GitHub Release using that version's changelog section (`scripts/changelog-section.mjs`). The macOS job is best-effort and does not block a release. The web app shows version information and an in-app changelog viewer.
+
+- `desktop-auto-update` (v0.3.0): `electron-updater` checks the GitHub Releases feed on startup and every 4 hours, downloads silently, and only installs after an explicit "Restart to update" click (notification or tray). `release.yml` publishes the `latest*.yml` feed metadata alongside the installers. Windows (NSIS) and the Linux AppImage update in place; `.deb` installs are deliberately excluded and must be reinstalled by hand; macOS checks run but cannot apply an update while the app is unsigned (see below). `electron-updater` is pinned, and unhandled download rejections plus `quitAndInstall` are guarded. The same release replaced the placeholder icon with the real brand mark and hid the default menu bar (Alt still reveals it).
+
+- `desktop-polish` (v0.3.1): fixes from a round of desktop feedback -- the About/changelog modal used undefined CSS tokens and rendered transparent; avatars and attachment images failed to load under Bearer-token auth, so they are now fetched with the token and rendered as blob URLs (cookie sessions keep plain `<img>`); the composer attach button became a paperclip; and desktop screen sharing with no available source (e.g. missing macOS Screen Recording permission) now shows an explanatory dialog instead of failing silently.
+
+## Release and distribution gaps
+
+These are known, accepted gaps in the current release setup, not regressions.
+
+- **Desktop builds are unsigned on every platform.** `release.yml` sets `CSC_IDENTITY_AUTO_DISCOVERY: false` and there is no Windows code-signing certificate or Apple Developer ID. Windows SmartScreen and macOS Gatekeeper both warn on first launch, which is a real barrier for non-technical users.
+- **macOS auto-update does not work.** Squirrel.Mac refuses to apply an update to an unsigned app, so macOS users see update checks run but must reinstall every release by hand. Fixing it needs an Apple Developer ID, signing plus notarization in the `build-mac` job, and a first signed release that users install manually once.
+- **macOS builds are unverified.** The `build-mac` job is best-effort (`continue-on-error`), and nobody on the project can test a macOS build by hand, so a broken `.dmg` could ship without anyone noticing.
+- **`.deb` installs never auto-update**, by design; Linux users who want updates should use the AppImage.
+- **No screen/window picker in the desktop client**: screen sharing always takes the primary screen.
 
 ## Security fixes
 
@@ -102,7 +133,7 @@ Branch state: `forms-ui-cleanup-palier1` was merged to `main` (fast-forward, `a0
 
 Branch state (continued): the screen-share fix was built on its own worktree/branch (`worktree-screen-share-audio-fix`), reviewed, tested, and merged (fast-forward, `d33e98f` → `ffd7a4c`) via `superpowers:finishing-a-development-branch`. `CreateChannelModal`'s migration (Palier 2b, partial) and the screen-share advanced audio quality mode were then both done directly on `main` in the primary checkout rather than their own worktree/branch -- a deviation from every other lot's process this pass -- because each followed directly from finishing the branch merges above, was small and mechanical, and was already covered by the same review discipline (tests, typecheck, build, live Playwright check) before being committed. `main` tip at the start of this branch: `7bbb844`, pushed to `origin/main`.
 
-Branch state (continued): `vocal-identity-phase1` was built on its own worktree/branch (`worktree-vocal-identity-phase1`, off `7bbb844`) as a 5-task plan (`docs`/`.superpowers/sdd/task-1..5-brief.md`): Task 1 (server migration + appearance routes), Task 2 (client theme foundation -- fonts, tokens, wordmark, accent resolution), Task 3 (apply identity to auth screens/sidebar/favicon), Task 4 (profile modal personal accent picker), Task 5 (admin panel appearance management), plus an ad hoc Task 6 live-verification pass that caught and fixed the auth-screen CSS gap described above. Each task's own review round is recorded in `.superpowers/sdd/progress.md` and the individual `task-N-report.md` files (kept in the worktree only, gitignored). Not yet merged to `main` as of this update -- the final whole-branch review's 6 required fixes (see `Delivered lots` above: the `data-accent` fallback, the hardcoded-blurple form primitives, this `ROADMAP.md` update, the missing `Inter/700` weight, the stale `theme-color`, and the invalid favicon `skewX`) were applied directly on this branch after that review, still pending merge.
+Branch state (continued): `vocal-identity-phase1` was built on its own worktree/branch (`worktree-vocal-identity-phase1`, off `7bbb844`) as a 5-task plan (`docs`/`.superpowers/sdd/task-1..5-brief.md`): Task 1 (server migration + appearance routes), Task 2 (client theme foundation -- fonts, tokens, wordmark, accent resolution), Task 3 (apply identity to auth screens/sidebar/favicon), Task 4 (profile modal personal accent picker), Task 5 (admin panel appearance management), plus an ad hoc Task 6 live-verification pass that caught and fixed the auth-screen CSS gap described above. Each task's own review round is recorded in `.superpowers/sdd/progress.md` and the individual `task-N-report.md` files (kept in the worktree only, gitignored). Not yet merged to `main` as of this update -- the final whole-branch review's 6 required fixes (see `Delivered lots` above: the `data-accent` fallback, the hardcoded-blurple form primitives, this `ROADMAP.md` update, the missing `Inter/700` weight, the stale `theme-color`, and the invalid favicon `skewX`) were applied directly on this branch after that review. Since merged to `main`, followed by phase 2.
 
 Last verified test baseline (on `worktree-vocal-identity-phase1`, after the final-review fix round):
 
@@ -118,12 +149,16 @@ Last verified test baseline (on `worktree-vocal-identity-phase1`, after the fina
 
 **Why chat messages use a cap instead of true virtualization** (don't re-attempt windowed rendering without reading this first): this test environment (jsdom) implements neither `Element.scrollTo`, `ResizeObserver`, nor a real layout engine (`getBoundingClientRect` always returns zeros). A virtualization library (evaluated: `react-window` v2, a very different and simpler API than v1) depends on all three to measure its container and rows. That means a windowed rewrite of `ChatView.tsx`'s message list could not be verified by any automated test here -- it would ship as a large rewrite of an always-on feature with no working safety net beyond "it typechecks." Asked the user directly; they chose the safer bound (see `chat-message-cap` above) over shipping that risk. If real virtualization is wanted later, it needs to happen where actual browser testing is possible (Playwright against a real browser engine, or manual verification), not here.
 
-All lots originally planned for this product pass are delivered. Nothing
-queued is blocking; pick based on what the user actually wants next.
+Since v0.1.0, work has landed directly on `main` and ships through tagged
+releases (see `release-pipeline` above). The branch-state notes above
+describe the earlier product pass and are kept for history.
 
-Next steps (none urgent, roughly in order of value):
+Next steps (re-ranked 2026-09-29, roughly in order of value):
 
-1. **TURN server + TLS hardening** -- still not configured anywhere (see README's "Known gaps"). Matters once real users are behind restrictive NATs.
-2. **Real E2E verification** -- a two-browser LiveKit join has only ever been checked manually/ad hoc in this project's history, never automated. Playwright against a real browser is also the only way to properly attempt chat-list virtualization later (see the jsdom limitation noted above).
-3. Server-side pagination was only done for `/api/admin/users` this pass -- check whether search results or other list endpoints have grown large enough on a real deployment to need the same treatment.
-4. **Forms UI cleanup: two low-priority deferred/YAGNI polish items** -- deliberately deferred until there is a concrete need: the harmless `className`-composition inconsistency across primitives, and speculative `ColorField` API parity (`error`/`hint`/`className`/extra-prop spreading) if a color field later needs validation or additional consumers.
+1. **TURN server + TLS hardening** -- still not configured anywhere (see README's "Known gaps"). Matters more now that the desktop client invites use outside the home network. Being worked on in the "Vocal next steps" project thread, which owns the README change.
+2. **Real E2E verification** -- a two-browser LiveKit join has only ever been checked manually. Now also covers DMs and the Bearer-token path the desktop client uses. Playwright against a real browser is also the only way to properly attempt chat-list virtualization later (see the jsdom limitation noted above). Being worked on in its own project thread.
+3. **Code signing and notarization** -- the largest distribution gap (see "Release and distribution gaps"). Windows signing removes the SmartScreen warning; an Apple Developer ID plus notarization unblocks macOS auto-update. Needs a certificate purchase decision from the project owner before any code work.
+4. **macOS build verification** -- make `build-mac` a required job once signing exists, or find someone who can smoke-test a `.dmg` each release.
+5. **Desktop screen/window picker** -- replace the primary-screen auto-select with a real source picker, matching what the browser offers.
+6. Server-side pagination was only done for `/api/admin/users` -- check whether search results, conversation lists or other list endpoints have grown large enough on a real deployment to need the same treatment.
+7. **Forms UI cleanup: two low-priority deferred/YAGNI polish items** -- the harmless `className`-composition inconsistency across primitives, and speculative `ColorField` API parity (`error`/`hint`/`className`/extra-prop spreading) if a color field later needs validation or additional consumers.
