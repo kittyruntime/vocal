@@ -1,0 +1,54 @@
+# Production LiveKit config for Vocal, with the built-in TURN server enabled.
+#
+# Pass it to the livekit container either by mounting it and running
+#   livekit-server --config /etc/livekit.yaml
+# or by pasting its contents into the LIVEKIT_CONFIG environment variable.
+# Replace every CHANGE_ME value; see README.md "TURN and TLS" for the ports
+# to open and how the TLS certificate gets here.
+
+port: 7880                      # signaling (HTTP/WebSocket); put this behind your TLS proxy as wss://
+bind_addresses: ["0.0.0.0"]
+
+keys:
+  # openssl rand -hex 16 / openssl rand -hex 32 -- must match the server's
+  # LIVEKIT_API_KEY / LIVEKIT_API_SECRET. Never use the dev pair (devkey/secret).
+  CHANGE_ME_API_KEY: CHANGE_ME_API_SECRET
+
+webhook:
+  api_key: CHANGE_ME_API_KEY
+  urls:
+    # Reaches the Vocal server over your internal network.
+    - http://server:3000/api/voice/webhook
+
+rtc:
+  tcp_port: 7881                # WebRTC over TCP fallback
+  udp_port: 7882                # WebRTC media, all participants multiplexed on one UDP port
+  # Advertise the host's public IP in ICE candidates (discovered via STUN).
+  # Required whenever LiveKit runs behind NAT or inside a container.
+  use_external_ip: true
+
+turn:
+  enabled: true
+  # Public DNS name for TURN. It needs its own A/AAAA record pointing at this
+  # host, and a TLS certificate valid for it.
+  domain: turn.CHANGE_ME.example.com
+  # TURN over TLS: the path that gets through corporate firewalls that only
+  # allow outbound 443. When LiveKit terminates TLS itself (option A below)
+  # LiveKit requires this to be 443, so nothing else on this host may listen
+  # on 443/tcp. Behind a layer-4 load balancer (option B) it can stay 5349.
+  tls_port: 443
+  # Plain TURN/UDP, for NATs that block direct UDP to 7882 but allow relaying.
+  udp_port: 3478
+  # Option A (default): LiveKit terminates TLS itself. Mount a certificate and
+  # key valid for `domain` (e.g. from certbot) and point these at them.
+  cert_file: /etc/livekit/turn.crt
+  key_file: /etc/livekit/turn.key
+  # Option B: a layer-4 (TCP) load balancer terminates TLS on 443 and forwards
+  # plain TCP to tls_port. Remove cert_file/key_file and set:
+  # external_tls: true
+  # If that load balancer hides the client's address, also enable
+  # proxy_protocol (see LiveKit's config-sample.yaml).
+  # Relay allocations use this UDP range; open it too. Each participant can
+  # hold up to 12 allocations, so size it to your peak relayed users.
+  relay_range_start: 30000
+  relay_range_end: 30999

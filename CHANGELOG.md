@@ -4,6 +4,10 @@ All notable changes to Vocal are documented here.
 
 ## [Unreleased]
 
+### Added
+- A production LiveKit config (`deploy/livekit.yaml`) with the built-in TURN server enabled, and README steps for TURN and TLS, so voice works for users behind restrictive NATs and corporate firewalls.
+- The server warns at startup when a production deployment uses a `ws://` or loopback `LIVEKIT_URL`, the LiveKit dev key pair, or `COOKIE_SECURE=false`.
+
 ## [0.3.1] - 2026-09-04
 
 ### Fixed
