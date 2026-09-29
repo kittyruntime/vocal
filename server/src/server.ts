@@ -1,6 +1,11 @@
 import { buildApp } from "./app.js";
 import { createPool } from "./db/pool.js";
 import { migrate } from "./db/migrate.js";
+import { productionConfigWarnings } from "./configWarnings.js";
+
+for (const warning of productionConfigWarnings(process.env)) {
+  console.warn(`[config] ${warning}`);
+}
 
 const pool = createPool();
 await migrate(pool);
