@@ -1,0 +1,63 @@
+name: E2E
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  two-browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: vocal
+          POSTGRES_PASSWORD: vocal
+          POSTGRES_DB: vocal
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U vocal"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      LIVEKIT_VERSION: 1.12.0
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # A native binary rather than a service container: LiveKit's webhook has
+      # to reach the API server on the runner's loopback, and media has to
+      # flow between it and the browsers there too.
+      - name: Install LiveKit server
+        run: |
+          curl -sSfL "https://github.com/livekit/livekit/releases/download/v${LIVEKIT_VERSION}/livekit_${LIVEKIT_VERSION}_linux_amd64.tar.gz" \
+            | sudo tar -xz -C /usr/local/bin livekit-server
+          livekit-server --version
+
+      - run: pnpm -C e2e exec playwright install --with-deps chromium
+
+      - run: pnpm -C e2e typecheck
+
+      - run: pnpm -C e2e test
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: |
+            e2e/playwright-report/
+            e2e/test-results/
+          retention-days: 7

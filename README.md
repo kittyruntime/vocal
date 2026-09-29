@@ -50,6 +50,25 @@ pnpm -C web test && pnpm -C web typecheck && pnpm -C web build
 Server tests need a running PostgreSQL (`docker-compose.dev.yml`); they
 create and drop a `vocal_test` database on each run.
 
+### End-to-end tests
+
+`e2e/` is a Playwright suite that drives two separate browsers against a real
+server and LiveKit: one sets up the server and creates a voice channel, the
+other registers, both join the call and hear each other, then they exchange a
+direct message. It runs in CI on every pull request (`.github/workflows/e2e.yml`).
+
+```bash
+docker compose -f docker-compose.dev.yml up -d postgres   # only postgres: the suite starts its own LiveKit
+pnpm -C e2e exec playwright install chromium               # once
+pnpm -C e2e test
+```
+
+It needs a [`livekit-server`](https://github.com/livekit/livekit/releases)
+binary on `PATH` (or `E2E_LIVEKIT_BIN=/path/to/livekit-server`) and ports
+3000, 5173 and 7880-7882 free, so stop the dev servers and the dev LiveKit
+container first. The suite recreates a `vocal_e2e` database on each run
+(override with `E2E_DATABASE_URL`) and never touches the dev database.
+
 ## Environment variables
 
 Set on the `server` process (see `.env.example`):
