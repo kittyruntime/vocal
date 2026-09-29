@@ -8,3 +8,5 @@ desktop/web-dist/
 desktop/release/
 .worktrees/
 feedback.md
+e2e/test-results/
+e2e/playwright-report/

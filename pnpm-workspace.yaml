@@ -2,6 +2,7 @@ packages:
   - server
   - web
   - desktop
+  - e2e
 
 onlyBuiltDependencies:
   - argon2

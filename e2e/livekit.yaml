@@ -1,0 +1,16 @@
+# LiveKit config for the E2E suite: dev keys, everything on loopback, and the
+# participant webhook pointed at the API server started by playwright.config.ts
+# (voice presence in the sidebar is driven entirely by that webhook).
+port: 7880
+bind_addresses: ["127.0.0.1"]
+rtc:
+  tcp_port: 7881
+  udp_port: 7882
+  use_external_ip: false
+  node_ip: 127.0.0.1
+keys:
+  devkey: e2e-only-livekit-secret-0123456789abcdef
+webhook:
+  api_key: devkey
+  urls:
+    - http://127.0.0.1:3000/api/voice/webhook
